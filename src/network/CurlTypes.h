@@ -61,7 +61,7 @@ namespace TUI::Network::Http::CurlTypes
             return value;
         }
 
-        void SetBody(std::string body);
+        void SetBody(const std::string& body);
         void SetHeaders(const std::map<std::string, std::string>& headers);
     private:
         CURL* _curl{nullptr};

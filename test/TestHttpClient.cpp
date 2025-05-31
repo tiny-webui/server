@@ -45,7 +45,8 @@ JS::Promise<void> TestPostAsync(std::shared_ptr<Http::Client> client)
         .body = R"({"key": "value"})"
     };
     auto response = co_await client->MakeRequestAsync(Http::Method::POST, requestData);
-    std::cout << "Response: " << std::endl << response << std::endl;
+    std::cout << "Response: " << std::endl << response;
+    std::cout << std::endl;
 }
 
 JS::Promise<void> TestCancelImmediatelyAsync(std::shared_ptr<Http::Client> client)
@@ -93,6 +94,59 @@ JS::Promise<void> TestCancelAsync(std::shared_ptr<Http::Client> client)
     }
 }
 
+JS::Promise<void> TestStreamAsync(std::shared_ptr<Http::Client> client)
+{
+    auto requestData = Http::RequestData{
+        .url = "https://httpbin.org/stream/5",
+        .headers = {{"X-Test-Header", "hello from tui"}},
+        .body = ""
+    };
+    auto streamRequest = client->MakeStreamRequest(Http::Method::GET, requestData);
+    
+    while(true)
+    {
+        auto next = co_await streamRequest.NextAsync();
+        if (!next.has_value())
+        {
+            break;
+        }
+        std::cout << "Streamed data: " << std::endl << *next;
+    }
+    std::cout << "Stream completed." << std::endl;
+}
+
+JS::Promise<void> TestStreamCancelAsync(std::shared_ptr<Http::Client> client)
+{
+    auto requestData = Http::RequestData{
+        .url = "https://httpbin.org/stream/5",
+        .headers = {{"X-Test-Header", "hello from tui"}},
+        .body = ""
+    };
+    auto streamRequest = client->MakeStreamRequest(Http::Method::GET, requestData);
+    
+    // Cancel the stream after a short delay
+    co_await DelayAsync(10);
+    client->CancelRequest(streamRequest);
+
+    try
+    {
+        while (true)
+        {
+            auto next = co_await streamRequest.NextAsync();
+            if (!next.has_value())
+            {
+                break;
+            }
+            std::cout << "Streamed data: " << std::endl << *next;
+        }
+        std::cout << "Stream completed." << std::endl;
+    }
+    catch (const Http::Client::RequestCancelledException&)
+    {
+        std::cout << "Stream was cancelled successfully." << std::endl;
+    }
+}
+
 #define RunAsyncTest(testFunc, client) \
     do \
     { \
@@ -119,6 +173,8 @@ JS::Promise<void> TestAsync()
     RunAsyncTest(TestPostAsync, client);
     RunAsyncTest(TestCancelImmediatelyAsync, client);
     RunAsyncTest(TestCancelAsync, client);
+    RunAsyncTest(TestStreamAsync, client);
+    RunAsyncTest(TestStreamCancelAsync, client);
 }
 
 int main(int argc, char const *argv[])

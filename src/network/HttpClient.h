@@ -49,18 +49,25 @@ namespace TUI::Network::Http
         static size_t CurlWriteFunction(char* ptr, size_t size, size_t nmemb, void* userdata) noexcept;
     };
 
-    // class StreamRequest
-    // {
-    //     friend class Client;
-    // public:
-    //     ~StreamRequest();
+    class StreamRequest
+    {
+        friend class Client;
+    public:
+        StreamRequest() = default;
+        ~StreamRequest() = default;
 
-    //     JS::Promise<std::string> NextAsync();
-    // private:
-    //     JS::AsyncGenerator<std::string> _generator;
+        JS::Promise<std::optional<std::string>> NextAsync();
+    private:
+        struct State
+        {
+            JS::AsyncGenerator<std::string> generator{};
+            std::weak_ptr<CurlTypes::Curl> curl{};
+        };
 
-    //     StreamRequest();
-    // };
+        std::shared_ptr<State> _state{std::make_shared<State>()};
+
+        static size_t CurlWriteFunction(char* ptr, size_t size, size_t nmemb, void* userdata) noexcept;
+    };
 
     class Client : public std::enable_shared_from_this<Client>
     {
@@ -71,19 +78,15 @@ namespace TUI::Network::Http
 
         static std::shared_ptr<Client> Create(Tev& tev);
         ~Client();
-
         Client(const Client&) = delete;
         Client& operator=(const Client&) = delete;
         Client(Client&&) = delete;
         Client& operator=(Client&&) = delete;
 
         Request MakeRequestAsync(Method method, const RequestData& data);
-
-        // StreamRequest MakeStreamRequest(Method method, const RequestData& data);
-
+        StreamRequest MakeStreamRequest(Method method, const RequestData& data);
         void CancelRequest(Request& request);
-
-        // void CancelRequest(StreamRequest& request);
+        void CancelRequest(StreamRequest& request);
     private:
         Tev& _tev;
         CurlTypes::CurlEnv _curlEnv{};
@@ -95,6 +98,7 @@ namespace TUI::Network::Http
          * Use CURL* as the key since the C callback uses this to identify the request.
          */
         std::map<CURL*, std::pair<std::shared_ptr<CurlTypes::Curl>, Request>> _requests{};
+        std::map<CURL*, std::pair<std::shared_ptr<CurlTypes::Curl>, StreamRequest>> _streamRequests{};
 
         Client(Tev& tev);
         static int CurlSocketFunction(CURL* easy, curl_socket_t s, int what, void* clientp, void* socketp) noexcept;

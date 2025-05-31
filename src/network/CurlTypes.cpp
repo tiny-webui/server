@@ -70,10 +70,10 @@ CURL* Curl::Get() const
     return _curl;
 }
 
-void Curl::SetBody(std::string body)
+void Curl::SetBody(const std::string& body)
 {
     /** Keep body alive during the request */
-    _body = std::move(body);
+    _body = body;
     SetOpt(CURLOPT_POSTFIELDS, _body.c_str());
 }
 

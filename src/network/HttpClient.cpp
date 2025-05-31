@@ -37,6 +37,29 @@ extern "C" size_t Http::Request::CurlWriteFunction(char* ptr, size_t size, size_
     }
 }
 
+/** Stream request */
+
+JS::Promise<std::optional<std::string>> Http::StreamRequest::NextAsync()
+{
+    return _state->generator.NextAsync();
+}
+
+extern "C" size_t Http::StreamRequest::CurlWriteFunction(char* ptr, size_t size, size_t nmemb, void* userdata) noexcept
+{
+    try
+    {
+        auto state = static_cast<Http::StreamRequest::State*>(userdata);
+        size_t total_size = size * nmemb;
+        state->generator.Feed(std::string(ptr, total_size));
+        return total_size;
+    }
+    catch(...)
+    {
+        /** @todo log */
+        return CURLE_WRITE_ERROR;
+    }
+}
+
 /** Client */
 
 std::shared_ptr<Http::Client> Http::Client::Create(Tev& tev)
@@ -99,6 +122,47 @@ void Http::Client::CancelRequest(Http::Request& request)
     _curlm->RemoveCurl(*item->second.first);
     _requests.erase(item);
     request._state->promise.Reject(std::make_exception_ptr(RequestCancelledException()));
+}
+
+Http::StreamRequest Http::Client::MakeStreamRequest(Http::Method method, const Http::RequestData& data)
+{
+    Http::StreamRequest request{};
+    auto curl = std::make_shared<Curl>();
+    curl->SetOpt(CURLOPT_URL, data.url.c_str());
+    if (method == Http::Method::POST)
+    {
+        curl->SetOpt(CURLOPT_POST, 1L);
+        curl->SetBody(data.body);
+    }
+    curl->SetHeaders(data.headers);
+    /** @todo set more request options */
+    /** Write directly to request._state's raw pointer */
+    curl->SetOpt(CURLOPT_WRITEDATA, request._state.get());
+    curl->SetOpt(CURLOPT_WRITEFUNCTION, &StreamRequest::CurlWriteFunction);
+
+    request._state->curl = curl;
+    _curlm->AddCurl(*curl);
+    _streamRequests[curl->Get()] = {curl, request};
+    return request;
+}
+
+void Http::Client::CancelRequest(Http::StreamRequest& request)
+{
+    auto curl = request._state->curl.lock();
+    if (!curl)
+    {
+        /** Request is invalid */
+        return;
+    }
+    auto item = _streamRequests.find(curl->Get());
+    if (item == _streamRequests.end())
+    {
+        request._state->generator.Reject("Request not found");
+        return;
+    }
+    _curlm->RemoveCurl(*item->second.first);
+    _streamRequests.erase(item);
+    request._state->generator.Reject(std::make_exception_ptr(RequestCancelledException()));
 }
 
 extern "C" int Http::Client::CurlSocketFunction(CURL*, curl_socket_t s, int what, void* clientp, void*) noexcept
@@ -178,32 +242,57 @@ void Http::Client::SocketActionHandler(int fd, int events)
         switch (msg->msg)
         {
         case CURLMSG_DONE: {
-            /** Find the Curl and request first */
-            auto item = _requests.find(msg->easy_handle);
-            if (item == _requests.end())
             {
-                /** Wild CURL*, manage it with a temporary Curl */
-                Curl curl(msg->easy_handle);
-                _curlm->RemoveCurl(curl);
-                break;
+                /** Find the Curl and request first */
+                auto item = _requests.find(msg->easy_handle);
+                if (item != _requests.end())
+                {
+                    auto [curl, request] = std::move(item->second);
+                    _requests.erase(item);
+                    _curlm->RemoveCurl(*curl);
+                    if (msg->data.result != CURLE_OK)
+                    {
+                        
+                        request._state->promise.Reject(std::string(curl_easy_strerror(msg->data.result)));
+                        break;
+                    }
+                    /** Get the http code */
+                    auto httpCode = curl->GetInfo<CURLINFO_HTTP_CODE>();
+                    if (httpCode < 200 || httpCode >= 300)
+                    {
+                        request._state->promise.Reject("HTTP error: " + std::to_string(httpCode));
+                        break;
+                    }
+                    request._state->promise.Resolve(std::move(request._state->response));
+                    break;
+                }
             }
-            auto [curl, request] = std::move(item->second);
-            _requests.erase(item);
-            _curlm->RemoveCurl(*curl);
-            if (msg->data.result != CURLE_OK)
             {
-                
-                request._state->promise.Reject(std::string(curl_easy_strerror(msg->data.result)));
-                break;
+                auto item = _streamRequests.find(msg->easy_handle);
+                if (item != _streamRequests.end())
+                {
+                    auto [curl, streamRequest] = std::move(item->second);
+                    _streamRequests.erase(item);
+                    _curlm->RemoveCurl(*curl);
+                    if (msg->data.result != CURLE_OK)
+                    {
+                        streamRequest._state->generator.Reject(std::string(curl_easy_strerror(msg->data.result)));
+                        break;
+                    }
+                    /** Get the http code */
+                    auto httpCode = curl->GetInfo<CURLINFO_HTTP_CODE>();
+                    if (httpCode < 200 || httpCode >= 300)
+                    {
+                        streamRequest._state->generator.Reject("HTTP error: " + std::to_string(httpCode));
+                        break;
+                    }
+                    streamRequest._state->generator.Finish();
+                    break;
+                }
             }
-            /** Get the http code */
-            auto httpCode = curl->GetInfo<CURLINFO_HTTP_CODE>();
-            if (httpCode < 200 || httpCode >= 300)
-            {
-                request._state->promise.Reject("HTTP error: " + std::to_string(httpCode));
-                break;
-            }
-            request._state->promise.Resolve(std::move(request._state->response));
+            /** Wild CURL*, manage it with a temporary Curl */
+            Curl curl(msg->easy_handle);
+            _curlm->RemoveCurl(curl);
         } break;
         default:
             break;
