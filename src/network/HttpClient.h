@@ -65,6 +65,10 @@ namespace TUI::Network::Http
     class Client : public std::enable_shared_from_this<Client>
     {
     public:
+        class RequestCancelledException : public std::exception
+        {
+        };
+
         static std::shared_ptr<Client> Create(Tev& tev);
         ~Client();
 
@@ -77,7 +81,7 @@ namespace TUI::Network::Http
 
         // StreamRequest MakeStreamRequest(Method method, const RequestData& data);
 
-        // void CancelRequest(Request& request);
+        void CancelRequest(Request& request);
 
         // void CancelRequest(StreamRequest& request);
     private:

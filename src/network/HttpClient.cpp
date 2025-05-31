@@ -4,51 +4,7 @@
 using namespace TUI::Network;
 using namespace TUI::Network::Http::CurlTypes;
 
-std::shared_ptr<Http::Client> Http::Client::Create(Tev& tev)
-{
-    /** The constructor is invisible to std::make_shared */
-    return std::shared_ptr<Http::Client>(new Client(tev));
-}
-
-Http::Client::Client(Tev& tev)
-    : _tev(tev)
-{
-    _curlm = std::make_unique<CurlM>();
-    _curlm->SetOpt(CURLMOPT_SOCKETDATA, static_cast<void*>(this));
-    _curlm->SetOpt(CURLMOPT_SOCKETFUNCTION, &Client::CurlSocketFunction);
-    _curlm->SetOpt(CURLMOPT_TIMERDATA, static_cast<void*>(this));
-    _curlm->SetOpt(CURLMOPT_TIMERFUNCTION, &Client::CurlTimeoutFunction);
-}
-
-Http::Client::~Client()
-{
-    _tev.ClearTimeout(_curlTimeoutHandle);
-}
-
-Http::Request Http::Client::MakeRequestAsync(Http::Method method, const Http::RequestData& data)
-{
-    (void)method;
-    (void)data;
-
-    Http::Request request{};
-    auto curl = std::make_shared<Curl>();
-    curl->SetOpt(CURLOPT_URL, data.url.c_str());
-    if (method == Http::Method::POST)
-    {
-        curl->SetOpt(CURLOPT_POST, 1L);
-        curl->SetBody(data.body);
-    }
-    curl->SetHeaders(data.headers);
-    /** @todo set more request options */
-    /** Write directly to request._state's raw pointer */
-    curl->SetOpt(CURLOPT_WRITEDATA, request._state.get());
-    curl->SetOpt(CURLOPT_WRITEFUNCTION, &Request::CurlWriteFunction);
-
-    request._state->curl = curl;
-    _curlm->AddCurl(*curl);
-    _requests[curl->Get()] = {curl, request};
-    return request;
-}
+/** Request */
 
 bool Http::Request::await_ready() const
 {
@@ -79,6 +35,70 @@ extern "C" size_t Http::Request::CurlWriteFunction(char* ptr, size_t size, size_
         /** @todo log */
         return CURLE_WRITE_ERROR;
     }
+}
+
+/** Client */
+
+std::shared_ptr<Http::Client> Http::Client::Create(Tev& tev)
+{
+    /** The constructor is invisible to std::make_shared */
+    return std::shared_ptr<Http::Client>(new Client(tev));
+}
+
+Http::Client::Client(Tev& tev)
+    : _tev(tev)
+{
+    _curlm = std::make_unique<CurlM>();
+    _curlm->SetOpt(CURLMOPT_SOCKETDATA, static_cast<void*>(this));
+    _curlm->SetOpt(CURLMOPT_SOCKETFUNCTION, &Client::CurlSocketFunction);
+    _curlm->SetOpt(CURLMOPT_TIMERDATA, static_cast<void*>(this));
+    _curlm->SetOpt(CURLMOPT_TIMERFUNCTION, &Client::CurlTimeoutFunction);
+}
+
+Http::Client::~Client()
+{
+    _tev.ClearTimeout(_curlTimeoutHandle);
+}
+
+Http::Request Http::Client::MakeRequestAsync(Http::Method method, const Http::RequestData& data)
+{
+    Http::Request request{};
+    auto curl = std::make_shared<Curl>();
+    curl->SetOpt(CURLOPT_URL, data.url.c_str());
+    if (method == Http::Method::POST)
+    {
+        curl->SetOpt(CURLOPT_POST, 1L);
+        curl->SetBody(data.body);
+    }
+    curl->SetHeaders(data.headers);
+    /** @todo set more request options */
+    /** Write directly to request._state's raw pointer */
+    curl->SetOpt(CURLOPT_WRITEDATA, request._state.get());
+    curl->SetOpt(CURLOPT_WRITEFUNCTION, &Request::CurlWriteFunction);
+
+    request._state->curl = curl;
+    _curlm->AddCurl(*curl);
+    _requests[curl->Get()] = {curl, request};
+    return request;
+}
+
+void Http::Client::CancelRequest(Http::Request& request)
+{
+    auto curl = request._state->curl.lock();
+    if (!curl)
+    {
+        /** Request is invalid */
+        return;
+    }
+    auto item = _requests.find(curl->Get());
+    if (item == _requests.end())
+    {
+        request._state->promise.Reject("Request not found");
+        return;
+    }
+    _curlm->RemoveCurl(*item->second.first);
+    _requests.erase(item);
+    request._state->promise.Reject(std::make_exception_ptr(RequestCancelledException()));
 }
 
 extern "C" int Http::Client::CurlSocketFunction(CURL*, curl_socket_t s, int what, void* clientp, void*) noexcept
