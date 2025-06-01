@@ -15,6 +15,11 @@ namespace TUI::Network::Http::CurlTypes
     public:
         CurlEnv();
         ~CurlEnv();
+
+        CurlEnv(const CurlEnv&) = delete;
+        CurlEnv& operator=(const CurlEnv&) = delete;
+        CurlEnv(CurlEnv&&) = delete;
+        CurlEnv& operator=(CurlEnv&&) = delete;
     };
 
     class CurlSList
@@ -22,6 +27,11 @@ namespace TUI::Network::Http::CurlTypes
     public:
         CurlSList() = default;
         ~CurlSList();
+        CurlSList(const CurlSList&) = delete;
+        CurlSList& operator=(const CurlSList&) = delete;
+        CurlSList(CurlSList&& other) noexcept;
+        CurlSList& operator=(CurlSList&& other) noexcept;
+
         void Append(const std::string& data);
         struct curl_slist* Get() const;
     private:
@@ -34,6 +44,11 @@ namespace TUI::Network::Http::CurlTypes
         Curl();
         Curl(CURL* curl);
         ~Curl();
+        Curl(const Curl&) = delete;
+        Curl& operator=(const Curl&) = delete;
+        Curl(Curl&& other) noexcept;
+        Curl& operator=(Curl&& other) noexcept;
+
         CURL* Get() const;
 
         template<typename... Args>
@@ -74,6 +89,11 @@ namespace TUI::Network::Http::CurlTypes
     public:
         CurlM();
         ~CurlM();
+        CurlM(const CurlM&) = delete;
+        CurlM& operator=(const CurlM&) = delete;
+        CurlM(CurlM&& other) noexcept;
+        CurlM& operator=(CurlM&& other) noexcept;
+
         CURLM* Get() const;
 
         template<typename... Args>

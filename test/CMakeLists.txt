@@ -31,3 +31,17 @@ target_link_libraries(TestHttpClient
     PRIVATE
         curl
         tev-cpp)
+
+add_executable(TestWebSocketServer
+    TestWebSocketServer.cpp
+    ../src/network/LwsTypes.cpp
+    ../src/network/WebSocketServer.cpp)
+
+target_include_directories(TestWebSocketServer
+    PRIVATE
+        ../src)
+
+target_link_libraries(TestWebSocketServer
+    PRIVATE
+        tev-cpp
+        websockets)

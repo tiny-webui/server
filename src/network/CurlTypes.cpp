@@ -24,6 +24,26 @@ CurlSList::~CurlSList()
     }
 }
 
+CurlSList::CurlSList(CurlSList&& other) noexcept
+    : _slist(other._slist)
+{
+    other._slist = nullptr;
+}
+
+CurlSList& CurlSList::operator=(CurlSList&& other) noexcept
+{
+    if (this != &other)
+    {
+        if (_slist)
+        {
+            curl_slist_free_all(_slist);
+        }
+        _slist = other._slist;
+        other._slist = nullptr;
+    }
+    return *this;
+}
+
 void CurlSList::Append(const std::string& data)
 {
     auto new_slist = curl_slist_append(_slist, data.c_str());
@@ -63,6 +83,28 @@ Curl::~Curl()
     {
         curl_easy_cleanup(_curl);
     }
+}
+
+Curl::Curl(Curl&& other) noexcept
+    : _curl(other._curl), _body(std::move(other._body)), _headers(std::move(other._headers))
+{
+    other._curl = nullptr;
+}
+
+Curl& Curl::operator=(Curl&& other) noexcept
+{
+    if (this != &other)
+    {
+        if (_curl)
+        {
+            curl_easy_cleanup(_curl);
+        }
+        _curl = other._curl;
+        _body = std::move(other._body);
+        _headers = std::move(other._headers);
+        other._curl = nullptr;
+    }
+    return *this;
 }
 
 CURL* Curl::Get() const
@@ -112,6 +154,26 @@ CurlM::~CurlM()
     {
         curl_multi_cleanup(_curlm);
     }
+}
+
+CurlM::CurlM(CurlM&& other) noexcept
+    : _curlm(other._curlm)
+{
+    other._curlm = nullptr;
+}
+
+CurlM& CurlM::operator=(CurlM&& other) noexcept
+{
+    if (this != &other)
+    {
+        if (_curlm)
+        {
+            curl_multi_cleanup(_curlm);
+        }
+        _curlm = other._curlm;
+        other._curlm = nullptr;
+    }
+    return *this;
 }
 
 CURLM* CurlM::Get() const
