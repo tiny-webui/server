@@ -45,3 +45,18 @@ target_link_libraries(TestWebSocketServer
     PRIVATE
         tev-cpp
         websockets)
+
+add_executable(TestHttpStreamResponseParser
+    TestHttpStreamResponseParser.cpp
+    ../src/network/HttpStreamResponseParser.cpp)
+
+target_include_directories(TestHttpStreamResponseParser
+    PRIVATE
+        ../src)
+
+add_executable(TestApiProviderOption
+    TestApiProviderOption.cpp)
+
+target_include_directories(TestApiProviderOption
+    PRIVATE
+        ../src)
