@@ -5,28 +5,34 @@
  * Options other than image_url is also removed in the image_url type.
  */
 
+type DeveloperMessageContent = {
+    type: 'text';
+    data: string;
+};
+
 type DeveloperMessage = {
     role: 'developer';
-    content: Array<{
-        type: 'text';
-        data: string;
-    }>;
+    content: Array<DeveloperMessageContent>;
 };
+
+type UserMessageContent = {
+    type: 'text' | 'image_url';
+    data: string;
+}
 
 type UserMessage = {
     role: 'user';
-    content: Array<{
-        type: 'text' | 'image_url';
-        data: string;
-    }>;
+    content: Array<UserMessageContent>;
 };
+
+type AssistantMessageContent = {
+    type: 'text' | 'refusal';
+    data: string;
+}
 
 type AssistantMessage = {
     role: 'assistant';
-    content: Array<{
-        type: 'text' | 'refusal';
-        data: string;
-    }>;
+    content: Array<AssistantMessageContent>;
 }
 
 type Message = DeveloperMessage | UserMessage | AssistantMessage;

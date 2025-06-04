@@ -4,8 +4,11 @@
 //
 //  Then include this file, and then do
 //
+//     DeveloperMessageContent data = nlohmann::json::parse(jsonString);
 //     DeveloperMessage data = nlohmann::json::parse(jsonString);
+//     UserMessageContent data = nlohmann::json::parse(jsonString);
 //     UserMessage data = nlohmann::json::parse(jsonString);
+//     AssistantMessageContent data = nlohmann::json::parse(jsonString);
 //     AssistantMessage data = nlohmann::json::parse(jsonString);
 //     Message data = nlohmann::json::parse(jsonString);
 //     ChatHistory data = nlohmann::json::parse(jsonString);
@@ -20,11 +23,11 @@
 
 namespace TUI {
 namespace Schema {
-namespace ChatHistory {
+namespace Chat {
     using nlohmann::json;
 
-    #ifndef NLOHMANN_UNTYPED_TUI_Schema_ChatHistory_HELPER
-    #define NLOHMANN_UNTYPED_TUI_Schema_ChatHistory_HELPER
+    #ifndef NLOHMANN_UNTYPED_TUI_Schema_Chat_HELPER
+    #define NLOHMANN_UNTYPED_TUI_Schema_Chat_HELPER
     inline json get_untyped(const json & j, const char * property) {
         if (j.find(property) != j.end()) {
             return j.at(property).get<json>();
@@ -37,12 +40,213 @@ namespace ChatHistory {
     }
     #endif
 
-    enum class PurpleType : int { TEXT };
+    enum class DeveloperMessageContentType : int { TEXT };
 
+    /**
+     * The format is based on OpenAI's chat completions but with several simplifications.
+     * Namely, all data fields are called data instead of text/image_url/refusal as the type
+     * already indicates the type of the data.
+     * Options other than image_url is also removed in the image_url type.
+     */
     class DeveloperMessageContent {
         public:
         DeveloperMessageContent() = default;
         virtual ~DeveloperMessageContent() = default;
+
+        private:
+        std::string data;
+        DeveloperMessageContentType type;
+
+        public:
+        const std::string & get_data() const { return data; }
+        std::string & get_mutable_data() { return data; }
+        void set_data(const std::string & value) { this->data = value; }
+
+        const DeveloperMessageContentType & get_type() const { return type; }
+        DeveloperMessageContentType & get_mutable_type() { return type; }
+        void set_type(const DeveloperMessageContentType & value) { this->type = value; }
+    };
+
+    /**
+     * The format is based on OpenAI's chat completions but with several simplifications.
+     * Namely, all data fields are called data instead of text/image_url/refusal as the type
+     * already indicates the type of the data.
+     * Options other than image_url is also removed in the image_url type.
+     */
+    class DeveloperMessageContentClass {
+        public:
+        DeveloperMessageContentClass() = default;
+        virtual ~DeveloperMessageContentClass() = default;
+
+        private:
+        std::string data;
+        DeveloperMessageContentType type;
+
+        public:
+        const std::string & get_data() const { return data; }
+        std::string & get_mutable_data() { return data; }
+        void set_data(const std::string & value) { this->data = value; }
+
+        const DeveloperMessageContentType & get_type() const { return type; }
+        DeveloperMessageContentType & get_mutable_type() { return type; }
+        void set_type(const DeveloperMessageContentType & value) { this->type = value; }
+    };
+
+    enum class DeveloperMessageRole : int { DEVELOPER };
+
+    class DeveloperMessage {
+        public:
+        DeveloperMessage() = default;
+        virtual ~DeveloperMessage() = default;
+
+        private:
+        std::vector<DeveloperMessageContentClass> content;
+        DeveloperMessageRole role;
+
+        public:
+        const std::vector<DeveloperMessageContentClass> & get_content() const { return content; }
+        std::vector<DeveloperMessageContentClass> & get_mutable_content() { return content; }
+        void set_content(const std::vector<DeveloperMessageContentClass> & value) { this->content = value; }
+
+        const DeveloperMessageRole & get_role() const { return role; }
+        DeveloperMessageRole & get_mutable_role() { return role; }
+        void set_role(const DeveloperMessageRole & value) { this->role = value; }
+    };
+
+    enum class UserMessageContentType : int { IMAGE_URL, TEXT };
+
+    class UserMessageContent {
+        public:
+        UserMessageContent() = default;
+        virtual ~UserMessageContent() = default;
+
+        private:
+        std::string data;
+        UserMessageContentType type;
+
+        public:
+        const std::string & get_data() const { return data; }
+        std::string & get_mutable_data() { return data; }
+        void set_data(const std::string & value) { this->data = value; }
+
+        const UserMessageContentType & get_type() const { return type; }
+        UserMessageContentType & get_mutable_type() { return type; }
+        void set_type(const UserMessageContentType & value) { this->type = value; }
+    };
+
+    class UserMessageContentClass {
+        public:
+        UserMessageContentClass() = default;
+        virtual ~UserMessageContentClass() = default;
+
+        private:
+        std::string data;
+        UserMessageContentType type;
+
+        public:
+        const std::string & get_data() const { return data; }
+        std::string & get_mutable_data() { return data; }
+        void set_data(const std::string & value) { this->data = value; }
+
+        const UserMessageContentType & get_type() const { return type; }
+        UserMessageContentType & get_mutable_type() { return type; }
+        void set_type(const UserMessageContentType & value) { this->type = value; }
+    };
+
+    enum class UserMessageRole : int { USER };
+
+    class UserMessage {
+        public:
+        UserMessage() = default;
+        virtual ~UserMessage() = default;
+
+        private:
+        std::vector<UserMessageContentClass> content;
+        UserMessageRole role;
+
+        public:
+        const std::vector<UserMessageContentClass> & get_content() const { return content; }
+        std::vector<UserMessageContentClass> & get_mutable_content() { return content; }
+        void set_content(const std::vector<UserMessageContentClass> & value) { this->content = value; }
+
+        const UserMessageRole & get_role() const { return role; }
+        UserMessageRole & get_mutable_role() { return role; }
+        void set_role(const UserMessageRole & value) { this->role = value; }
+    };
+
+    enum class AssistantMessageContentType : int { REFUSAL, TEXT };
+
+    class AssistantMessageContent {
+        public:
+        AssistantMessageContent() = default;
+        virtual ~AssistantMessageContent() = default;
+
+        private:
+        std::string data;
+        AssistantMessageContentType type;
+
+        public:
+        const std::string & get_data() const { return data; }
+        std::string & get_mutable_data() { return data; }
+        void set_data(const std::string & value) { this->data = value; }
+
+        const AssistantMessageContentType & get_type() const { return type; }
+        AssistantMessageContentType & get_mutable_type() { return type; }
+        void set_type(const AssistantMessageContentType & value) { this->type = value; }
+    };
+
+    class AssistantMessageContentClass {
+        public:
+        AssistantMessageContentClass() = default;
+        virtual ~AssistantMessageContentClass() = default;
+
+        private:
+        std::string data;
+        AssistantMessageContentType type;
+
+        public:
+        const std::string & get_data() const { return data; }
+        std::string & get_mutable_data() { return data; }
+        void set_data(const std::string & value) { this->data = value; }
+
+        const AssistantMessageContentType & get_type() const { return type; }
+        AssistantMessageContentType & get_mutable_type() { return type; }
+        void set_type(const AssistantMessageContentType & value) { this->type = value; }
+    };
+
+    enum class AssistantMessageRole : int { ASSISTANT };
+
+    class AssistantMessage {
+        public:
+        AssistantMessage() = default;
+        virtual ~AssistantMessage() = default;
+
+        private:
+        std::vector<AssistantMessageContentClass> content;
+        AssistantMessageRole role;
+
+        public:
+        const std::vector<AssistantMessageContentClass> & get_content() const { return content; }
+        std::vector<AssistantMessageContentClass> & get_mutable_content() { return content; }
+        void set_content(const std::vector<AssistantMessageContentClass> & value) { this->content = value; }
+
+        const AssistantMessageRole & get_role() const { return role; }
+        AssistantMessageRole & get_mutable_role() { return role; }
+        void set_role(const AssistantMessageRole & value) { this->role = value; }
+    };
+
+    enum class PurpleType : int { IMAGE_URL, REFUSAL, TEXT };
+
+    /**
+     * The format is based on OpenAI's chat completions but with several simplifications.
+     * Namely, all data fields are called data instead of text/image_url/refusal as the type
+     * already indicates the type of the data.
+     * Options other than image_url is also removed in the image_url type.
+     */
+    class MessageContent {
+        public:
+        MessageContent() = default;
+        virtual ~MessageContent() = default;
 
         private:
         std::string data;
@@ -58,146 +262,8 @@ namespace ChatHistory {
         void set_type(const PurpleType & value) { this->type = value; }
     };
 
-    enum class DeveloperMessageRole : int { DEVELOPER };
-
-    /**
-     * The format is based on OpenAI's chat completions but with several simplifications.
-     * Namely, all data fields are called data instead of text/image_url/refusal as the type
-     * already indicates the type of the data.
-     * Options other than image_url is also removed in the image_url type.
-     */
-    class DeveloperMessage {
-        public:
-        DeveloperMessage() = default;
-        virtual ~DeveloperMessage() = default;
-
-        private:
-        std::vector<DeveloperMessageContent> content;
-        DeveloperMessageRole role;
-
-        public:
-        const std::vector<DeveloperMessageContent> & get_content() const { return content; }
-        std::vector<DeveloperMessageContent> & get_mutable_content() { return content; }
-        void set_content(const std::vector<DeveloperMessageContent> & value) { this->content = value; }
-
-        const DeveloperMessageRole & get_role() const { return role; }
-        DeveloperMessageRole & get_mutable_role() { return role; }
-        void set_role(const DeveloperMessageRole & value) { this->role = value; }
-    };
-
-    enum class FluffyType : int { IMAGE_URL, TEXT };
-
-    class UserMessageContent {
-        public:
-        UserMessageContent() = default;
-        virtual ~UserMessageContent() = default;
-
-        private:
-        std::string data;
-        FluffyType type;
-
-        public:
-        const std::string & get_data() const { return data; }
-        std::string & get_mutable_data() { return data; }
-        void set_data(const std::string & value) { this->data = value; }
-
-        const FluffyType & get_type() const { return type; }
-        FluffyType & get_mutable_type() { return type; }
-        void set_type(const FluffyType & value) { this->type = value; }
-    };
-
-    enum class UserMessageRole : int { USER };
-
-    class UserMessage {
-        public:
-        UserMessage() = default;
-        virtual ~UserMessage() = default;
-
-        private:
-        std::vector<UserMessageContent> content;
-        UserMessageRole role;
-
-        public:
-        const std::vector<UserMessageContent> & get_content() const { return content; }
-        std::vector<UserMessageContent> & get_mutable_content() { return content; }
-        void set_content(const std::vector<UserMessageContent> & value) { this->content = value; }
-
-        const UserMessageRole & get_role() const { return role; }
-        UserMessageRole & get_mutable_role() { return role; }
-        void set_role(const UserMessageRole & value) { this->role = value; }
-    };
-
-    enum class TentacledType : int { REFUSAL, TEXT };
-
-    class AssistantMessageContent {
-        public:
-        AssistantMessageContent() = default;
-        virtual ~AssistantMessageContent() = default;
-
-        private:
-        std::string data;
-        TentacledType type;
-
-        public:
-        const std::string & get_data() const { return data; }
-        std::string & get_mutable_data() { return data; }
-        void set_data(const std::string & value) { this->data = value; }
-
-        const TentacledType & get_type() const { return type; }
-        TentacledType & get_mutable_type() { return type; }
-        void set_type(const TentacledType & value) { this->type = value; }
-    };
-
-    enum class AssistantMessageRole : int { ASSISTANT };
-
-    class AssistantMessage {
-        public:
-        AssistantMessage() = default;
-        virtual ~AssistantMessage() = default;
-
-        private:
-        std::vector<AssistantMessageContent> content;
-        AssistantMessageRole role;
-
-        public:
-        const std::vector<AssistantMessageContent> & get_content() const { return content; }
-        std::vector<AssistantMessageContent> & get_mutable_content() { return content; }
-        void set_content(const std::vector<AssistantMessageContent> & value) { this->content = value; }
-
-        const AssistantMessageRole & get_role() const { return role; }
-        AssistantMessageRole & get_mutable_role() { return role; }
-        void set_role(const AssistantMessageRole & value) { this->role = value; }
-    };
-
-    enum class StickyType : int { IMAGE_URL, REFUSAL, TEXT };
-
-    class MessageContent {
-        public:
-        MessageContent() = default;
-        virtual ~MessageContent() = default;
-
-        private:
-        std::string data;
-        StickyType type;
-
-        public:
-        const std::string & get_data() const { return data; }
-        std::string & get_mutable_data() { return data; }
-        void set_data(const std::string & value) { this->data = value; }
-
-        const StickyType & get_type() const { return type; }
-        StickyType & get_mutable_type() { return type; }
-        void set_type(const StickyType & value) { this->type = value; }
-    };
-
     enum class MessageRole : int { ASSISTANT, DEVELOPER, USER };
 
-    /**
-     * The format is based on OpenAI's chat completions but with several simplifications.
-     * Namely, all data fields are called data instead of text/image_url/refusal as the type
-     * already indicates the type of the data.
-     * Options other than image_url is also removed in the image_url type.
-     */
     class Message {
         public:
         Message() = default;
@@ -224,9 +290,12 @@ namespace ChatHistory {
 
 namespace TUI {
 namespace Schema {
-namespace ChatHistory {
+namespace Chat {
     void from_json(const json & j, DeveloperMessageContent & x);
     void to_json(json & j, const DeveloperMessageContent & x);
+
+    void from_json(const json & j, DeveloperMessageContentClass & x);
+    void to_json(json & j, const DeveloperMessageContentClass & x);
 
     void from_json(const json & j, DeveloperMessage & x);
     void to_json(json & j, const DeveloperMessage & x);
@@ -234,11 +303,17 @@ namespace ChatHistory {
     void from_json(const json & j, UserMessageContent & x);
     void to_json(json & j, const UserMessageContent & x);
 
+    void from_json(const json & j, UserMessageContentClass & x);
+    void to_json(json & j, const UserMessageContentClass & x);
+
     void from_json(const json & j, UserMessage & x);
     void to_json(json & j, const UserMessage & x);
 
     void from_json(const json & j, AssistantMessageContent & x);
     void to_json(json & j, const AssistantMessageContent & x);
+
+    void from_json(const json & j, AssistantMessageContentClass & x);
+    void to_json(json & j, const AssistantMessageContentClass & x);
 
     void from_json(const json & j, AssistantMessage & x);
     void to_json(json & j, const AssistantMessage & x);
@@ -249,33 +324,33 @@ namespace ChatHistory {
     void from_json(const json & j, Message & x);
     void to_json(json & j, const Message & x);
 
-    void from_json(const json & j, PurpleType & x);
-    void to_json(json & j, const PurpleType & x);
+    void from_json(const json & j, DeveloperMessageContentType & x);
+    void to_json(json & j, const DeveloperMessageContentType & x);
 
     void from_json(const json & j, DeveloperMessageRole & x);
     void to_json(json & j, const DeveloperMessageRole & x);
 
-    void from_json(const json & j, FluffyType & x);
-    void to_json(json & j, const FluffyType & x);
+    void from_json(const json & j, UserMessageContentType & x);
+    void to_json(json & j, const UserMessageContentType & x);
 
     void from_json(const json & j, UserMessageRole & x);
     void to_json(json & j, const UserMessageRole & x);
 
-    void from_json(const json & j, TentacledType & x);
-    void to_json(json & j, const TentacledType & x);
+    void from_json(const json & j, AssistantMessageContentType & x);
+    void to_json(json & j, const AssistantMessageContentType & x);
 
     void from_json(const json & j, AssistantMessageRole & x);
     void to_json(json & j, const AssistantMessageRole & x);
 
-    void from_json(const json & j, StickyType & x);
-    void to_json(json & j, const StickyType & x);
+    void from_json(const json & j, PurpleType & x);
+    void to_json(json & j, const PurpleType & x);
 
     void from_json(const json & j, MessageRole & x);
     void to_json(json & j, const MessageRole & x);
 
     inline void from_json(const json & j, DeveloperMessageContent& x) {
         x.set_data(j.at("data").get<std::string>());
-        x.set_type(j.at("type").get<PurpleType>());
+        x.set_type(j.at("type").get<DeveloperMessageContentType>());
     }
 
     inline void to_json(json & j, const DeveloperMessageContent & x) {
@@ -284,8 +359,19 @@ namespace ChatHistory {
         j["type"] = x.get_type();
     }
 
+    inline void from_json(const json & j, DeveloperMessageContentClass& x) {
+        x.set_data(j.at("data").get<std::string>());
+        x.set_type(j.at("type").get<DeveloperMessageContentType>());
+    }
+
+    inline void to_json(json & j, const DeveloperMessageContentClass & x) {
+        j = json::object();
+        j["data"] = x.get_data();
+        j["type"] = x.get_type();
+    }
+
     inline void from_json(const json & j, DeveloperMessage& x) {
-        x.set_content(j.at("content").get<std::vector<DeveloperMessageContent>>());
+        x.set_content(j.at("content").get<std::vector<DeveloperMessageContentClass>>());
         x.set_role(j.at("role").get<DeveloperMessageRole>());
     }
 
@@ -297,7 +383,7 @@ namespace ChatHistory {
 
     inline void from_json(const json & j, UserMessageContent& x) {
         x.set_data(j.at("data").get<std::string>());
-        x.set_type(j.at("type").get<FluffyType>());
+        x.set_type(j.at("type").get<UserMessageContentType>());
     }
 
     inline void to_json(json & j, const UserMessageContent & x) {
@@ -306,8 +392,19 @@ namespace ChatHistory {
         j["type"] = x.get_type();
     }
 
+    inline void from_json(const json & j, UserMessageContentClass& x) {
+        x.set_data(j.at("data").get<std::string>());
+        x.set_type(j.at("type").get<UserMessageContentType>());
+    }
+
+    inline void to_json(json & j, const UserMessageContentClass & x) {
+        j = json::object();
+        j["data"] = x.get_data();
+        j["type"] = x.get_type();
+    }
+
     inline void from_json(const json & j, UserMessage& x) {
-        x.set_content(j.at("content").get<std::vector<UserMessageContent>>());
+        x.set_content(j.at("content").get<std::vector<UserMessageContentClass>>());
         x.set_role(j.at("role").get<UserMessageRole>());
     }
 
@@ -319,7 +416,7 @@ namespace ChatHistory {
 
     inline void from_json(const json & j, AssistantMessageContent& x) {
         x.set_data(j.at("data").get<std::string>());
-        x.set_type(j.at("type").get<TentacledType>());
+        x.set_type(j.at("type").get<AssistantMessageContentType>());
     }
 
     inline void to_json(json & j, const AssistantMessageContent & x) {
@@ -328,8 +425,19 @@ namespace ChatHistory {
         j["type"] = x.get_type();
     }
 
+    inline void from_json(const json & j, AssistantMessageContentClass& x) {
+        x.set_data(j.at("data").get<std::string>());
+        x.set_type(j.at("type").get<AssistantMessageContentType>());
+    }
+
+    inline void to_json(json & j, const AssistantMessageContentClass & x) {
+        j = json::object();
+        j["data"] = x.get_data();
+        j["type"] = x.get_type();
+    }
+
     inline void from_json(const json & j, AssistantMessage& x) {
-        x.set_content(j.at("content").get<std::vector<AssistantMessageContent>>());
+        x.set_content(j.at("content").get<std::vector<AssistantMessageContentClass>>());
         x.set_role(j.at("role").get<AssistantMessageRole>());
     }
 
@@ -341,7 +449,7 @@ namespace ChatHistory {
 
     inline void from_json(const json & j, MessageContent& x) {
         x.set_data(j.at("data").get<std::string>());
-        x.set_type(j.at("type").get<StickyType>());
+        x.set_type(j.at("type").get<PurpleType>());
     }
 
     inline void to_json(json & j, const MessageContent & x) {
@@ -361,15 +469,15 @@ namespace ChatHistory {
         j["role"] = x.get_role();
     }
 
-    inline void from_json(const json & j, PurpleType & x) {
-        if (j == "text") x = PurpleType::TEXT;
+    inline void from_json(const json & j, DeveloperMessageContentType & x) {
+        if (j == "text") x = DeveloperMessageContentType::TEXT;
         else { throw std::runtime_error("Input JSON does not conform to schema!"); }
     }
 
-    inline void to_json(json & j, const PurpleType & x) {
+    inline void to_json(json & j, const DeveloperMessageContentType & x) {
         switch (x) {
-            case PurpleType::TEXT: j = "text"; break;
-            default: throw std::runtime_error("Unexpected value in enumeration \"PurpleType\": " + std::to_string(static_cast<int>(x)));
+            case DeveloperMessageContentType::TEXT: j = "text"; break;
+            default: throw std::runtime_error("Unexpected value in enumeration \"DeveloperMessageContentType\": " + std::to_string(static_cast<int>(x)));
         }
     }
 
@@ -385,17 +493,17 @@ namespace ChatHistory {
         }
     }
 
-    inline void from_json(const json & j, FluffyType & x) {
-        if (j == "image_url") x = FluffyType::IMAGE_URL;
-        else if (j == "text") x = FluffyType::TEXT;
+    inline void from_json(const json & j, UserMessageContentType & x) {
+        if (j == "image_url") x = UserMessageContentType::IMAGE_URL;
+        else if (j == "text") x = UserMessageContentType::TEXT;
         else { throw std::runtime_error("Input JSON does not conform to schema!"); }
     }
 
-    inline void to_json(json & j, const FluffyType & x) {
+    inline void to_json(json & j, const UserMessageContentType & x) {
         switch (x) {
-            case FluffyType::IMAGE_URL: j = "image_url"; break;
-            case FluffyType::TEXT: j = "text"; break;
-            default: throw std::runtime_error("Unexpected value in enumeration \"FluffyType\": " + std::to_string(static_cast<int>(x)));
+            case UserMessageContentType::IMAGE_URL: j = "image_url"; break;
+            case UserMessageContentType::TEXT: j = "text"; break;
+            default: throw std::runtime_error("Unexpected value in enumeration \"UserMessageContentType\": " + std::to_string(static_cast<int>(x)));
         }
     }
 
@@ -411,17 +519,17 @@ namespace ChatHistory {
         }
     }
 
-    inline void from_json(const json & j, TentacledType & x) {
-        if (j == "refusal") x = TentacledType::REFUSAL;
-        else if (j == "text") x = TentacledType::TEXT;
+    inline void from_json(const json & j, AssistantMessageContentType & x) {
+        if (j == "refusal") x = AssistantMessageContentType::REFUSAL;
+        else if (j == "text") x = AssistantMessageContentType::TEXT;
         else { throw std::runtime_error("Input JSON does not conform to schema!"); }
     }
 
-    inline void to_json(json & j, const TentacledType & x) {
+    inline void to_json(json & j, const AssistantMessageContentType & x) {
         switch (x) {
-            case TentacledType::REFUSAL: j = "refusal"; break;
-            case TentacledType::TEXT: j = "text"; break;
-            default: throw std::runtime_error("Unexpected value in enumeration \"TentacledType\": " + std::to_string(static_cast<int>(x)));
+            case AssistantMessageContentType::REFUSAL: j = "refusal"; break;
+            case AssistantMessageContentType::TEXT: j = "text"; break;
+            default: throw std::runtime_error("Unexpected value in enumeration \"AssistantMessageContentType\": " + std::to_string(static_cast<int>(x)));
         }
     }
 
@@ -437,19 +545,19 @@ namespace ChatHistory {
         }
     }
 
-    inline void from_json(const json & j, StickyType & x) {
-        if (j == "image_url") x = StickyType::IMAGE_URL;
-        else if (j == "refusal") x = StickyType::REFUSAL;
-        else if (j == "text") x = StickyType::TEXT;
+    inline void from_json(const json & j, PurpleType & x) {
+        if (j == "image_url") x = PurpleType::IMAGE_URL;
+        else if (j == "refusal") x = PurpleType::REFUSAL;
+        else if (j == "text") x = PurpleType::TEXT;
         else { throw std::runtime_error("Input JSON does not conform to schema!"); }
     }
 
-    inline void to_json(json & j, const StickyType & x) {
+    inline void to_json(json & j, const PurpleType & x) {
         switch (x) {
-            case StickyType::IMAGE_URL: j = "image_url"; break;
-            case StickyType::REFUSAL: j = "refusal"; break;
-            case StickyType::TEXT: j = "text"; break;
-            default: throw std::runtime_error("Unexpected value in enumeration \"StickyType\": " + std::to_string(static_cast<int>(x)));
+            case PurpleType::IMAGE_URL: j = "image_url"; break;
+            case PurpleType::REFUSAL: j = "refusal"; break;
+            case PurpleType::TEXT: j = "text"; break;
+            default: throw std::runtime_error("Unexpected value in enumeration \"PurpleType\": " + std::to_string(static_cast<int>(x)));
         }
     }
 
