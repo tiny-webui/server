@@ -1,0 +1,10 @@
+{
+  "dependencies": {
+    "quicktype-core": "^23.2.6",
+    "quicktype-typescript-input": "^23.2.6"
+  },
+  "type": "module",
+  "devDependencies": {
+    "@types/node": "^22.15.29"
+  }
+}
