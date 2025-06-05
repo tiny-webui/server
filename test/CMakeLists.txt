@@ -60,3 +60,19 @@ add_executable(TestApiProviderOption
 target_include_directories(TestApiProviderOption
     PRIVATE
         ../src)
+
+add_executable(TestApiProvider
+    TestApiProvider.cpp
+    ../src/network/HttpClient.cpp
+    ../src/network/CurlTypes.cpp
+    ../src/network/HttpStreamResponseParser.cpp
+    ../src/apiProvider/AzureOpenAI.cpp)
+
+target_include_directories(TestApiProvider
+    PRIVATE
+        ../src)
+
+target_link_libraries(TestApiProvider
+    PRIVATE
+        tev-cpp
+        curl)
