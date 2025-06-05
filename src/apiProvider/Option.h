@@ -312,13 +312,11 @@ namespace TUI::ApiProvider::Option
     {
         Type type;
         std::string jsonKey;
-        std::string description;
         bool optional{false};
         std::shared_ptr<OptionBase<T>> params;
-        Option(Type typeIn, std::string jsonKeyIn, std::string descriptionIn, bool optionalIn, std::shared_ptr<OptionBase<T>> paramsIn)
+        Option(Type typeIn, std::string jsonKeyIn, bool optionalIn, std::shared_ptr<OptionBase<T>> paramsIn)
             : type(typeIn),
               jsonKey(std::move(jsonKeyIn)),
-              description(std::move(descriptionIn)),
               optional(optionalIn),
               params(std::move(paramsIn))
         {
@@ -332,7 +330,6 @@ namespace TUI::ApiProvider::Option
             nlohmann::json json;
             json["type"] = TypeToJsonType.at(type);
             json["key"] = jsonKey;
-            json["description"] = description;
             json["optional"] = optional;
             auto defaultValue = params->GetDefaultValue();
             if (!defaultValue.is_null())
@@ -439,13 +436,12 @@ namespace TUI::ApiProvider::Option
     };
 
     template <typename T, typename U, typename... Args>
-    Option<T> CreateOption(std::string jsonKey, std::string description, bool optional, Args&&... args)
+    Option<T> CreateOption(std::string jsonKey, bool optional, Args&&... args)
     {
         static_assert(std::is_base_of_v<OptionBase<T>, U>, "U must derive from OptionBase<T>");
         return Option<T>{
             TypeFromOption<U>::value,
             std::move(jsonKey),
-            std::move(description),
             optional,
             std::make_shared<U>(std::forward<Args>(args)...)
         };

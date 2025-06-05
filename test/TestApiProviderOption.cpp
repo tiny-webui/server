@@ -37,13 +37,11 @@ int main(int argc, char const *argv[])
         /** Mandatory option w/o default value */
         CreateOption<TestOptions,StringOption<TestOptions>>(
             "stringOption",
-            "This is a string option",
             false,
             [](TestOptions& options, std::string value){options.stringOption = value;}),
         /** Mandatory option w/ default value */
         CreateOption<TestOptions, StringFromListOption<TestOptions>>(
             "stringFromListOption",
-            "This is a string from list option",
             false,
             [](TestOptions& options, std::string value){options.stringFromListOption = value;},
             std::vector<std::string>{"option1", "option2", "option3"},
@@ -51,7 +49,6 @@ int main(int argc, char const *argv[])
         /** Optional option w/ default value */
         CreateOption<TestOptions, NumberFromRangeOption<TestOptions>>(
             "numberFromRangeOption",
-            "This is a number from range option",
             true,
             [](TestOptions& options, double value){options.numberFromRangeOption = value;},
             0.0, 100.0,
@@ -59,14 +56,12 @@ int main(int argc, char const *argv[])
         /** Optional option w/o default value */
         CreateOption<TestOptions, NumberFromListOption<TestOptions>>(
             "numberFromListOption",
-            "This is a number from list option",
             true,
             [](TestOptions& options, double value){options.numberFromListOption = value;},
             std::vector<double>{1.0, 2.0, 3.0}),
         /** Optional option w/o default value */
         CreateOption<TestOptions, BooleanOption<TestOptions>>(
             "booleanOption",
-            "This is a boolean option",
             true,
             [](TestOptions& options, bool value){options.booleanOption = value;})
     };
