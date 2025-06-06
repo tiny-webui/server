@@ -42,7 +42,7 @@ JS::Promise<void> TestBulkChatAsync()
     provider.Initialize(params);
     auto history = LoadChatHistory(historyFilePath);
     auto requestData = provider.FormatRequest(history, false);
-    auto response = co_await client->MakeRequestAsync(Http::Method::POST, requestData);
+    auto response = co_await client->MakeRequest(Http::Method::POST, requestData).GetResponseAsync();
     auto message = provider.ParseResponse(response);
     std::cout << nlohmann::json(message).dump(4) << std::endl;
 }
@@ -56,33 +56,22 @@ JS::Promise<void> TestStreamChatAsync()
     auto history = LoadChatHistory(historyFilePath);
     auto requestData = provider.FormatRequest(history, true);
     auto streamEventParser = Http::StreamResponse::Parser{};
-    auto response = client->MakeStreamRequest(Http::Method::POST, requestData);
+    auto responseStream = client->MakeStreamRequest(Http::Method::POST, requestData).GetResponseStream();
+    auto parser = Http::StreamResponse::AsyncParser(responseStream);
+    auto eventStream = parser.Parse();
     while (true)
     {
-        auto data = co_await response.NextAsync();
-        if (!data.has_value())
+        auto event = co_await eventStream.NextAsync();
+        if (!event.has_value())
         {
-            auto event = streamEventParser.End();
-            if (event.has_value())
-            {
-                auto message = provider.ParseStreamResponse(event.value());
-                if (message.has_value())
-                {
-                    std::cout << message.value().get_data();
-                }
-            }
             std::cout << std::endl;
             break;
         }
-        auto events = streamEventParser.Feed(data.value());
-        for (const auto& event : events)
+        auto message = provider.ParseStreamResponse(event.value());
+        if (message.has_value())
         {
-            auto message = provider.ParseStreamResponse(event);
-            if (message.has_value())
-            {
-                std::cout << message.value().get_data();
-                std::cout.flush();
-            }
+            std::cout << message.value().get_data();
+            std::cout.flush();
         }
     }
 }

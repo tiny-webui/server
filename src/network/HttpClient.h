@@ -32,10 +32,7 @@ namespace TUI::Network::Http
         Request() = default;
         ~Request() = default;
 
-        /** Awaitable implementation */
-        bool await_ready() const;
-        void await_suspend(std::coroutine_handle<> handle);
-        std::string await_resume();
+        JS::Promise<std::string> GetResponseAsync() const;
     private:
         struct State
         {
@@ -56,7 +53,7 @@ namespace TUI::Network::Http
         StreamRequest() = default;
         ~StreamRequest() = default;
 
-        JS::Promise<std::optional<std::string>> NextAsync();
+        JS::AsyncGenerator<std::string> GetResponseStream() const;
     private:
         struct State
         {
@@ -83,7 +80,7 @@ namespace TUI::Network::Http
         Client(Client&&) = delete;
         Client& operator=(Client&&) = delete;
 
-        Request MakeRequestAsync(Method method, const RequestData& data);
+        Request MakeRequest(Method method, const RequestData& data);
         StreamRequest MakeStreamRequest(Method method, const RequestData& data);
         void CancelRequest(Request& request);
         void CancelRequest(StreamRequest& request);

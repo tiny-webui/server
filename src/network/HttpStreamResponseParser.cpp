@@ -134,3 +134,30 @@ std::optional<Event> Parser::ParseEvent(const std::string& eventData) const
     /** No valid event found */
     return std::nullopt;
 }
+
+AsyncParser::AsyncParser(JS::AsyncGenerator<std::string> responseStream)
+    : _responseStream(std::move(responseStream))
+{
+}
+
+JS::AsyncGenerator<Event> AsyncParser::Parse()
+{
+    while (true)
+    {
+        auto response = co_await _responseStream.NextAsync();
+        if (!response.has_value())
+        {
+            auto event = _parser.End();
+            if (event.has_value())
+            {
+                co_yield event.value();
+            }
+            break;
+        }
+        auto events = _parser.Feed(response.value());
+        for (const auto& event : events)
+        {
+            co_yield event;
+        }
+    }
+}

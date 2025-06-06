@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 #include <optional>
+#include <js-style-co-routine/AsyncGenerator.h>
 
 namespace TUI::Network::Http::StreamResponse
 {
@@ -25,5 +26,17 @@ namespace TUI::Network::Http::StreamResponse
     private:
         std::string _buffer{};
         std::optional<Event> ParseEvent(const std::string& eventData) const;
+    };
+
+    class AsyncParser
+    {
+    public:
+        AsyncParser(JS::AsyncGenerator<std::string> responseStream);
+        ~AsyncParser() = default;
+
+        JS::AsyncGenerator<Event> Parse();
+    private:
+        JS::AsyncGenerator<std::string> _responseStream;
+        Parser _parser{};
     };
 }
