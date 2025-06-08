@@ -6,19 +6,9 @@ using namespace TUI::Network::Http::CurlTypes;
 
 /** Request */
 
-bool Http::Request::await_ready() const
+JS::Promise<std::string> Http::Request::GetResponseAsync() const
 {
-    return _state->promise.await_ready();
-}
-
-void Http::Request::await_suspend(std::coroutine_handle<> handle)
-{
-    _state->promise.await_suspend(handle);
-}
-
-std::string Http::Request::await_resume()
-{
-    return _state->promise.await_resume();
+    return _state->promise;
 }
 
 extern "C" size_t Http::Request::CurlWriteFunction(char* ptr, size_t size, size_t nmemb, void* userdata) noexcept
@@ -39,9 +29,9 @@ extern "C" size_t Http::Request::CurlWriteFunction(char* ptr, size_t size, size_
 
 /** Stream request */
 
-JS::Promise<std::optional<std::string>> Http::StreamRequest::NextAsync()
+JS::AsyncGenerator<std::string> Http::StreamRequest::GetResponseStream() const
 {
-    return _state->generator.NextAsync();
+    return _state->generator;
 }
 
 extern "C" size_t Http::StreamRequest::CurlWriteFunction(char* ptr, size_t size, size_t nmemb, void* userdata) noexcept
@@ -83,7 +73,7 @@ Http::Client::~Client()
     _tev.ClearTimeout(_curlTimeoutHandle);
 }
 
-Http::Request Http::Client::MakeRequestAsync(Http::Method method, const Http::RequestData& data)
+Http::Request Http::Client::MakeRequest(Http::Method method, const Http::RequestData& data)
 {
     Http::Request request{};
     auto curl = std::make_shared<Curl>();

@@ -30,7 +30,7 @@ JS::Promise<void> TestGetAsync(std::shared_ptr<Http::Client> client)
         .headers = {{"X-Test-Header", "hello from tui"}},
         .body = ""
     };
-    auto response = co_await client->MakeRequestAsync(Http::Method::GET, requestData);
+    auto response = co_await client->MakeRequest(Http::Method::GET, requestData).GetResponseAsync();
     std::cout << "Response: " << std::endl << response << std::endl;
 }
 
@@ -44,7 +44,7 @@ JS::Promise<void> TestPostAsync(std::shared_ptr<Http::Client> client)
         },
         .body = R"({"key": "value"})"
     };
-    auto response = co_await client->MakeRequestAsync(Http::Method::POST, requestData);
+    auto response = co_await client->MakeRequest(Http::Method::POST, requestData).GetResponseAsync();
     std::cout << "Response: " << std::endl << response;
     std::cout << std::endl;
 }
@@ -56,14 +56,15 @@ JS::Promise<void> TestCancelImmediatelyAsync(std::shared_ptr<Http::Client> clien
         .headers = {{"X-Test-Header", "hello from tui"}},
         .body = ""
     };
-    auto request = client->MakeRequestAsync(Http::Method::GET, requestData);
+    auto request = client->MakeRequest(Http::Method::GET, requestData);
+    auto responsePromise = request.GetResponseAsync();
     
     // Cancel the request immediately
     client->CancelRequest(request);
     
     try
     {
-        co_await request;
+        co_await responsePromise;
     }
     catch (const Http::Client::RequestCancelledException&)
     {
@@ -78,15 +79,16 @@ JS::Promise<void> TestCancelAsync(std::shared_ptr<Http::Client> client)
         .headers = {{"X-Test-Header", "hello from tui"}},
         .body = ""
     };
-    auto request = client->MakeRequestAsync(Http::Method::GET, requestData);
-    
+    auto request = client->MakeRequest(Http::Method::GET, requestData);
+    auto responsePromise = request.GetResponseAsync();
+
     // Cancel the request after a short delay
     co_await DelayAsync(10);
     client->CancelRequest(request);
 
     try
     {
-        co_await request;
+        co_await responsePromise;
     }
     catch (const Http::Client::RequestCancelledException&)
     {
@@ -101,11 +103,11 @@ JS::Promise<void> TestStreamAsync(std::shared_ptr<Http::Client> client)
         .headers = {{"X-Test-Header", "hello from tui"}},
         .body = ""
     };
-    auto streamRequest = client->MakeStreamRequest(Http::Method::GET, requestData);
+    auto responseStream = client->MakeStreamRequest(Http::Method::GET, requestData).GetResponseStream();
     
     while(true)
     {
-        auto next = co_await streamRequest.NextAsync();
+        auto next = co_await responseStream.NextAsync();
         if (!next.has_value())
         {
             break;
@@ -128,11 +130,12 @@ JS::Promise<void> TestStreamCancelAsync(std::shared_ptr<Http::Client> client)
     co_await DelayAsync(10);
     client->CancelRequest(streamRequest);
 
+    auto responseStream = streamRequest.GetResponseStream();
     try
     {
         while (true)
         {
-            auto next = co_await streamRequest.NextAsync();
+            auto next = co_await responseStream.NextAsync();
             if (!next.has_value())
             {
                 break;

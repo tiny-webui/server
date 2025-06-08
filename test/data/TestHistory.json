@@ -1,0 +1,20 @@
+[
+    {
+        "role": "developer",
+        "content": [
+            {
+                "type": "text",
+                "data": "You are a helpful assistant."
+            }
+        ]
+    },
+    {
+        "role": "user",
+        "content": [
+            {
+                "type": "text",
+                "data": "Tell me a long story about a falling nation."
+          }
+        ]
+    }
+]
