@@ -87,8 +87,8 @@ Server::Server(Tev& tev, const std::string& address, int port)
 
     _context = std::make_unique<LwsTypes::Context>(info);
 
-    _rxEventFd = Common::RAII::Fd(eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC));
-    if (_rxEventFd.Get() == -1)
+    _rxEventFd = eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC);
+    if (_rxEventFd == -1)
     {
         throw std::runtime_error("Failed to create eventfd for tx");
     }
@@ -99,7 +99,7 @@ Server::Server(Tev& tev, const std::string& address, int port)
         throw std::runtime_error("Failed to create LWS thread");
     }
 
-    _tev.SetReadHandler(_rxEventFd.Get(), std::bind(&Server::ITCRxCallback, this));
+    _tev.SetReadHandler(_rxEventFd, std::bind(&Server::ITCRxCallback, this));
 }
 
 Server::~Server()
@@ -114,16 +114,15 @@ void Server::Close()
 
 void Server::CloseInternal(bool closedByLws)
 {
-    /** @todo */
     if (_closed)
     {
         return;
     }
     _closed = true;
-    if (_rxEventFd.Get() != -1)
+    if (_rxEventFd != -1)
     {
-        _tev.SetReadHandler(_rxEventFd.Get(), nullptr);
-        _rxEventFd.Close();
+        _tev.SetReadHandler(_rxEventFd, nullptr);
+        _rxEventFd = -1;
     }
     if (!closedByLws)
     {
@@ -182,7 +181,7 @@ void Server::ITCRxCallback()
     auto self = shared_from_this();
     /** Read from eventfd to clear the event */
     eventfd_t value;
-    eventfd_read(_rxEventFd.Get(), &value);
+    eventfd_read(_rxEventFd, &value);
     while (true)
     {
         struct ITCMessage msg;
@@ -440,8 +439,8 @@ void Server::SendMessageToMainThread(ITCType type, std::unique_ptr<IITCData> dat
 {
     std::lock_guard<std::mutex> lock(_rxMutex);
     _rxQueue.push_back(ITCMessage{type, std::move(data)});
-    if (_rxEventFd.Get() != -1)
+    if (_rxEventFd != -1)
     {
-        eventfd_write(_rxEventFd.Get(), 1);
+        eventfd_write(_rxEventFd, 1);
     }
 }

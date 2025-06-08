@@ -76,3 +76,14 @@ target_link_libraries(TestApiProvider
     PRIVATE
         tev-cpp
         curl)
+
+add_executable(TestTevInjectionQueue
+    TestTevInjectionQueue.cpp)
+
+target_include_directories(TestTevInjectionQueue
+    PRIVATE
+        ../src)
+
+target_link_libraries(TestTevInjectionQueue
+    PRIVATE
+        tev-cpp)

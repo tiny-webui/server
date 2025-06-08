@@ -8,7 +8,7 @@
 #include <js-style-co-routine/AsyncGenerator.h>
 #include <tev-cpp/Tev.h>
 #include "LwsTypes.h"
-#include "common/RAIIHelpers.h"
+#include "common/UniqueTypes.h"
 
 namespace TUI::Network::WebSocket
 {
@@ -127,7 +127,7 @@ namespace TUI::Network::WebSocket
         bool _closed{false};
         std::mutex _txMutex{};                                  /** Both threads */
         std::deque<ITCMessage> _txQueue{};                      /** Both threads */
-        Common::RAII::Fd _rxEventFd{-1};                        /** Both threads */
+        Common::Unique::Fd _rxEventFd{-1};                        /** Both threads */
         std::mutex _rxMutex{};                                  /** Both threads */
         std::deque<ITCMessage> _rxQueue{};                      /** Both threads */
 
