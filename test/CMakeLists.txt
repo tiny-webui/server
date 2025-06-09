@@ -87,3 +87,14 @@ target_include_directories(TestTevInjectionQueue
 target_link_libraries(TestTevInjectionQueue
     PRIVATE
         tev-cpp)
+
+add_executable(TestWorkerThread
+    TestWorkerThread.cpp)
+
+target_include_directories(TestWorkerThread
+    PRIVATE
+        ../src)
+
+target_link_libraries(TestWorkerThread
+    PRIVATE
+        tev-cpp)
