@@ -95,6 +95,14 @@ namespace TUI::Common
             }
             while(true)
             {
+                if (_eventFd < 0)
+                {
+                    /** 
+                     * The queue is closed, should not process more data
+                     * This can happen in the previous callback.
+                     */
+                    break;
+                }
                 std::optional<T> data;
                 {
                     std::lock_guard<std::mutex> lock(_mutex);
