@@ -112,3 +112,13 @@ target_link_libraries(TestSqlite
         tev-cpp
         sqlite3)
 
+add_executable(TestUuid
+    TestUuid.cpp)
+
+target_include_directories(TestUuid
+    PRIVATE
+        ../src)
+
+target_link_libraries(TestUuid
+    PRIVATE
+        uuid)
