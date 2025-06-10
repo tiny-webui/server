@@ -71,7 +71,7 @@ namespace TUI::Common
         TevInjectionQueue(Tev& tev, std::function<void(T&&)> onData, std::function<void()> onError)
             : _tev(tev), _onData(std::move(onData)), _onError(std::move(onError))
         {
-            _eventFd = eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC);
+            _eventFd = Unique::Fd(eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC));
             if (_eventFd < 0)
             {
                 throw std::runtime_error("Failed to create eventfd: " + std::string(strerror(errno)));
@@ -125,7 +125,7 @@ namespace TUI::Common
             if (_eventFd >= 0)
             {
                 _tev.SetReadHandler(_eventFd, nullptr);
-                _eventFd = -1;
+                _eventFd = Unique::Fd(-1);
             }
             {
                 std::lock_guard<std::mutex> lock(_mutex);

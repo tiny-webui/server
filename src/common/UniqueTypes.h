@@ -7,7 +7,7 @@ namespace TUI::Common::Unique
     class Fd
     {
     public:
-        Fd(int fd) : _fd(fd) {}
+        explicit Fd(int fd) : _fd(fd) {}
         ~Fd()
         {
             if (_fd != -1)

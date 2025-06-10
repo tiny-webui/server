@@ -1,6 +1,7 @@
 #include "WebSocketServer.h"
 #include <sys/eventfd.h>
 
+using namespace TUI::Common;
 using namespace TUI::Network::WebSocket;
 
 /**
@@ -87,7 +88,7 @@ Server::Server(Tev& tev, const std::string& address, int port)
 
     _context = std::make_unique<LwsTypes::Context>(info);
 
-    _rxEventFd = eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC);
+    _rxEventFd = Unique::Fd(eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC));
     if (_rxEventFd == -1)
     {
         throw std::runtime_error("Failed to create eventfd for tx");
@@ -122,7 +123,7 @@ void Server::CloseInternal(bool closedByLws)
     if (_rxEventFd != -1)
     {
         _tev.SetReadHandler(_rxEventFd, nullptr);
-        _rxEventFd = -1;
+        _rxEventFd = Unique::Fd(-1);
     }
     if (!closedByLws)
     {
