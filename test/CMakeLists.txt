@@ -98,3 +98,17 @@ target_include_directories(TestWorkerThread
 target_link_libraries(TestWorkerThread
     PRIVATE
         tev-cpp)
+
+add_executable(TestSqlite
+    TestSqlite.cpp
+    ../src/database/Sqlite.cpp)
+
+target_include_directories(TestSqlite
+    PRIVATE
+        ../src)
+
+target_link_libraries(TestSqlite
+    PRIVATE
+        tev-cpp
+        sqlite3)
+
