@@ -3,6 +3,7 @@
 #include <filesystem>
 #include <string>
 #include <vector>
+#include <list>
 #include <map>
 #include <js-style-co-routine/Promise.h>
 #include <tev-cpp/Tev.h>
@@ -103,7 +104,7 @@ namespace TUI::Database
             return _workerThread.ExecTaskAsync([this, query, tup = std::move(tup)]() -> ExecResult {
                 return std::apply([&](auto&&... unpackedArgs) {
                     UniqueStmt stmt(_dbAsync, query, std::forward<decltype(unpackedArgs)>(unpackedArgs)...);
-                    return ExecInternal(std::move(stmt));
+                    return ExecInternal(stmt);
                 }, std::move(tup));
             });
         }
@@ -111,7 +112,7 @@ namespace TUI::Database
         ExecResult Exec(const std::string& query, Args&&... args)
         {
             UniqueStmt stmt(_db, query, std::forward<Args>(args)...);
-            return ExecInternal(std::move(stmt));
+            return ExecInternal(stmt);
         }
 
     private:
@@ -178,8 +179,8 @@ namespace TUI::Database
             void BindValue(int i, double value);
             void BindValue(int i, std::nullptr_t);
 
-            std::vector<std::string> _bondStrings{};
-            std::vector<std::vector<uint8_t>> _bondBlobs{};
+            std::list<std::string> _bondStrings{};
+            std::list<std::vector<uint8_t>> _bondBlobs{};
             /** Put this last so it is destructed first */
             UniqueStmtInternal _stmt{nullptr};
         };
@@ -188,7 +189,7 @@ namespace TUI::Database
 
         Sqlite(Tev& tev);
 
-        ExecResult ExecInternal(UniqueStmt&& stmt);
+        ExecResult ExecInternal(const UniqueStmt& stmt);
 
         Tev& _tev;
         UniqueSqlite3 _db{nullptr};

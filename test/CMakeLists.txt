@@ -122,3 +122,18 @@ target_include_directories(TestUuid
 target_link_libraries(TestUuid
     PRIVATE
         uuid)
+
+add_executable(TestDatabase
+    TestDatabase
+    ../src/database/Database.cpp
+    ../src/database/Sqlite.cpp)
+
+target_include_directories(TestDatabase
+    PRIVATE
+        ../src)
+
+target_link_libraries(TestDatabase
+    PRIVATE
+        tev-cpp
+        sqlite3
+        uuid)

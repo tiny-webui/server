@@ -29,21 +29,21 @@ Sqlite::Value::Value(const Value &other)
 	: _type(other._type), _value{}
 {
 	switch (_type) {
-		case Type::null:
-			_value.null = nullptr;
-			break;
-		case Type::integer:
-			_value.integer = other._value.integer;
-			break;
-		case Type::real:
-			_value.real = other._value.real;
-			break;
-		case Type::text:
-			new (&_value.text) std::string(other._value.text);
-			break;
-		case Type::blob:
-			new (&_value.blob) std::vector<uint8_t>(other._value.blob);
-			break;
+	case Type::null:
+		_value.null = nullptr;
+		break;
+	case Type::integer:
+		_value.integer = other._value.integer;
+		break;
+	case Type::real:
+		_value.real = other._value.real;
+		break;
+	case Type::text:
+		new (&_value.text) std::string(other._value.text);
+		break;
+	case Type::blob:
+		new (&_value.blob) std::vector<uint8_t>(other._value.blob);
+		break;
 	}
 }
 
@@ -51,21 +51,21 @@ Sqlite::Value::Value(Value &&other) noexcept
 	: _type(other._type), _value{}
 {
 	switch (_type) {
-		case Type::null:
-			_value.null = nullptr;
-			break;
-		case Type::integer:
-			_value.integer = other._value.integer;
-			break;
-		case Type::real:
-			_value.real = other._value.real;
-			break;
-		case Type::text:
-			new (&_value.text) std::string(std::move(other._value.text));
-			break;
-		case Type::blob:
-			new (&_value.blob) std::vector<uint8_t>(std::move(other._value.blob));
-			break;
+	case Type::null:
+		_value.null = nullptr;
+		break;
+	case Type::integer:
+		_value.integer = other._value.integer;
+		break;
+	case Type::real:
+		_value.real = other._value.real;
+		break;
+	case Type::text:
+		new (&_value.text) std::string(std::move(other._value.text));
+		break;
+	case Type::blob:
+		new (&_value.blob) std::vector<uint8_t>(std::move(other._value.blob));
+		break;
 	}
 	other._type = Type::null;
 	other._value.null = nullptr;
@@ -359,7 +359,7 @@ JS::Promise<std::shared_ptr<Sqlite>> Sqlite::CreateAsync(Tev& tev, const std::fi
 	co_return sqlite;
 }
 
-Sqlite::ExecResult Sqlite::ExecInternal(UniqueStmt&& stmt)
+Sqlite::ExecResult Sqlite::ExecInternal(const UniqueStmt& stmt)
 {
 	ExecResult result{};
 	bool finished = false;
