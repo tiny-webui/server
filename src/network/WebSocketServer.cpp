@@ -2,6 +2,7 @@
 #include <sys/eventfd.h>
 
 using namespace TUI::Common;
+using namespace TUI::Network;
 using namespace TUI::Network::WebSocket;
 
 /**
@@ -19,17 +20,17 @@ using namespace TUI::Network::WebSocket;
 
 /** Connection */
 
-Connection::Connection(std::uint64_t id, std::shared_ptr<Server> server)
+Server::Connection::Connection(std::uint64_t id, std::shared_ptr<Server> server)
     : _id(id), _server(server)
 {
 }
 
-Connection::~Connection()
+Server::Connection::~Connection()
 {
     Close();
 }
 
-void Connection::Close()
+void Server::Connection::Close()
 {
     auto server = _server.lock();
     if (!server)
@@ -39,7 +40,7 @@ void Connection::Close()
     server->CloseConnection(_id);
 }
 
-void Connection::Send(std::vector<std::uint8_t> message)
+void Server::Connection::Send(std::vector<std::uint8_t> message)
 {
     auto server = _server.lock();
     if (!server)
@@ -49,7 +50,7 @@ void Connection::Send(std::vector<std::uint8_t> message)
     server->SendMessage(_id, std::move(message));
 }
 
-JS::Promise<std::optional<std::vector<std::uint8_t>>> Connection::ReceiveAsync()
+JS::Promise<std::optional<std::vector<std::uint8_t>>> Server::Connection::ReceiveAsync()
 {
     return _receiveGenerator.NextAsync();
 }
@@ -61,7 +62,12 @@ std::shared_ptr<Server> Server::Create(Tev& tev, const std::string& address, int
     return std::shared_ptr<Server>(new Server(tev, address, port));
 }
 
-Server::Server(Tev& tev, const std::string& address, int port)
+std::shared_ptr<Server> Server::Create(Tev& tev, const std::string& unixSocketPath)
+{
+    return std::shared_ptr<Server>(new Server(tev, unixSocketPath, -1, true));
+}
+
+Server::Server(Tev& tev, const std::string& address, int port, bool addressIsUds)
     : _tev(tev)
 {
     struct lws_protocols protocol{};
@@ -81,10 +87,17 @@ Server::Server(Tev& tev, const std::string& address, int port)
 
     struct lws_context_creation_info info{};
     info.iface = address.c_str();
-    info.port = port;
+    if (!addressIsUds)
+    {
+        info.port = port;
+    }
     info.protocols = _protocols.data();
     info.pt_serv_buf_size = LWS_BUFFER_SIZE;
     info.options = LWS_SERVER_OPTION_VALIDATE_UTF8;
+    if (addressIsUds)
+    {
+        info.options |= LWS_SERVER_OPTION_UNIX_SOCK;
+    }
 
     _context = std::make_unique<LwsTypes::Context>(info);
 
@@ -139,7 +152,7 @@ void Server::CloseInternal(bool closedByLws)
     _connectionGenerator.Finish();
 }
 
-JS::Promise<std::optional<std::shared_ptr<Connection>>> Server::AcceptAsync()
+JS::Promise<std::optional<std::shared_ptr<IConnection<void>>>> Server::AcceptAsync()
 {
     return _connectionGenerator.NextAsync();
 }
@@ -203,7 +216,7 @@ void Server::ITCRxCallback()
             );
             auto connection = std::shared_ptr<Connection>(new Connection(data->id, shared_from_this()));
             _connections[data->id] = connection;
-            _connectionGenerator.Feed(std::move(connection));
+            _connectionGenerator.Feed(connection);
         } break;
         case ITCType::CONNECTION_DISCONNECTED:{
             auto data = std::unique_ptr<ITCDataConnectionDisconnected>(
