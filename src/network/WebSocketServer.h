@@ -17,8 +17,8 @@ namespace TUI::Network::WebSocket
     class Server : public IServer<void>, public std::enable_shared_from_this<Server> 
     {
     public:
-        static std::shared_ptr<Server> Create(Tev& tev, const std::string& address, int port);
-        static std::shared_ptr<Server> Create(Tev& tev, const std::string& unixSocketPath);    
+        static std::shared_ptr<IServer<void>> Create(Tev& tev, const std::string& address, int port);
+        static std::shared_ptr<IServer<void>> Create(Tev& tev, const std::string& unixSocketPath);    
 
         ~Server() override;
         Server(const Server&) = delete;

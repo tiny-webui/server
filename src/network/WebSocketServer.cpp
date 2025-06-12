@@ -57,12 +57,12 @@ JS::Promise<std::optional<std::vector<std::uint8_t>>> Server::Connection::Receiv
 
 /** Server */
 
-std::shared_ptr<Server> Server::Create(Tev& tev, const std::string& address, int port)
+std::shared_ptr<IServer<void>> Server::Create(Tev& tev, const std::string& address, int port)
 {
     return std::shared_ptr<Server>(new Server(tev, address, port));
 }
 
-std::shared_ptr<Server> Server::Create(Tev& tev, const std::string& unixSocketPath)
+std::shared_ptr<IServer<void>> Server::Create(Tev& tev, const std::string& unixSocketPath)
 {
     return std::shared_ptr<Server>(new Server(tev, unixSocketPath, -1, true));
 }
