@@ -46,12 +46,12 @@ JS::Promise<void> Database::DeleteModelAsync(const Common::Uuid& id)
         static_cast<std::string>(id));
 }
 
-std::vector<Uuid> Database::ListModel()
+std::list<Uuid> Database::ListModel()
 {
     return ListTableId("model");
 }
 
-std::vector<std::pair<Uuid, std::string>> Database::ListModelWithMetadata()
+std::list<std::pair<Uuid, std::string>> Database::ListModelWithMetadata()
 {
     return ListTableIdWithMetadata("model");
 }
@@ -96,12 +96,12 @@ JS::Promise<void> Database::DeleteUserAsync(const Uuid& id)
         static_cast<std::string>(id));
 }
 
-std::vector<Uuid> Database::ListUser()
+std::list<Uuid> Database::ListUser()
 {
     return ListTableId("user");
 }
 
-std::vector<std::pair<Uuid, std::string>> Database::ListUserWithMetadata()
+std::list<std::pair<Uuid, std::string>> Database::ListUserWithMetadata()
 {
     return ListTableIdWithMetadata("user");
 }
@@ -149,7 +149,7 @@ size_t Database::GetChatCount(const Uuid& userId)
     {
         throw std::runtime_error("Empty result");
     }
-    auto row = result.at(0);
+    auto row = result.front();
     auto item = row.find("count");
     if (item == row.end())
     {
@@ -158,7 +158,7 @@ size_t Database::GetChatCount(const Uuid& userId)
     return static_cast<size_t>(item->second.Get<int64_t>());
 }
 
-std::vector<Uuid> Database::ListChat(const Uuid& userId, size_t from, size_t limit)
+std::list<Uuid> Database::ListChat(const Uuid& userId, size_t from, size_t limit)
 {
     auto sql = std::format(
         "SELECT id FROM chat WHERE user_id = ? ORDER BY timestamp DESC LIMIT {} OFFSET {}",
@@ -167,7 +167,7 @@ std::vector<Uuid> Database::ListChat(const Uuid& userId, size_t from, size_t lim
     return ParseListTableIdResult(result);
 }
 
-std::vector<std::pair<Uuid, std::string>> Database::ListChatWithMetadata(
+std::list<std::pair<Uuid, std::string>> Database::ListChatWithMetadata(
     const Uuid& userId, size_t from , size_t limit)
 {
     auto sql = std::format(
@@ -197,16 +197,16 @@ std::string Database::GetChatContent(const Uuid& userId, const Uuid& id)
     return GetStringFromChat(userId, id, "content");
 }
 
-std::vector<Uuid> Database::ListTableId(const std::string& table)
+std::list<Uuid> Database::ListTableId(const std::string& table)
 {
     auto sql = std::format("SELECT id from {};", table);
     auto result = _db->Exec(sql);
     return ParseListTableIdResult(result);
 }
 
-std::vector<Uuid> Database::ParseListTableIdResult(Sqlite::ExecResult& result)
+std::list<Uuid> Database::ParseListTableIdResult(Sqlite::ExecResult& result)
 {
-     std::vector<Uuid> list{};
+    std::list<Uuid> list{};
     for (const auto& row : result)
     {
         try
@@ -227,7 +227,7 @@ std::vector<Uuid> Database::ParseListTableIdResult(Sqlite::ExecResult& result)
     return list;
 }
 
-std::vector<std::pair<Uuid, std::string>> Database::ListTableIdWithMetadata(
+std::list<std::pair<Uuid, std::string>> Database::ListTableIdWithMetadata(
     const std::string& table)
 {
     auto sql = std::format("SELECT id, metadata FROM {};", table);
@@ -235,10 +235,10 @@ std::vector<std::pair<Uuid, std::string>> Database::ListTableIdWithMetadata(
     return ParseListTableIdWithMetadataResult(result);
 }
 
-std::vector<std::pair<Uuid, std::string>> Database::ParseListTableIdWithMetadataResult(
+std::list<std::pair<Uuid, std::string>> Database::ParseListTableIdWithMetadataResult(
     Sqlite::ExecResult& result)
 {
-    std::vector<std::pair<Uuid, std::string>> list{};
+    std::list<std::pair<Uuid, std::string>> list{};
     for (const auto& row : result)
     {
         try
@@ -293,7 +293,7 @@ std::string Database::GetStringFromTableById(
     {
         throw std::runtime_error(std::format("Item not found in {}", table));
     }
-    auto row = result.at(0);
+    auto row = result.front();
     auto item = row.find(name);
     if (item == row.end())
     {
@@ -338,7 +338,7 @@ std::string Database::GetStringFromChat(
     {
         throw std::runtime_error("Chat not found");
     }
-    auto row = result.at(0);
+    auto row = result.front();
     auto item = row.find(name);
     if (item == row.end())
     {

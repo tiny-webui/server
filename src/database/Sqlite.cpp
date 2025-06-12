@@ -379,7 +379,7 @@ Sqlite::ExecResult Sqlite::ExecInternal(const UniqueStmt& stmt)
 			break;
 		case SQLITE_ROW:{
 			int columnCount = sqlite3_column_count(stmt);
-			std::map<std::string, Value> row;
+			std::unordered_map<std::string, Value> row;
 			for (int i = 0; i < columnCount; i++)
 			{
 				std::string columnName{sqlite3_column_name(stmt, i)};

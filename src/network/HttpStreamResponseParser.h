@@ -1,7 +1,7 @@
 #pragma once
 
 #include <string>
-#include <vector>
+#include <list>
 #include <optional>
 #include <js-style-co-routine/AsyncGenerator.h>
 
@@ -21,7 +21,7 @@ namespace TUI::Network::Http::StreamResponse
         Parser() = default;
         ~Parser() = default;
 
-        std::vector<Event> Feed(const std::string& response);
+        std::list<Event> Feed(const std::string& response);
         std::optional<Event> End();
     private:
         std::string _buffer{};

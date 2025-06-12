@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 #include <list>
-#include <map>
+#include <unordered_map>
 #include <js-style-co-routine/Promise.h>
 #include <tev-cpp/Tev.h>
 #include <sqlite3.h>
@@ -95,7 +95,7 @@ namespace TUI::Database
         Sqlite(Sqlite&&) noexcept = delete;
         Sqlite& operator=(Sqlite&&) noexcept = delete;
 
-        using ExecResult = std::vector<std::map<std::string, Value>>;
+        using ExecResult = std::list<std::unordered_map<std::string, Value>>;
         template<typename... Args>
         JS::Promise<ExecResult> ExecAsync(const std::string& query, Args&&... args)
         {

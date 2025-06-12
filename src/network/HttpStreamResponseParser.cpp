@@ -2,10 +2,10 @@
 
 using namespace TUI::Network::Http::StreamResponse;
 
-std::vector<Event> Parser::Feed(const std::string& response)
+std::list<Event> Parser::Feed(const std::string& response)
 {
     _buffer += response;
-    std::vector<Event> events;
+    std::list<Event> events;
     while (true)
     {
         /** Cut the event out */
