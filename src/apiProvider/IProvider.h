@@ -7,7 +7,7 @@
 #include "Option.h"
 #include "network/HttpClient.h"
 #include "network/HttpStreamResponseParser.h"
-#include "schema/Chat.h"
+#include "schema/IServer.h"
 
 namespace TUI::ApiProvider
 {
@@ -22,8 +22,8 @@ namespace TUI::ApiProvider
         virtual ~IProvider() = default;
         virtual nlohmann::json GetParams() const = 0;
         virtual void Initialize(const nlohmann::json& params) = 0;
-        virtual Network::Http::RequestData FormatRequest(const Schema::Chat::ChatHistory& history, bool stream) const = 0;
-        virtual Schema::Chat::MessageContent ParseResponse(const std::string& response) const = 0;
-        virtual std::optional<Schema::Chat::MessageContent> ParseStreamResponse(const Network::Http::StreamResponse::Event& event) const = 0;
+        virtual Network::Http::RequestData FormatRequest(const Schema::IServer::LinearHistory& history, bool stream) const = 0;
+        virtual Schema::IServer::MessageContent ParseResponse(const std::string& response) const = 0;
+        virtual std::optional<Schema::IServer::MessageContent> ParseStreamResponse(const Network::Http::StreamResponse::Event& event) const = 0;
     };
 }

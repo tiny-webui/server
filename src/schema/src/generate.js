@@ -10,6 +10,7 @@ import {
     schemaForTypeScriptSources
 } from 'quicktype-typescript-input';
 import fs from 'fs';
+import { argv } from 'process';
 
 async function generateCppFromTypeScript(sourceFile) {
     const schemaInput = new JSONSchemaInput(new FetchingJSONSchemaStore());
@@ -34,15 +35,20 @@ async function generateCppFromTypeScript(sourceFile) {
 }
 
 const scriptRoot = new URL('.', import.meta.url).pathname;
-const schemaRoot = `${scriptRoot}schema/`;
-const files = fs.readdirSync(schemaRoot).filter(file => file.endsWith('.ts'));
 
-for (const file of files) {
-    console.log(`Generating C++ code for ${file}...`);
-    const filePath = `${schemaRoot}${file}`;
-    const cppCode = await generateCppFromTypeScript(filePath);
-    const outputFilePath = `${scriptRoot}../${file.replace(/\.ts$/, '.h')}`;
-    fs.writeFileSync(outputFilePath, cppCode);
-    console.log(`Generated C++ code at ${outputFilePath}`);
+if (argv.length < 3) {
+    console.error('Usage: node generate.js <file.ts>');
+    process.exit(1);
 }
+const filePath = argv[2];
+const fileName = filePath.split('/').pop();
+if (fileName === undefined) {
+    console.error('Invalid file path provided.');
+    process.exit(1);
+}
+console.log(`Generating C++ code for ${filePath}...`);
+const cppCode = await generateCppFromTypeScript(filePath);
+const outputFilePath = `${scriptRoot}../${fileName.replace(/\.ts$/, '.h')}`;
+fs.writeFileSync(outputFilePath, cppCode);
+console.log(`Generated C++ code at ${outputFilePath}`);
 

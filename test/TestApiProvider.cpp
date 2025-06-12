@@ -29,10 +29,10 @@ static nlohmann::json LoadJsonFile(const std::filesystem::path& path)
     return nlohmann::json::parse(content);
 }
 
-static Schema::Chat::ChatHistory LoadChatHistory(const std::filesystem::path& path)
+static Schema::IServer::LinearHistory LoadChatHistory(const std::filesystem::path& path)
 {
     auto json = LoadJsonFile(path);
-    return json.get<Schema::Chat::ChatHistory>();
+    return json.get<Schema::IServer::LinearHistory>();
 }
 
 JS::Promise<void> TestBulkChatAsync()
@@ -103,7 +103,7 @@ int main(int argc, char const *argv[])
     }
     if (configFilePath.empty() || historyFilePath.empty())
     {
-        std::cerr << "Both config file and history file must be specified." << std::endl;
+        std::cerr << "Usage: " << argv[0] << " -c <config_file> -h <history_file>" << std::endl;
         return 1;
     }
 
