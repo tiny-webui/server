@@ -9,6 +9,7 @@
 #include "apiProvider/AzureOpenAI.h"
 #include "network/HttpClient.h"
 #include "network/HttpStreamResponseParser.h"
+#include "Utility.h"
 
 using namespace TUI;
 using namespace TUI::Network;
@@ -76,36 +77,10 @@ JS::Promise<void> TestStreamChatAsync()
     }
 }
 
-#define testAssert(expr, msg) \
-    if (!(expr)) \
-    { \
-        std::cerr << "Assertion failed: " << msg << " at " << __FILE__ << ":" << __LINE__ << std::endl; \
-        abort(); \
-    }
-
-#define RunAsyncTest(testFunc) \
-    do \
-    { \
-        try \
-        { \
-            std::cout << "Running test: " #testFunc << std::endl; \
-            co_await testFunc(); \
-            std::cout << "Test " #testFunc " completed successfully." << std::endl; \
-        } \
-        catch(const std::exception& e) \
-        { \
-            testAssert(false, "Unhandled exception: " + std::string(e.what())); \
-        } \
-        catch(...) \
-        { \
-            testAssert(false, "Unhandled unknown exception"); \
-        } \
-    } while (0)
-
 static JS::Promise<void> TestAsync()
 {
-    RunAsyncTest(TestBulkChatAsync);
-    RunAsyncTest(TestStreamChatAsync);
+    RunAsyncTest(TestBulkChatAsync());
+    RunAsyncTest(TestStreamChatAsync());
 }
 
 int main(int argc, char const *argv[])

@@ -54,7 +54,7 @@ int main(int argc, char const *argv[])
         lastPos = pos;
     }
 
-    std::vector<Event> allEvents;
+    std::list<Event> allEvents;
     for (const auto& piece : pieces)
     {
         auto events = parser.Feed(piece);

@@ -76,3 +76,64 @@ target_link_libraries(TestApiProvider
     PRIVATE
         tev-cpp
         curl)
+
+add_executable(TestTevInjectionQueue
+    TestTevInjectionQueue.cpp)
+
+target_include_directories(TestTevInjectionQueue
+    PRIVATE
+        ../src)
+
+target_link_libraries(TestTevInjectionQueue
+    PRIVATE
+        tev-cpp)
+
+add_executable(TestWorkerThread
+    TestWorkerThread.cpp)
+
+target_include_directories(TestWorkerThread
+    PRIVATE
+        ../src)
+
+target_link_libraries(TestWorkerThread
+    PRIVATE
+        tev-cpp)
+
+add_executable(TestSqlite
+    TestSqlite.cpp
+    ../src/database/Sqlite.cpp)
+
+target_include_directories(TestSqlite
+    PRIVATE
+        ../src)
+
+target_link_libraries(TestSqlite
+    PRIVATE
+        tev-cpp
+        sqlite3)
+
+add_executable(TestUuid
+    TestUuid.cpp)
+
+target_include_directories(TestUuid
+    PRIVATE
+        ../src)
+
+target_link_libraries(TestUuid
+    PRIVATE
+        uuid)
+
+add_executable(TestDatabase
+    TestDatabase
+    ../src/database/Database.cpp
+    ../src/database/Sqlite.cpp)
+
+target_include_directories(TestDatabase
+    PRIVATE
+        ../src)
+
+target_link_libraries(TestDatabase
+    PRIVATE
+        tev-cpp
+        sqlite3
+        uuid)

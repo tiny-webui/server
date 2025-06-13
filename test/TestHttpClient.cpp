@@ -2,15 +2,9 @@
 #include <tev-cpp/Tev.h>
 #include <js-style-co-routine/Promise.h>
 #include "network/HttpClient.h"
+#include "Utility.h"
 
 using namespace TUI::Network;
-
-#define assert(expr, msg) \
-    if (!(expr)) \
-    { \
-        std::cerr << "Assertion failed: " << msg << " at " << __FILE__ << ":" << __LINE__ << std::endl; \
-        abort(); \
-    }
 
 static Tev tev{};
 
@@ -150,34 +144,15 @@ JS::Promise<void> TestStreamCancelAsync(std::shared_ptr<Http::Client> client)
     }
 }
 
-#define RunAsyncTest(testFunc, client) \
-    do \
-    { \
-        try \
-        { \
-            std::cout << "Running test: " #testFunc << std::endl; \
-            co_await testFunc(client); \
-            std::cout << "Test " #testFunc " completed successfully." << std::endl; \
-        } \
-        catch(const std::exception& e) \
-        { \
-            assert(false, "Unhandled exception: " + std::string(e.what())); \
-        } \
-        catch(...) \
-        { \
-            assert(false, "Unhandled unknown exception"); \
-        } \
-    } while (0)
-
 JS::Promise<void> TestAsync()
 {
     auto client = Http::Client::Create(tev);
-    RunAsyncTest(TestGetAsync, client);
-    RunAsyncTest(TestPostAsync, client);
-    RunAsyncTest(TestCancelImmediatelyAsync, client);
-    RunAsyncTest(TestCancelAsync, client);
-    RunAsyncTest(TestStreamAsync, client);
-    RunAsyncTest(TestStreamCancelAsync, client);
+    RunAsyncTest(TestGetAsync(client));
+    RunAsyncTest(TestPostAsync(client));
+    RunAsyncTest(TestCancelImmediatelyAsync(client));
+    RunAsyncTest(TestCancelAsync(client));
+    RunAsyncTest(TestStreamAsync(client));
+    RunAsyncTest(TestStreamCancelAsync(client));
 }
 
 int main(int argc, char const *argv[])
