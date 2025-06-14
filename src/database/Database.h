@@ -28,7 +28,7 @@ namespace TUI::Database
         ~Database() = default;
 
         /** Model */
-        JS::Promise<void> CreateModelAsync(const Common::Uuid& id, const std::string& provider);
+        JS::Promise<Common::Uuid> CreateModelAsync(const std::string& provider);
         JS::Promise<void> DeleteModelAsync(const Common::Uuid& id);
         std::list<Common::Uuid> ListModel();
         std::list<std::pair<Common::Uuid, std::string>> ListModelWithMetadata();
@@ -39,7 +39,7 @@ namespace TUI::Database
         std::string GetModelProvider(const Common::Uuid& id);
 
         /** User */
-        JS::Promise<void> CreateUserAsync(const Common::Uuid& id);
+        JS::Promise<Common::Uuid> CreateUserAsync(const std::string& username);
         JS::Promise<void> DeleteUserAsync(const Common::Uuid& id);
         std::list<Common::Uuid> ListUser();
         std::list<std::pair<Common::Uuid, std::string>> ListUserWithMetadata();
@@ -47,9 +47,10 @@ namespace TUI::Database
         std::string GetUserMetadata(const Common::Uuid& id);
         JS::Promise<void> SetUserCredentialAsync(const Common::Uuid& id, std::string credential);
         std::string GetUserCredential(const Common::Uuid& id);
+        Common::Uuid GetUserId(const std::string& username);
 
         /** Chat */
-        JS::Promise<void> CreateChatAsync(const Common::Uuid& userId, const Common::Uuid& chatId);
+        JS::Promise<Common::Uuid> CreateChatAsync(const Common::Uuid& userId);
         JS::Promise<void> DeleteChatAsync(const Common::Uuid& userId, const Common::Uuid& chatId);
         size_t GetChatCount(const Common::Uuid& userId);
         std::list<Common::Uuid> ListChat(
