@@ -150,6 +150,21 @@ namespace Rpc {
         static constexpr double CONFLICT = 409;
         static constexpr double LOCKED = 423;
     };
+
+    class Exception : public std::runtime_error
+    {
+    public:
+        Exception(double code, const std::string& message)
+            : std::runtime_error(message), _code(code)
+        {
+        }
+        double get_code() const noexcept
+        {
+            return _code;
+        }
+    private:
+        double _code;
+    };
 }
 }
 }

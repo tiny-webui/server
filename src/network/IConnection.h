@@ -18,6 +18,7 @@ namespace TUI::Network
         IConnection& operator=(IConnection&&) = delete;
 
         virtual void Close() = 0;
+        virtual bool IsClosed() const noexcept = 0;
         virtual void Send(std::vector<std::uint8_t> message) = 0;
         virtual JS::Promise<std::optional<std::vector<std::uint8_t>>> ReceiveAsync() = 0;
         virtual Identity GetId() const = 0;
@@ -38,5 +39,6 @@ namespace TUI::Network
         virtual void Close() = 0;
         virtual void Send(std::vector<std::uint8_t> message) = 0;
         virtual JS::Promise<std::optional<std::vector<std::uint8_t>>> ReceiveAsync() = 0;
+        virtual bool IsClosed() const noexcept = 0;
     };
 }

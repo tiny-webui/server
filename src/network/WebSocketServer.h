@@ -27,6 +27,7 @@ namespace TUI::Network::WebSocket
         Server& operator=(Server&&) = delete;
 
         void Close() override;
+        bool IsClosed() const noexcept override;
         JS::Promise<std::optional<std::shared_ptr<IConnection<void>>>> AcceptAsync() override;
 
         /** DO NOT call these directly. You do not have the id do to so. */
@@ -47,6 +48,7 @@ namespace TUI::Network::WebSocket
             Connection& operator=(Connection&&) = delete;
 
             void Close() override;
+            bool IsClosed() const noexcept override;
             void Send(std::vector<std::uint8_t> message) override;
             JS::Promise<std::optional<std::vector<std::uint8_t>>> ReceiveAsync() override;
         private:
@@ -54,6 +56,7 @@ namespace TUI::Network::WebSocket
             std::uint64_t _id;
             std::weak_ptr<Server> _server;
             JS::AsyncGenerator<std::vector<std::uint8_t>> _receiveGenerator{};
+            bool _closed{false};
         };
 
         struct LwsConnection

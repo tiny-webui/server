@@ -17,6 +17,7 @@ namespace TUI::Network
         IServer& operator=(IServer&&) = delete;
 
         virtual void Close() = 0;
+        virtual bool IsClosed() const noexcept = 0;
         virtual JS::Promise<std::optional<std::shared_ptr<IConnection<Identity>>>> AcceptAsync() = 0;
     };
 
@@ -33,6 +34,7 @@ namespace TUI::Network
         IServer& operator=(IServer&&) = delete;
 
         virtual void Close() = 0;
+        virtual bool IsClosed() const noexcept = 0;
         virtual JS::Promise<std::optional<std::shared_ptr<IConnection<void>>>> AcceptAsync() = 0;
     };
 }

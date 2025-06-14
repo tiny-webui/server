@@ -137,3 +137,10 @@ target_link_libraries(TestDatabase
         tev-cpp
         sqlite3
         uuid)
+
+add_executable(TestRpcServer
+    TestRpcServer.cpp)
+
+target_include_directories(TestRpcServer
+    PRIVATE
+        ../src)

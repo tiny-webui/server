@@ -35,9 +35,15 @@ void Server::Connection::Close()
     auto server = _server.lock();
     if (!server)
     {
+        _closed = true;
         return;
     }
     server->CloseConnection(_id);
+}
+
+bool Server::Connection::IsClosed() const noexcept
+{
+    return _closed;
 }
 
 void Server::Connection::Send(std::vector<std::uint8_t> message)
@@ -126,6 +132,11 @@ void Server::Close()
     CloseInternal();
 }
 
+bool Server::IsClosed() const noexcept
+{
+    return _closed;
+}
+
 void Server::CloseInternal(bool closedByLws)
 {
     if (_closed)
@@ -167,6 +178,7 @@ void Server::CloseConnection(std::uint64_t id, bool closedByPeer)
     }
     auto connection = it->second;
     _connections.erase(it);
+    connection->_closed = true;
     if (!closedByPeer)
     {
         SendMessageToLwsThread(
