@@ -24,8 +24,7 @@ void TestClose()
 
 JS::Promise<void> TestModelAsync()
 {
-    Uuid modelId{};
-    co_await db->CreateModelAsync(modelId, "test-provider");
+    auto modelId = co_await db->CreateModelAsync("test-provider");
     auto models = db->ListModel();
     bool modelFound = false;
     for (const auto& model : models)
@@ -61,8 +60,8 @@ JS::Promise<void> TestModelAsync()
 
 JS::Promise<void> TestUserAsync()
 {
-    Uuid userId{};
-    co_await db->CreateUserAsync(userId);
+    std::string username = "test-user";
+    auto userId = co_await db->CreateUserAsync(username);
     auto users = db->ListUser();
     bool userFound = false;
     for (const auto& user : users)
@@ -80,6 +79,29 @@ JS::Promise<void> TestUserAsync()
     co_await db->SetUserCredentialAsync(userId, "test-credential");
     auto credential = db->GetUserCredential(userId);
     AssertWithMessage(credential == "test-credential", "User credential should match");
+    auto foundUserId = db->GetUserId(username);
+    AssertWithMessage(foundUserId == userId, "GetUserId should return the correct user ID");
+    auto userWithMetadata = db->ListUserWithMetadata();
+    bool userWithMetadataFound = false;
+    for (const auto& user : userWithMetadata)
+    {
+        if (user.first == userId && user.second == "test-user-metadata")
+        {
+            userWithMetadataFound = true;
+            break;
+        }
+    }
+    AssertWithMessage(userWithMetadataFound, "User with metadata not found");
+    try
+    {
+        Uuid userId2{};
+        co_await db->CreateUserAsync(username);
+        AssertWithMessage(false, "Creating user with existing username should throw an exception");
+    }
+    catch(const std::exception& e)
+    {
+        /** ignore */
+    }
     co_await db->DeleteUserAsync(userId);
     users = db->ListUser();
     userFound = false;
@@ -96,10 +118,9 @@ JS::Promise<void> TestUserAsync()
 
 JS::Promise<void> TestChatAsync()
 {
-    Uuid userId{};
-    Uuid chatId{};
-    co_await db->CreateUserAsync(userId);
-    co_await db->CreateChatAsync(userId, chatId);
+    std::string username = "test-user2";
+    auto userId = co_await db->CreateUserAsync(username);
+    auto chatId = co_await db->CreateChatAsync(userId);
     auto chats = db->ListChat(userId);
     bool chatFound = false;
     for (const auto& chat : chats)
@@ -131,7 +152,7 @@ JS::Promise<void> TestChatAsync()
         }
     }
     AssertWithMessage(!chatFound, "Deleted chat found");
-    co_await db->CreateChatAsync(userId, chatId);
+    chatId = co_await db->CreateChatAsync(userId);
     chats = db->ListChat(userId);
     chatFound = false;
     for (const auto& chat : chats)
@@ -163,6 +184,8 @@ JS::Promise<void> TestAsync()
     /** Always run this first */
     RunAsyncTest(TestCreateAsync());
     RunAsyncTest(TestModelAsync());
+    RunAsyncTest(TestUserAsync());
+    RunAsyncTest(TestChatAsync());
     RunTest(TestClose());
 }
 

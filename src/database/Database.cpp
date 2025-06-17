@@ -9,34 +9,36 @@ JS::Promise<std::shared_ptr<Database>> Database::CreateAsync(Tev& tev, const std
     auto db = std::shared_ptr<Database>(new Database());
     db->_db = co_await Sqlite::CreateAsync(tev, dbPath);
     /** Create tables */
-    db->_db->ExecAsync(
+    co_await db->_db->ExecAsync(
         "CREATE TABLE IF NOT EXISTS model ("
         "id TEXT PRIMARY KEY, "
         "provider TEXT, "
         "metadata TEXT, "
         "params TEXT);");
-    db->_db->ExecAsync(
+    co_await db->_db->ExecAsync(
         "CREATE TABLE IF NOT EXISTS user ("
         "id TEXT PRIMARY KEY, "
+        "username TEXT UNIQUE, "
         "metadata TEXT, "
         "credential TEXT);");
-    db->_db->ExecAsync(
+    co_await db->_db->ExecAsync(
         "CREATE TABLE IF NOT EXISTS chat ("
         "timestamp INTEGER, "
         "user_id TEXT, "
         "id TEXT, "
         "metadata TEXT, "
         "content TEXT, "
-        "PRIMARY KEY (user_id, id), "
-        "FOREIGN KEY (user_id) REFERENCES user(id) ON DELETE CASCADE);");
+        "PRIMARY KEY (user_id, id));");
     co_return db;
 }
 
-JS::Promise<void> Database::CreateModelAsync(const Common::Uuid& id, const std::string& provider)
+JS::Promise<Uuid> Database::CreateModelAsync(const std::string& provider)
 {
+    Uuid id{};
     co_await _db->ExecAsync(
         "INSERT INTO model (id, provider) VALUES (?, ?);",
         static_cast<std::string>(id), provider);
+    co_return id;
 }
 
 JS::Promise<void> Database::DeleteModelAsync(const Common::Uuid& id)
@@ -81,18 +83,22 @@ std::string Database::GetModelProvider(const Uuid& id)
     return GetStringFromTableById("model", id, "provider");
 }
 
-JS::Promise<void> Database::CreateUserAsync(const Uuid& id)
+JS::Promise<Uuid> Database::CreateUserAsync(const std::string& username)
 {
+    Uuid id{};
     co_await _db->ExecAsync(
-        "INSERT INTO user (id) VALUES (?);",
-        static_cast<std::string>(id));
+        "INSERT INTO user (id, username) VALUES (?, ?);",
+        static_cast<std::string>(id), username);
+    co_return id;
 }
 
 JS::Promise<void> Database::DeleteUserAsync(const Uuid& id)
 {
-    /** This should also clean up chats linked to this user */
     co_await _db->ExecAsync(
         "DELETE FROM user WHERE id = ?",
+        static_cast<std::string>(id));
+    co_await _db->ExecAsync(
+        "DELETE FROM chat WHERE user_id = ?",
         static_cast<std::string>(id));
 }
 
@@ -126,11 +132,31 @@ std::string Database::GetUserCredential(const Uuid& id)
     return GetStringFromTableById("user", id, "credential");
 }
 
-JS::Promise<void> Database::CreateChatAsync(const Uuid& userId, const Uuid& id)
+Uuid Database::GetUserId(const std::string& username)
 {
+    auto result = _db->Exec(
+        "SELECT id FROM user WHERE username = ?;",
+        username);
+    if (result.empty())
+    {
+        throw std::runtime_error("User not found");
+    }
+    auto row = result.front();
+    auto item = row.find("id");
+    if (item == row.end())
+    {
+        throw std::runtime_error("User ID not found");
+    }
+    return Uuid(item->second.Get<std::string>());
+}
+
+JS::Promise<Uuid> Database::CreateChatAsync(const Uuid& userId)
+{
+    Uuid id{};
     co_await _db->ExecAsync(
         "INSERT INTO chat (timestamp, user_id, id) VALUES(?, ?, ?);",
         GetTimestamp(), static_cast<std::string>(userId), static_cast<std::string>(id));
+    co_return id;
 }
 
 JS::Promise<void> Database::DeleteChatAsync(const Uuid& userId, const Uuid& id)
