@@ -144,3 +144,10 @@ add_executable(TestRpcServer
 target_include_directories(TestRpcServer
     PRIVATE
         ../src)
+
+add_executable(TestResourceVersionManager
+    TestResourceVersionManager.cpp)
+
+target_include_directories(TestResourceVersionManager
+    PRIVATE
+        ../src)
