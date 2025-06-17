@@ -32,7 +32,7 @@ void AzureOpenAI::Initialize(const nlohmann::json& params)
     _params = ParamsDefinition.Parse(params);
 }
 
-RequestData AzureOpenAI::FormatRequest(const Schema::Chat::ChatHistory& history, bool stream) const
+RequestData AzureOpenAI::FormatRequest(const Schema::IServer::LinearHistory& history, bool stream) const
 {
     RequestData data{};
     data.url = _params.url;
@@ -43,22 +43,21 @@ RequestData AzureOpenAI::FormatRequest(const Schema::Chat::ChatHistory& history,
     nlohmann::json body = {
         {"messages", nlohmann::json::array()},
         {"temperature", 0.5},
-        {"top_p", 1.0},
         {"stream", stream}
     };
     for (const auto& message : history)
     {
         auto messageJson = nlohmann::json::object();
         messageJson["content"] = nlohmann::json::array();
-        if (message.get_role() == Schema::Chat::Role::DEVELOPER)
+        if (message.get_role() == Schema::IServer::Role::DEVELOPER)
         {
             messageJson["role"] = "system";
         }
-        else if(message.get_role() == Schema::Chat::Role::USER)
+        else if(message.get_role() == Schema::IServer::Role::USER)
         {
             messageJson["role"] = "user";
         }
-        else if(message.get_role() == Schema::Chat::Role::ASSISTANT)
+        else if(message.get_role() == Schema::IServer::Role::ASSISTANT)
         {
             messageJson["role"] = "assistant";
         }
@@ -68,7 +67,7 @@ RequestData AzureOpenAI::FormatRequest(const Schema::Chat::ChatHistory& history,
         }
         for (const auto& content : message.get_content())
         {
-            if (content.get_type() == Schema::Chat::Type::TEXT || content.get_type() == Schema::Chat::Type::REFUSAL)
+            if (content.get_type() == Schema::IServer::Type::TEXT || content.get_type() == Schema::IServer::Type::REFUSAL)
             {
                 /** Azure open ai does not seem to have a special REFUSAL message type */
                 messageJson["content"].push_back({
@@ -76,7 +75,7 @@ RequestData AzureOpenAI::FormatRequest(const Schema::Chat::ChatHistory& history,
                     {"text", content.get_data()}
                 });
             }
-            else if (content.get_type() == Schema::Chat::Type::IMAGE_URL)
+            else if (content.get_type() == Schema::IServer::Type::IMAGE_URL)
             {
                 messageJson["content"].push_back({
                     {"type", "image_url"},
@@ -96,7 +95,7 @@ RequestData AzureOpenAI::FormatRequest(const Schema::Chat::ChatHistory& history,
     return data;
 }
 
-Schema::Chat::MessageContent AzureOpenAI::ParseResponse(const std::string& responseString) const
+Schema::IServer::MessageContent AzureOpenAI::ParseResponse(const std::string& responseString) const
 {
     Schema::AzureOpenAI::BulkResponse response;
     try
@@ -113,13 +112,13 @@ Schema::Chat::MessageContent AzureOpenAI::ParseResponse(const std::string& respo
     }
     const auto& choice = response.get_choices().front();
     const auto& message = choice.get_message();
-    Schema::Chat::MessageContent content;
-    content.set_type(message.get_refusal() ? Schema::Chat::Type::REFUSAL : Schema::Chat::Type::TEXT);
+    Schema::IServer::MessageContent content;
+    content.set_type(message.get_refusal() ? Schema::IServer::Type::REFUSAL : Schema::IServer::Type::TEXT);
     content.set_data(message.get_content());
     return content;
 }
 
-std::optional<Schema::Chat::MessageContent> AzureOpenAI::ParseStreamResponse(const StreamResponse::Event& event) const
+std::optional<Schema::IServer::MessageContent> AzureOpenAI::ParseStreamResponse(const StreamResponse::Event& event) const
 {
     if (!event.value.has_value())
     {
@@ -149,8 +148,8 @@ std::optional<Schema::Chat::MessageContent> AzureOpenAI::ParseStreamResponse(con
     {
         return std::nullopt;
     }
-    Schema::Chat::MessageContent content{};
-    content.set_type(Schema::Chat::Type::TEXT);
+    Schema::IServer::MessageContent content{};
+    content.set_type(Schema::IServer::Type::TEXT);
     content.set_data(delta.get_content());
     return content;
 }

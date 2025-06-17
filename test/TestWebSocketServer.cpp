@@ -7,7 +7,7 @@
 using namespace TUI::Network;
 
 static Tev tev{};
-static std::shared_ptr<WebSocket::Server> server{nullptr};
+static std::shared_ptr<IServer<void>> server{nullptr};
 static int exitFd = -1;
 
 std::vector<std::uint8_t> StringToBytes(const std::string_view& str)
@@ -15,7 +15,7 @@ std::vector<std::uint8_t> StringToBytes(const std::string_view& str)
     return std::vector<std::uint8_t>(str.begin(), str.end());
 }
 
-JS::Promise<void> ReceiveMessageAsync(std::shared_ptr<WebSocket::Connection> connection)
+JS::Promise<void> ReceiveMessageAsync(std::shared_ptr<IConnection<void>> connection)
 {
     while (true)
     {

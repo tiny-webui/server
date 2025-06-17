@@ -9,45 +9,26 @@
 #include <tev-cpp/Tev.h>
 #include "LwsTypes.h"
 #include "common/UniqueTypes.h"
+#include "IConnection.h"
+#include "IServer.h"
 
 namespace TUI::Network::WebSocket
 {
-    class Server;
-
-    class Connection : public std::enable_shared_from_this<Connection>
-    {
-        friend class Server;
-    public:
-        ~Connection();
-        Connection(const Connection&) = delete;
-        Connection& operator=(const Connection&) = delete;
-        Connection(Connection&&) = delete;
-        Connection& operator=(Connection&&) = delete;
-
-        void Close();
-        void Send(std::vector<std::uint8_t> message);
-        JS::Promise<std::optional<std::vector<std::uint8_t>>> ReceiveAsync();
-    private:
-        Connection(std::uint64_t id, std::shared_ptr<Server> server);
-        std::uint64_t _id;
-        std::weak_ptr<Server> _server;
-        JS::AsyncGenerator<std::vector<std::uint8_t>> _receiveGenerator{};
-    };
-
-    class Server : public std::enable_shared_from_this<Server> 
+    class Server : public IServer<void>, public std::enable_shared_from_this<Server> 
     {
     public:
-        static std::shared_ptr<Server> Create(Tev& tev, const std::string& address, int port);
-        static std::shared_ptr<Server> Create(Tev& tev, const std::string& unixSocketPath);    
+        static std::shared_ptr<IServer<void>> Create(Tev& tev, const std::string& address, int port);
+        static std::shared_ptr<IServer<void>> Create(Tev& tev, const std::string& unixSocketPath);    
 
-        ~Server();
+        ~Server() override;
         Server(const Server&) = delete;
         Server& operator=(const Server&) = delete;
         Server(Server&&) = delete;
         Server& operator=(Server&&) = delete;
 
-        void Close();
-        JS::Promise<std::optional<std::shared_ptr<Connection>>> AcceptAsync();
+        void Close() override;
+        bool IsClosed() const noexcept override;
+        JS::Promise<std::optional<std::shared_ptr<IConnection<void>>>> AcceptAsync() override;
 
         /** DO NOT call these directly. You do not have the id do to so. */
         void CloseConnection(std::uint64_t id, bool closedByPeer = false);
@@ -55,6 +36,28 @@ namespace TUI::Network::WebSocket
     private:
         /** 1MiB */
         static constexpr size_t LWS_BUFFER_SIZE = 1 * 1024 * 1024; 
+
+        class Connection : public IConnection<void>, public std::enable_shared_from_this<Connection>
+        {
+            friend class Server;
+        public:
+            ~Connection() override;
+            Connection(const Connection&) = delete;
+            Connection& operator=(const Connection&) = delete;
+            Connection(Connection&&) = delete;
+            Connection& operator=(Connection&&) = delete;
+
+            void Close() override;
+            bool IsClosed() const noexcept override;
+            void Send(std::vector<std::uint8_t> message) override;
+            JS::Promise<std::optional<std::vector<std::uint8_t>>> ReceiveAsync() override;
+        private:
+            Connection(std::uint64_t id, std::shared_ptr<Server> server);
+            std::uint64_t _id;
+            std::weak_ptr<Server> _server;
+            JS::AsyncGenerator<std::vector<std::uint8_t>> _receiveGenerator{};
+            bool _closed{false};
+        };
 
         struct LwsConnection
         {
@@ -120,7 +123,7 @@ namespace TUI::Network::WebSocket
         std::unique_ptr<LwsTypes::Context> _context{nullptr};   /** lws thread only */
         std::uint64_t _connectionIdSeed{0};                     /** lws thread only */
         std::unordered_map<std::uint64_t, std::shared_ptr<Connection>> _connections{};
-        JS::AsyncGenerator<std::shared_ptr<Connection>> _connectionGenerator{};
+        JS::AsyncGenerator<std::shared_ptr<IConnection<void>>> _connectionGenerator{};
         std::unordered_map<std::uint64_t, std::unique_ptr<LwsConnection>> _lwsConnections{}; /** lws thread only */
         std::thread _lwsThread{};
         bool _lwsThreadShouldExit{false};                       /** lws thread only */
@@ -133,8 +136,7 @@ namespace TUI::Network::WebSocket
 
         /** Functions */
         static int LwsCallback(struct lws* wsi, enum lws_callback_reasons reason, void* user, void* in, size_t len) noexcept;
-        Server(Tev& tev, const std::string& address, int port);
-        Server(Tev& tev, const std::string& unixSocketPath);
+        Server(Tev& tev, const std::string& address, int port, bool addressIsUds = false);
         void LwsThreadFunc();
         void ITCRxCallback();
         void SendMessageToMainThread(ITCType type, std::unique_ptr<IITCData> data = nullptr);
