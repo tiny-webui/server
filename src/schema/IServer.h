@@ -15,7 +15,7 @@
 //     GetChatListParams data = nlohmann::json::parse(jsonString);
 //     GetChatListResult data = nlohmann::json::parse(jsonString);
 //     ChatCompletionParams data = nlohmann::json::parse(jsonString);
-//     GetLastCompletionInfoResult data = nlohmann::json::parse(jsonString);
+//     ChatCompletionInfo data = nlohmann::json::parse(jsonString);
 //     ExecuteGenerationTaskParams data = nlohmann::json::parse(jsonString);
 //     GetModelListParams data = nlohmann::json::parse(jsonString);
 //     GetModelListResult data = nlohmann::json::parse(jsonString);
@@ -559,10 +559,10 @@ namespace IServer {
         void set_user_message(const Message & value) { this->user_message = value; }
     };
 
-    class GetLastCompletionInfoResult {
+    class ChatCompletionInfo {
         public:
-        GetLastCompletionInfoResult() = default;
-        virtual ~GetLastCompletionInfoResult() = default;
+        ChatCompletionInfo() = default;
+        virtual ~ChatCompletionInfo() = default;
 
         private:
         std::string assistant_message_id;
@@ -748,8 +748,8 @@ namespace IServer {
     void from_json(const json & j, ChatCompletionParams & x);
     void to_json(json & j, const ChatCompletionParams & x);
 
-    void from_json(const json & j, GetLastCompletionInfoResult & x);
-    void to_json(json & j, const GetLastCompletionInfoResult & x);
+    void from_json(const json & j, ChatCompletionInfo & x);
+    void to_json(json & j, const ChatCompletionInfo & x);
 
     void from_json(const json & j, ExecuteGenerationTaskParams & x);
     void to_json(json & j, const ExecuteGenerationTaskParams & x);
@@ -1019,12 +1019,12 @@ namespace IServer {
         j["userMessage"] = x.get_user_message();
     }
 
-    inline void from_json(const json & j, GetLastCompletionInfoResult& x) {
+    inline void from_json(const json & j, ChatCompletionInfo& x) {
         x.set_assistant_message_id(j.at("assistantMessageId").get<std::string>());
         x.set_user_message_id(j.at("userMessageId").get<std::string>());
     }
 
-    inline void to_json(json & j, const GetLastCompletionInfoResult & x) {
+    inline void to_json(json & j, const ChatCompletionInfo & x) {
         j = json::object();
         j["assistantMessageId"] = x.get_assistant_message_id();
         j["userMessageId"] = x.get_user_message_id();

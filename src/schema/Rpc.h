@@ -132,6 +132,7 @@ namespace Rpc {
         private:
         bool end;
         double id;
+        nlohmann::json result;
 
         public:
         const bool & get_end() const { return end; }
@@ -141,6 +142,10 @@ namespace Rpc {
         const double & get_id() const { return id; }
         double & get_mutable_id() { return id; }
         void set_id(const double & value) { this->id = value; }
+
+        const nlohmann::json & get_result() const { return result; }
+        nlohmann::json & get_mutable_result() { return result; }
+        void set_result(const nlohmann::json & value) { this->result = value; }
     };
 
     struct ErrorCode
@@ -236,12 +241,14 @@ namespace Rpc {
     inline void from_json(const json & j, StreamEndResponse& x) {
         x.set_end(j.at("end").get<bool>());
         x.set_id(j.at("id").get<double>());
+        x.set_result(get_untyped(j, "result"));
     }
 
     inline void to_json(json & j, const StreamEndResponse & x) {
         j = json::object();
         j["end"] = x.get_end();
         j["id"] = x.get_id();
+        j["result"] = x.get_result();
     }
 }
 }
