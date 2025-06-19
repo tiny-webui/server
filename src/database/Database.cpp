@@ -20,6 +20,8 @@ JS::Promise<std::shared_ptr<Database>> Database::CreateAsync(Tev& tev, const std
         "id TEXT PRIMARY KEY, "
         "username TEXT UNIQUE, "
         "metadata TEXT, "
+        "public_metadata TEXT, "
+        "admin_settings TEXT, "
         "credential TEXT);");
     co_await db->_db->ExecAsync(
         "CREATE TABLE IF NOT EXISTS chat ("
@@ -48,14 +50,10 @@ JS::Promise<void> Database::DeleteModelAsync(const Common::Uuid& id)
         static_cast<std::string>(id));
 }
 
-std::list<Uuid> Database::ListModel()
+std::list<Database::IdMetadataPair> Database::ListModel()
 {
-    return ListTableId("model");
-}
-
-std::list<std::pair<Uuid, std::string>> Database::ListModelWithMetadata()
-{
-    return ListTableIdWithMetadata("model");
+    auto result = _db->Exec("SELECT id, metadata FROM model;");
+    return ParseListTableIdWithMetadataResult(result);
 }
 
 JS::Promise<void> Database::SetModelMetadataAsync(const Uuid& id, std::string metadata)
@@ -83,33 +81,94 @@ std::string Database::GetModelProvider(const Uuid& id)
     return GetStringFromTableById("model", id, "provider");
 }
 
-JS::Promise<Uuid> Database::CreateUserAsync(const std::string& username)
+JS::Promise<Uuid> Database::CreateUserAsync(
+    std::string username, std::string adminSettings, std::string credential)
 {
     Uuid id{};
     co_await _db->ExecAsync(
-        "INSERT INTO user (id, username) VALUES (?, ?);",
-        static_cast<std::string>(id), username);
+        "INSERT INTO user (id, username, admin_settings, credential) VALUES (?, ?, ?, ?);",
+        static_cast<std::string>(id),
+        std::move(username),
+        std::move(adminSettings),
+        std::move(credential));
     co_return id;
 }
 
 JS::Promise<void> Database::DeleteUserAsync(const Uuid& id)
 {
     co_await _db->ExecAsync(
-        "DELETE FROM user WHERE id = ?",
+        "DELETE FROM user WHERE id = ?;",
         static_cast<std::string>(id));
     co_await _db->ExecAsync(
-        "DELETE FROM chat WHERE user_id = ?",
+        "DELETE FROM chat WHERE user_id = ?;",
         static_cast<std::string>(id));
 }
 
-std::list<Uuid> Database::ListUser()
+std::list<Database::UserListItem> Database::ListUser()
 {
-    return ListTableId("user");
+    auto result = _db->Exec("SELECT id, username, admin_settings, public_metadata FROM user;");
+    std::list<UserListItem> list{};
+    for (auto& row : result)
+    {
+        try
+        {
+            auto idItem = row.find("id");
+            if (idItem == row.end())
+            {
+                continue;
+            }
+            Uuid id{std::get<std::string>(idItem->second)};
+
+            auto usernameItem = row.find("username");
+            if (usernameItem == row.end())
+            {
+                continue;
+            }
+            std::string username = std::move(std::get<std::string>(usernameItem->second));
+
+            auto adminSettingsItem = row.find("admin_settings");
+            if (adminSettingsItem == row.end())
+            {
+                continue;
+            }
+            std::string adminSettings = std::move(std::get<std::string>(adminSettingsItem->second));
+
+            auto metadataItem = row.find("public_metadata");
+            std::string metadata{};
+            if (metadataItem == row.end())
+            {
+                continue;
+            }
+            if (std::holds_alternative<std::string>(metadataItem->second))
+            {
+                metadata = std::move(std::get<std::string>(metadataItem->second));
+            }
+            else if (!std::holds_alternative<std::nullptr_t>(metadataItem->second))
+            {
+                /** Invalid metadata */
+                continue;
+            }
+
+            list.emplace_back(
+                id, std::move(username), std::move(adminSettings), std::move(metadata));
+        }
+        catch(...)
+        {
+            /** @todo log */
+            /** Ignored, avoid corrupted data from corrupting the whole application */
+        }
+    }
+    return list;
 }
 
-std::list<std::pair<Uuid, std::string>> Database::ListUserWithMetadata()
+JS::Promise<void> Database::SetUserPublicMetadataAsync(const Uuid& id, std::string metadata)
 {
-    return ListTableIdWithMetadata("user");
+    return SetStringToTableById("user", id, "public_metadata", std::move(metadata));
+}
+
+std::string Database::GetUserPublicMetadataAsync(const Uuid& id)
+{
+    return GetStringFromTableById("user", id, "public_metadata");
 }
 
 JS::Promise<void> Database::SetUserMetadataAsync(const Uuid& id, std::string metadata)
@@ -120,6 +179,16 @@ JS::Promise<void> Database::SetUserMetadataAsync(const Uuid& id, std::string met
 std::string Database::GetUserMetadata(const Uuid& id)
 {
     return GetStringFromTableById("user", id, "metadata");
+}
+
+JS::Promise<void> Database::SetUserAdminSettingsAsync(const Uuid& id, std::string settings)
+{
+    return SetStringToTableById("user", id, "admin_settings", std::move(settings));
+}
+
+std::string Database::GetUserAdminSettings(const Uuid& id)
+{
+    return GetStringFromTableById("user", id, "admin_settings");
 }
 
 JS::Promise<void> Database::SetUserCredentialAsync(const Uuid& id, std::string credential)
@@ -147,7 +216,7 @@ Uuid Database::GetUserId(const std::string& username)
     {
         throw std::runtime_error("User ID not found");
     }
-    return Uuid(item->second.Get<std::string>());
+    return Uuid{std::get<std::string>(item->second)};
 }
 
 JS::Promise<Uuid> Database::CreateChatAsync(const Uuid& userId)
@@ -181,19 +250,10 @@ size_t Database::GetChatCount(const Uuid& userId)
     {
         throw std::runtime_error("Count not found");
     }
-    return static_cast<size_t>(item->second.Get<int64_t>());
+    return static_cast<size_t>(std::get<int64_t>(item->second));
 }
 
-std::list<Uuid> Database::ListChat(const Uuid& userId, size_t from, size_t limit)
-{
-    auto sql = std::format(
-        "SELECT id FROM chat WHERE user_id = ? ORDER BY timestamp DESC LIMIT {} OFFSET {}",
-        limit, from);
-    auto result = _db->Exec(sql, static_cast<std::string>(userId));
-    return ParseListTableIdResult(result);
-}
-
-std::list<std::pair<Uuid, std::string>> Database::ListChatWithMetadata(
+std::list<Database::IdMetadataPair> Database::ListChat(
     const Uuid& userId, size_t from , size_t limit)
 {
     auto sql = std::format(
@@ -223,49 +283,11 @@ std::string Database::GetChatContent(const Uuid& userId, const Uuid& id)
     return GetStringFromChat(userId, id, "content");
 }
 
-std::list<Uuid> Database::ListTableId(const std::string& table)
-{
-    auto sql = std::format("SELECT id from {};", table);
-    auto result = _db->Exec(sql);
-    return ParseListTableIdResult(result);
-}
-
-std::list<Uuid> Database::ParseListTableIdResult(Sqlite::ExecResult& result)
-{
-    std::list<Uuid> list{};
-    for (const auto& row : result)
-    {
-        try
-        {
-            auto item = row.find("id");
-            if (item == row.end())
-            {
-                continue;
-            }
-            list.emplace_back(Uuid(item->second.template Get<std::string>()));
-        }
-        catch(...)
-        {
-            /** @todo log */
-            /** Ignored. Avoid corrupted data from corrupting the whole application. */
-        }
-    }
-    return list;
-}
-
-std::list<std::pair<Uuid, std::string>> Database::ListTableIdWithMetadata(
-    const std::string& table)
-{
-    auto sql = std::format("SELECT id, metadata FROM {};", table);
-    auto result = _db->Exec(sql);
-    return ParseListTableIdWithMetadataResult(result);
-}
-
-std::list<std::pair<Uuid, std::string>> Database::ParseListTableIdWithMetadataResult(
+std::list<Database::IdMetadataPair> Database::ParseListTableIdWithMetadataResult(
     Sqlite::ExecResult& result)
 {
-    std::list<std::pair<Uuid, std::string>> list{};
-    for (const auto& row : result)
+    std::list<IdMetadataPair> list{};
+    for (auto& row : result)
     {
         try
         {
@@ -274,17 +296,17 @@ std::list<std::pair<Uuid, std::string>> Database::ParseListTableIdWithMetadataRe
             {
                 continue;
             }
-            Uuid id{idItem->second.template Get<std::string>()};
+            Uuid id{std::get<std::string>(idItem->second)};
             auto metadataItem = row.find("metadata");
             if (metadataItem == row.end())
             {
                 continue;
             }
-            if (metadataItem->second.GetType() == Sqlite::Value::Type::text)
+            if (std::holds_alternative<std::string>(metadataItem->second))
             {
-                list.emplace_back(id, std::move(metadataItem->second));
+                list.emplace_back(id, std::move(std::get<std::string>(metadataItem->second)));
             }
-            else if (metadataItem->second.GetType() == Sqlite::Value::Type::null)
+            else if (std::holds_alternative<std::nullptr_t>(metadataItem->second))
             {
                 /** If metadata is not set, treat it as an empty string */
                 list.emplace_back(id, std::string{});
@@ -325,11 +347,11 @@ std::string Database::GetStringFromTableById(
     {
         throw std::runtime_error(std::format("{} not found in row", name));
     }
-    if (item->second.GetType() == Sqlite::Value::Type::text)
+    if (std::holds_alternative<std::string>(item->second))
     {
-        return static_cast<std::string>(item->second);
+        return std::move(std::get<std::string>(item->second));
     }
-    else if (item->second.GetType() == Sqlite::Value::Type::null)
+    else if (std::holds_alternative<std::nullptr_t>(item->second))
     {
         /** If the string is not set, return an empty string. */
         return std::string{};
@@ -370,11 +392,11 @@ std::string Database::GetStringFromChat(
     {
         throw std::runtime_error(std::format("{} not found in row", name));
     }
-    if (item->second.GetType() == Sqlite::Value::Type::text)
+    if (std::holds_alternative<std::string>(item->second))
     {
-        return static_cast<std::string>(item->second);
+        return std::move(std::get<std::string>(item->second));
     }
-    else if (item->second.GetType() == Sqlite::Value::Type::null)
+    else if (std::holds_alternative<std::nullptr_t>(item->second))
     {
         /** If the string is not set, return an empty string. */
         return std::string{};
