@@ -218,44 +218,6 @@ namespace IServer {
         void set_role(const Role & value) { this->role = value; }
     };
 
-    // class PurpleContent {
-    //     public:
-    //     PurpleContent() = default;
-    //     virtual ~PurpleContent() = default;
-
-    //     private:
-    //     std::string data;
-    //     Type type;
-
-    //     public:
-    //     const std::string & get_data() const { return data; }
-    //     std::string & get_mutable_data() { return data; }
-    //     void set_data(const std::string & value) { this->data = value; }
-
-    //     const Type & get_type() const { return type; }
-    //     Type & get_mutable_type() { return type; }
-    //     void set_type(const Type & value) { this->type = value; }
-    // };
-
-    // class MessageNodeMessage {
-    //     public:
-    //     MessageNodeMessage() = default;
-    //     virtual ~MessageNodeMessage() = default;
-
-    //     private:
-    //     std::vector<PurpleContent> content;
-    //     Role role;
-
-    //     public:
-    //     const std::vector<PurpleContent> & get_content() const { return content; }
-    //     std::vector<PurpleContent> & get_mutable_content() { return content; }
-    //     void set_content(const std::vector<PurpleContent> & value) { this->content = value; }
-
-    //     const Role & get_role() const { return role; }
-    //     Role & get_mutable_role() { return role; }
-    //     void set_role(const Role & value) { this->role = value; }
-    // };
-
     class MessageNode {
         public:
         MessageNode() = default;
@@ -264,7 +226,6 @@ namespace IServer {
         private:
         std::vector<std::string> children;
         std::string id;
-        // MessageNodeMessage message;
         Message message;
         std::optional<std::string> parent;
         double timestamp;
@@ -278,9 +239,6 @@ namespace IServer {
         std::string & get_mutable_id() { return id; }
         void set_id(const std::string & value) { this->id = value; }
 
-        // const MessageNodeMessage & get_message() const { return message; }
-        // MessageNodeMessage & get_mutable_message() { return message; }
-        // void set_message(const MessageNodeMessage & value) { this->message = value; }
         const Message & get_message() const { return message; }
         Message & get_mutable_message() { return message; }
         void set_message(const Message & value) { this->message = value; }
@@ -293,115 +251,6 @@ namespace IServer {
         void set_timestamp(const double & value) { this->timestamp = value; }
     };
 
-    // class LinearHistoryContent {
-    //     public:
-    //     LinearHistoryContent() = default;
-    //     virtual ~LinearHistoryContent() = default;
-
-    //     private:
-    //     std::string data;
-    //     Type type;
-
-    //     public:
-    //     const std::string & get_data() const { return data; }
-    //     std::string & get_mutable_data() { return data; }
-    //     void set_data(const std::string & value) { this->data = value; }
-
-    //     const Type & get_type() const { return type; }
-    //     Type & get_mutable_type() { return type; }
-    //     void set_type(const Type & value) { this->type = value; }
-    // };
-
-    // class LinearHistoryElement {
-    //     public:
-    //     LinearHistoryElement() = default;
-    //     virtual ~LinearHistoryElement() = default;
-
-    //     private:
-    //     std::vector<LinearHistoryContent> content;
-    //     Role role;
-
-    //     public:
-    //     const std::vector<LinearHistoryContent> & get_content() const { return content; }
-    //     std::vector<LinearHistoryContent> & get_mutable_content() { return content; }
-    //     void set_content(const std::vector<LinearHistoryContent> & value) { this->content = value; }
-
-    //     const Role & get_role() const { return role; }
-    //     Role & get_mutable_role() { return role; }
-    //     void set_role(const Role & value) { this->role = value; }
-    // };
-
-    // class FluffyContent {
-    //     public:
-    //     FluffyContent() = default;
-    //     virtual ~FluffyContent() = default;
-
-    //     private:
-    //     std::string data;
-    //     Type type;
-
-    //     public:
-    //     const std::string & get_data() const { return data; }
-    //     std::string & get_mutable_data() { return data; }
-    //     void set_data(const std::string & value) { this->data = value; }
-
-    //     const Type & get_type() const { return type; }
-    //     Type & get_mutable_type() { return type; }
-    //     void set_type(const Type & value) { this->type = value; }
-    // };
-
-    // class NodeMessage {
-    //     public:
-    //     NodeMessage() = default;
-    //     virtual ~NodeMessage() = default;
-
-    //     private:
-    //     std::vector<FluffyContent> content;
-    //     Role role;
-
-    //     public:
-    //     const std::vector<FluffyContent> & get_content() const { return content; }
-    //     std::vector<FluffyContent> & get_mutable_content() { return content; }
-    //     void set_content(const std::vector<FluffyContent> & value) { this->content = value; }
-
-    //     const Role & get_role() const { return role; }
-    //     Role & get_mutable_role() { return role; }
-    //     void set_role(const Role & value) { this->role = value; }
-    // };
-
-    // class Node {
-    //     public:
-    //     Node() = default;
-    //     virtual ~Node() = default;
-
-    //     private:
-    //     std::vector<std::string> children;
-    //     std::string id;
-    //     NodeMessage message;
-    //     std::optional<std::string> parent;
-    //     double timestamp;
-
-    //     public:
-    //     const std::vector<std::string> & get_children() const { return children; }
-    //     std::vector<std::string> & get_mutable_children() { return children; }
-    //     void set_children(const std::vector<std::string> & value) { this->children = value; }
-
-    //     const std::string & get_id() const { return id; }
-    //     std::string & get_mutable_id() { return id; }
-    //     void set_id(const std::string & value) { this->id = value; }
-
-    //     const NodeMessage & get_message() const { return message; }
-    //     NodeMessage & get_mutable_message() { return message; }
-    //     void set_message(const NodeMessage & value) { this->message = value; }
-
-    //     std::optional<std::string> get_parent() const { return parent; }
-    //     void set_parent(std::optional<std::string> value) { this->parent = value; }
-
-    //     const double & get_timestamp() const { return timestamp; }
-    //     double & get_mutable_timestamp() { return timestamp; }
-    //     void set_timestamp(const double & value) { this->timestamp = value; }
-    // };
-
     class TreeHistory {
         public:
         TreeHistory() = default;
@@ -409,7 +258,6 @@ namespace IServer {
 
         private:
         std::string head;
-        // std::map<std::string, Node> nodes;
         std::map<std::string, MessageNode> nodes;
 
         public:
@@ -417,9 +265,6 @@ namespace IServer {
         std::string & get_mutable_head() { return head; }
         void set_head(const std::string & value) { this->head = value; }
 
-        // const std::map<std::string, Node> & get_nodes() const { return nodes; }
-        // std::map<std::string, Node> & get_mutable_nodes() { return nodes; }
-        // void set_nodes(const std::map<std::string, Node> & value) { this->nodes = value; }
         const std::map<std::string, MessageNode> & get_nodes() const { return nodes; }
         std::map<std::string, MessageNode> & get_mutable_nodes() { return nodes; }
         void set_nodes(const std::map<std::string, MessageNode> & value) { this->nodes = value; }
@@ -486,44 +331,6 @@ namespace IServer {
         void set_list(const std::vector<List> & value) { this->list = value; }
     };
 
-    // class UserMessageContent {
-    //     public:
-    //     UserMessageContent() = default;
-    //     virtual ~UserMessageContent() = default;
-
-    //     private:
-    //     std::string data;
-    //     Type type;
-
-    //     public:
-    //     const std::string & get_data() const { return data; }
-    //     std::string & get_mutable_data() { return data; }
-    //     void set_data(const std::string & value) { this->data = value; }
-
-    //     const Type & get_type() const { return type; }
-    //     Type & get_mutable_type() { return type; }
-    //     void set_type(const Type & value) { this->type = value; }
-    // };
-
-    // class UserMessage {
-    //     public:
-    //     UserMessage() = default;
-    //     virtual ~UserMessage() = default;
-
-    //     private:
-    //     std::vector<UserMessageContent> content;
-    //     Role role;
-
-    //     public:
-    //     const std::vector<UserMessageContent> & get_content() const { return content; }
-    //     std::vector<UserMessageContent> & get_mutable_content() { return content; }
-    //     void set_content(const std::vector<UserMessageContent> & value) { this->content = value; }
-
-    //     const Role & get_role() const { return role; }
-    //     Role & get_mutable_role() { return role; }
-    //     void set_role(const Role & value) { this->role = value; }
-    // };
-
     class ChatCompletionParams {
         public:
         ChatCompletionParams() = default;
@@ -533,7 +340,6 @@ namespace IServer {
         std::string id;
         std::string model_id;
         std::optional<std::string> parent;
-        // UserMessage user_message;
         Message user_message;
 
         public:
@@ -551,9 +357,6 @@ namespace IServer {
         std::optional<std::string> get_parent() const { return parent; }
         void set_parent(std::optional<std::string> value) { this->parent = value; }
 
-        // const UserMessage & get_user_message() const { return user_message; }
-        // UserMessage & get_mutable_user_message() { return user_message; }
-        // void set_user_message(const UserMessage & value) { this->user_message = value; }
         const Message & get_user_message() const { return user_message; }
         Message & get_mutable_user_message() { return user_message; }
         void set_user_message(const Message & value) { this->user_message = value; }
@@ -677,7 +480,6 @@ namespace IServer {
     };
 
     using GetMetadataResult = std::map<std::string, nlohmann::json>;
-    // using LinearHistory = std::vector<LinearHistoryElement>;
     using LinearHistory = std::vector<Message>;
     using GetModelListResult = std::vector<GetModelListResultElement>;
     using ProviderParams = nlohmann::json;
@@ -703,29 +505,8 @@ namespace IServer {
     void from_json(const json & j, Message & x);
     void to_json(json & j, const Message & x);
 
-    // void from_json(const json & j, PurpleContent & x);
-    // void to_json(json & j, const PurpleContent & x);
-
-    // void from_json(const json & j, MessageNodeMessage & x);
-    // void to_json(json & j, const MessageNodeMessage & x);
-
     void from_json(const json & j, MessageNode & x);
     void to_json(json & j, const MessageNode & x);
-
-    // void from_json(const json & j, LinearHistoryContent & x);
-    // void to_json(json & j, const LinearHistoryContent & x);
-
-    // void from_json(const json & j, LinearHistoryElement & x);
-    // void to_json(json & j, const LinearHistoryElement & x);
-
-    // void from_json(const json & j, FluffyContent & x);
-    // void to_json(json & j, const FluffyContent & x);
-
-    // void from_json(const json & j, NodeMessage & x);
-    // void to_json(json & j, const NodeMessage & x);
-
-    // void from_json(const json & j, Node & x);
-    // void to_json(json & j, const Node & x);
 
     void from_json(const json & j, TreeHistory & x);
     void to_json(json & j, const TreeHistory & x);
@@ -738,12 +519,6 @@ namespace IServer {
 
     void from_json(const json & j, GetChatListResult & x);
     void to_json(json & j, const GetChatListResult & x);
-
-    // void from_json(const json & j, UserMessageContent & x);
-    // void to_json(json & j, const UserMessageContent & x);
-
-    // void from_json(const json & j, UserMessage & x);
-    // void to_json(json & j, const UserMessage & x);
 
     void from_json(const json & j, ChatCompletionParams & x);
     void to_json(json & j, const ChatCompletionParams & x);
@@ -827,32 +602,9 @@ namespace IServer {
         j["role"] = x.get_role();
     }
 
-    // inline void from_json(const json & j, PurpleContent& x) {
-    //     x.set_data(j.at("data").get<std::string>());
-    //     x.set_type(j.at("type").get<Type>());
-    // }
-
-    // inline void to_json(json & j, const PurpleContent & x) {
-    //     j = json::object();
-    //     j["data"] = x.get_data();
-    //     j["type"] = x.get_type();
-    // }
-
-    // inline void from_json(const json & j, MessageNodeMessage& x) {
-    //     x.set_content(j.at("content").get<std::vector<PurpleContent>>());
-    //     x.set_role(j.at("role").get<Role>());
-    // }
-
-    // inline void to_json(json & j, const MessageNodeMessage & x) {
-    //     j = json::object();
-    //     j["content"] = x.get_content();
-    //     j["role"] = x.get_role();
-    // }
-
     inline void from_json(const json & j, MessageNode& x) {
         x.set_children(j.at("children").get<std::vector<std::string>>());
         x.set_id(j.at("id").get<std::string>());
-        // x.set_message(j.at("message").get<MessageNodeMessage>());
         x.set_message(j.at("message").get<Message>());
         x.set_parent(get_stack_optional<std::string>(j, "parent"));
         x.set_timestamp(j.at("timestamp").get<double>());
@@ -868,69 +620,6 @@ namespace IServer {
         }
         j["timestamp"] = x.get_timestamp();
     }
-
-    // inline void from_json(const json & j, LinearHistoryContent& x) {
-    //     x.set_data(j.at("data").get<std::string>());
-    //     x.set_type(j.at("type").get<Type>());
-    // }
-
-    // inline void to_json(json & j, const LinearHistoryContent & x) {
-    //     j = json::object();
-    //     j["data"] = x.get_data();
-    //     j["type"] = x.get_type();
-    // }
-
-    // inline void from_json(const json & j, LinearHistoryElement& x) {
-    //     x.set_content(j.at("content").get<std::vector<LinearHistoryContent>>());
-    //     x.set_role(j.at("role").get<Role>());
-    // }
-
-    // inline void to_json(json & j, const LinearHistoryElement & x) {
-    //     j = json::object();
-    //     j["content"] = x.get_content();
-    //     j["role"] = x.get_role();
-    // }
-
-    // inline void from_json(const json & j, FluffyContent& x) {
-    //     x.set_data(j.at("data").get<std::string>());
-    //     x.set_type(j.at("type").get<Type>());
-    // }
-
-    // inline void to_json(json & j, const FluffyContent & x) {
-    //     j = json::object();
-    //     j["data"] = x.get_data();
-    //     j["type"] = x.get_type();
-    // }
-
-    // inline void from_json(const json & j, NodeMessage& x) {
-    //     x.set_content(j.at("content").get<std::vector<FluffyContent>>());
-    //     x.set_role(j.at("role").get<Role>());
-    // }
-
-    // inline void to_json(json & j, const NodeMessage & x) {
-    //     j = json::object();
-    //     j["content"] = x.get_content();
-    //     j["role"] = x.get_role();
-    // }
-
-    // inline void from_json(const json & j, Node& x) {
-    //     x.set_children(j.at("children").get<std::vector<std::string>>());
-    //     x.set_id(j.at("id").get<std::string>());
-    //     x.set_message(j.at("message").get<NodeMessage>());
-    //     x.set_parent(get_stack_optional<std::string>(j, "parent"));
-    //     x.set_timestamp(j.at("timestamp").get<double>());
-    // }
-
-    // inline void to_json(json & j, const Node & x) {
-    //     j = json::object();
-    //     j["children"] = x.get_children();
-    //     j["id"] = x.get_id();
-    //     j["message"] = x.get_message();
-    //     if (x.get_parent()) {
-    //         j["parent"] = x.get_parent();
-    //     }
-    //     j["timestamp"] = x.get_timestamp();
-    // }
 
     inline void from_json(const json & j, TreeHistory& x) {
         x.set_head(j.at("head").get<std::string>());
@@ -979,28 +668,6 @@ namespace IServer {
         j = json::object();
         j["list"] = x.get_list();
     }
-
-    // inline void from_json(const json & j, UserMessageContent& x) {
-    //     x.set_data(j.at("data").get<std::string>());
-    //     x.set_type(j.at("type").get<Type>());
-    // }
-
-    // inline void to_json(json & j, const UserMessageContent & x) {
-    //     j = json::object();
-    //     j["data"] = x.get_data();
-    //     j["type"] = x.get_type();
-    // }
-
-    // inline void from_json(const json & j, UserMessage& x) {
-    //     x.set_content(j.at("content").get<std::vector<UserMessageContent>>());
-    //     x.set_role(j.at("role").get<Role>());
-    // }
-
-    // inline void to_json(json & j, const UserMessage & x) {
-    //     j = json::object();
-    //     j["content"] = x.get_content();
-    //     j["role"] = x.get_role();
-    // }
 
     inline void from_json(const json & j, ChatCompletionParams& x) {
         x.set_id(j.at("id").get<std::string>());
