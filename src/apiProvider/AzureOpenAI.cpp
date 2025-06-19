@@ -49,15 +49,15 @@ RequestData AzureOpenAI::FormatRequest(const Schema::IServer::LinearHistory& his
     {
         auto messageJson = nlohmann::json::object();
         messageJson["content"] = nlohmann::json::array();
-        if (message.get_role() == Schema::IServer::Role::DEVELOPER)
+        if (message.get_role() == Schema::IServer::MessageRole::DEVELOPER)
         {
             messageJson["role"] = "system";
         }
-        else if(message.get_role() == Schema::IServer::Role::USER)
+        else if(message.get_role() == Schema::IServer::MessageRole::USER)
         {
             messageJson["role"] = "user";
         }
-        else if(message.get_role() == Schema::IServer::Role::ASSISTANT)
+        else if(message.get_role() == Schema::IServer::MessageRole::ASSISTANT)
         {
             messageJson["role"] = "assistant";
         }

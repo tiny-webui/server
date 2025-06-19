@@ -19,9 +19,15 @@
 //     ExecuteGenerationTaskParams data = nlohmann::json::parse(jsonString);
 //     GetModelListParams data = nlohmann::json::parse(jsonString);
 //     GetModelListResult data = nlohmann::json::parse(jsonString);
-//     ProviderParams data = nlohmann::json::parse(jsonString);
-//     NewModelParams data = nlohmann::json::parse(jsonString);
-//     ModifyModelParams data = nlohmann::json::parse(jsonString);
+//     ModelSettings data = nlohmann::json::parse(jsonString);
+//     ModifyModelSettingsParams data = nlohmann::json::parse(jsonString);
+//     UserAdminSettings data = nlohmann::json::parse(jsonString);
+//     UserCredential data = nlohmann::json::parse(jsonString);
+//     GetUserListParams data = nlohmann::json::parse(jsonString);
+//     GetUserListResult data = nlohmann::json::parse(jsonString);
+//     GetUserAnyParams data = nlohmann::json::parse(jsonString);
+//     NewUserParams data = nlohmann::json::parse(jsonString);
+//     SetUserAdminSettingsParams data = nlohmann::json::parse(jsonString);
 
 #pragma once
 
@@ -129,7 +135,8 @@ namespace IServer {
 
         /**
          * For example, ['global'] means global metadata,
-         * ['user'] means current user's metadata,
+         * ['user'] means current user's private metadata,
+         * ['user', 'public' ] means current user's public metadata,
          * ['chat', '123'] means chat metadata for chat with id 123.
          * ['model', 'abc'] means model metadata for model with id abc.
          */
@@ -197,7 +204,7 @@ namespace IServer {
         void set_type(const Type & value) { this->type = value; }
     };
 
-    enum class Role : int { ASSISTANT, DEVELOPER, USER };
+    enum class MessageRole : int { ASSISTANT, DEVELOPER, USER };
 
     class Message {
         public:
@@ -206,16 +213,16 @@ namespace IServer {
 
         private:
         std::vector<MessageContent> content;
-        Role role;
+        MessageRole role;
 
         public:
         const std::vector<MessageContent> & get_content() const { return content; }
         std::vector<MessageContent> & get_mutable_content() { return content; }
         void set_content(const std::vector<MessageContent> & value) { this->content = value; }
 
-        const Role & get_role() const { return role; }
-        Role & get_mutable_role() { return role; }
-        void set_role(const Role & value) { this->role = value; }
+        const MessageRole & get_role() const { return role; }
+        MessageRole & get_mutable_role() { return role; }
+        void set_role(const MessageRole & value) { this->role = value; }
     };
 
     class MessageNode {
@@ -441,10 +448,10 @@ namespace IServer {
         void set_provider_name(const std::string & value) { this->provider_name = value; }
     };
 
-    class NewModelParams {
+    class ModelSettings {
         public:
-        NewModelParams() = default;
-        virtual ~NewModelParams() = default;
+        ModelSettings() = default;
+        virtual ~ModelSettings() = default;
 
         private:
         std::string provider_name;
@@ -460,29 +467,151 @@ namespace IServer {
         void set_provider_params(const nlohmann::json & value) { this->provider_params = value; }
     };
 
-    class ModifyModelParams {
+    class ModifyModelSettingsParams {
         public:
-        ModifyModelParams() = default;
-        virtual ~ModifyModelParams() = default;
+        ModifyModelSettingsParams() = default;
+        virtual ~ModifyModelSettingsParams() = default;
 
         private:
         std::string id;
-        nlohmann::json provider_params;
+        ModelSettings settings;
 
         public:
         const std::string & get_id() const { return id; }
         std::string & get_mutable_id() { return id; }
         void set_id(const std::string & value) { this->id = value; }
 
-        const nlohmann::json & get_provider_params() const { return provider_params; }
-        nlohmann::json & get_mutable_provider_params() { return provider_params; }
-        void set_provider_params(const nlohmann::json & value) { this->provider_params = value; }
+        const ModelSettings & get_settings() const { return settings; }
+        ModelSettings & get_mutable_settings() { return settings; }
+        void set_settings(const ModelSettings & value) { this->settings = value; }
+    };
+
+    enum class UserAdminSettingsRole : int { ADMIN, USER };
+
+    class UserAdminSettings {
+        public:
+        UserAdminSettings() = default;
+        virtual ~UserAdminSettings() = default;
+
+        private:
+        UserAdminSettingsRole role;
+
+        public:
+        const UserAdminSettingsRole & get_role() const { return role; }
+        UserAdminSettingsRole & get_mutable_role() { return role; }
+        void set_role(const UserAdminSettingsRole & value) { this->role = value; }
+    };
+
+    class GetUserListParams {
+        public:
+        GetUserListParams() = default;
+        virtual ~GetUserListParams() = default;
+
+        private:
+        std::optional<std::vector<std::string>> metadata_keys;
+
+        public:
+        std::optional<std::vector<std::string>> get_metadata_keys() const { return metadata_keys; }
+        void set_metadata_keys(std::optional<std::vector<std::string>> value) { this->metadata_keys = value; }
+    };
+
+    class GetUserListResultElement {
+        public:
+        GetUserListResultElement() = default;
+        virtual ~GetUserListResultElement() = default;
+
+        private:
+        UserAdminSettings admin_settings;
+        std::string id;
+        std::map<std::string, nlohmann::json> public_metadata;
+        std::string user_name;
+
+        public:
+        const UserAdminSettings & get_admin_settings() const { return admin_settings; }
+        UserAdminSettings & get_mutable_admin_settings() { return admin_settings; }
+        void set_admin_settings(const UserAdminSettings & value) { this->admin_settings = value; }
+
+        const std::string & get_id() const { return id; }
+        std::string & get_mutable_id() { return id; }
+        void set_id(const std::string & value) { this->id = value; }
+
+        const std::map<std::string, nlohmann::json> & get_public_metadata() const { return public_metadata; }
+        std::map<std::string, nlohmann::json> & get_mutable_public_metadata() { return public_metadata; }
+        void set_public_metadata(const std::map<std::string, nlohmann::json> & value) { this->public_metadata = value; }
+
+        const std::string & get_user_name() const { return user_name; }
+        std::string & get_mutable_user_name() { return user_name; }
+        void set_user_name(const std::string & value) { this->user_name = value; }
+    };
+
+    class GetUserAnyParams {
+        public:
+        GetUserAnyParams() = default;
+        virtual ~GetUserAnyParams() = default;
+
+        private:
+        std::optional<std::string> id;
+
+        public:
+        /**
+         * For admin, the user id.
+         * The current user has no knowledge of their id. It's provided by the authentication system.
+         */
+        std::optional<std::string> get_id() const { return id; }
+        void set_id(std::optional<std::string> value) { this->id = value; }
+    };
+
+    class NewUserParams {
+        public:
+        NewUserParams() = default;
+        virtual ~NewUserParams() = default;
+
+        private:
+        UserAdminSettings admin_settings;
+        nlohmann::json credential;
+        std::string user_name;
+
+        public:
+        const UserAdminSettings & get_admin_settings() const { return admin_settings; }
+        UserAdminSettings & get_mutable_admin_settings() { return admin_settings; }
+        void set_admin_settings(const UserAdminSettings & value) { this->admin_settings = value; }
+
+        const nlohmann::json & get_credential() const { return credential; }
+        nlohmann::json & get_mutable_credential() { return credential; }
+        void set_credential(const nlohmann::json & value) { this->credential = value; }
+
+        /**
+         * User name cannot be changed. As this is how the admin identifies a user.
+         */
+        const std::string & get_user_name() const { return user_name; }
+        std::string & get_mutable_user_name() { return user_name; }
+        void set_user_name(const std::string & value) { this->user_name = value; }
+    };
+
+    class SetUserAdminSettingsParams {
+        public:
+        SetUserAdminSettingsParams() = default;
+        virtual ~SetUserAdminSettingsParams() = default;
+
+        private:
+        UserAdminSettings admin_settings;
+        std::string id;
+
+        public:
+        const UserAdminSettings & get_admin_settings() const { return admin_settings; }
+        UserAdminSettings & get_mutable_admin_settings() { return admin_settings; }
+        void set_admin_settings(const UserAdminSettings & value) { this->admin_settings = value; }
+
+        const std::string & get_id() const { return id; }
+        std::string & get_mutable_id() { return id; }
+        void set_id(const std::string & value) { this->id = value; }
     };
 
     using GetMetadataResult = std::map<std::string, nlohmann::json>;
     using LinearHistory = std::vector<Message>;
     using GetModelListResult = std::vector<GetModelListResultElement>;
-    using ProviderParams = nlohmann::json;
+    using UserCredential = nlohmann::json;
+    using GetUserListResult = std::vector<GetUserListResultElement>;
 }
 }
 }
@@ -535,17 +664,38 @@ namespace IServer {
     void from_json(const json & j, GetModelListResultElement & x);
     void to_json(json & j, const GetModelListResultElement & x);
 
-    void from_json(const json & j, NewModelParams & x);
-    void to_json(json & j, const NewModelParams & x);
+    void from_json(const json & j, ModelSettings & x);
+    void to_json(json & j, const ModelSettings & x);
 
-    void from_json(const json & j, ModifyModelParams & x);
-    void to_json(json & j, const ModifyModelParams & x);
+    void from_json(const json & j, ModifyModelSettingsParams & x);
+    void to_json(json & j, const ModifyModelSettingsParams & x);
+
+    void from_json(const json & j, UserAdminSettings & x);
+    void to_json(json & j, const UserAdminSettings & x);
+
+    void from_json(const json & j, GetUserListParams & x);
+    void to_json(json & j, const GetUserListParams & x);
+
+    void from_json(const json & j, GetUserListResultElement & x);
+    void to_json(json & j, const GetUserListResultElement & x);
+
+    void from_json(const json & j, GetUserAnyParams & x);
+    void to_json(json & j, const GetUserAnyParams & x);
+
+    void from_json(const json & j, NewUserParams & x);
+    void to_json(json & j, const NewUserParams & x);
+
+    void from_json(const json & j, SetUserAdminSettingsParams & x);
+    void to_json(json & j, const SetUserAdminSettingsParams & x);
 
     void from_json(const json & j, Type & x);
     void to_json(json & j, const Type & x);
 
-    void from_json(const json & j, Role & x);
-    void to_json(json & j, const Role & x);
+    void from_json(const json & j, MessageRole & x);
+    void to_json(json & j, const MessageRole & x);
+
+    void from_json(const json & j, UserAdminSettingsRole & x);
+    void to_json(json & j, const UserAdminSettingsRole & x);
 
     inline void from_json(const json & j, SetMetadataParams& x) {
         x.set_entries(j.at("entries").get<std::map<std::string, nlohmann::json>>());
@@ -593,7 +743,7 @@ namespace IServer {
 
     inline void from_json(const json & j, Message& x) {
         x.set_content(j.at("content").get<std::vector<MessageContent>>());
-        x.set_role(j.at("role").get<Role>());
+        x.set_role(j.at("role").get<MessageRole>());
     }
 
     inline void to_json(json & j, const Message & x) {
@@ -736,26 +886,96 @@ namespace IServer {
         j["providerName"] = x.get_provider_name();
     }
 
-    inline void from_json(const json & j, NewModelParams& x) {
+    inline void from_json(const json & j, ModelSettings& x) {
         x.set_provider_name(j.at("providerName").get<std::string>());
         x.set_provider_params(get_untyped(j, "providerParams"));
     }
 
-    inline void to_json(json & j, const NewModelParams & x) {
+    inline void to_json(json & j, const ModelSettings & x) {
         j = json::object();
         j["providerName"] = x.get_provider_name();
         j["providerParams"] = x.get_provider_params();
     }
 
-    inline void from_json(const json & j, ModifyModelParams& x) {
+    inline void from_json(const json & j, ModifyModelSettingsParams& x) {
         x.set_id(j.at("id").get<std::string>());
-        x.set_provider_params(get_untyped(j, "providerParams"));
+        x.set_settings(j.at("settings").get<ModelSettings>());
     }
 
-    inline void to_json(json & j, const ModifyModelParams & x) {
+    inline void to_json(json & j, const ModifyModelSettingsParams & x) {
         j = json::object();
         j["id"] = x.get_id();
-        j["providerParams"] = x.get_provider_params();
+        j["settings"] = x.get_settings();
+    }
+
+    inline void from_json(const json & j, UserAdminSettings& x) {
+        x.set_role(j.at("role").get<UserAdminSettingsRole>());
+    }
+
+    inline void to_json(json & j, const UserAdminSettings & x) {
+        j = json::object();
+        j["role"] = x.get_role();
+    }
+
+    inline void from_json(const json & j, GetUserListParams& x) {
+        x.set_metadata_keys(get_stack_optional<std::vector<std::string>>(j, "metadataKeys"));
+    }
+
+    inline void to_json(json & j, const GetUserListParams & x) {
+        j = json::object();
+        if (x.get_metadata_keys()) {
+            j["metadataKeys"] = x.get_metadata_keys();
+        }
+    }
+
+    inline void from_json(const json & j, GetUserListResultElement& x) {
+        x.set_admin_settings(j.at("adminSettings").get<UserAdminSettings>());
+        x.set_id(j.at("id").get<std::string>());
+        x.set_public_metadata(j.at("publicMetadata").get<std::map<std::string, nlohmann::json>>());
+        x.set_user_name(j.at("userName").get<std::string>());
+    }
+
+    inline void to_json(json & j, const GetUserListResultElement & x) {
+        j = json::object();
+        j["adminSettings"] = x.get_admin_settings();
+        j["id"] = x.get_id();
+        j["publicMetadata"] = x.get_public_metadata();
+        j["userName"] = x.get_user_name();
+    }
+
+    inline void from_json(const json & j, GetUserAnyParams& x) {
+        x.set_id(get_stack_optional<std::string>(j, "id"));
+    }
+
+    inline void to_json(json & j, const GetUserAnyParams & x) {
+        j = json::object();
+        if (x.get_id()) {
+            j["id"] = x.get_id();
+        }
+    }
+
+    inline void from_json(const json & j, NewUserParams& x) {
+        x.set_admin_settings(j.at("adminSettings").get<UserAdminSettings>());
+        x.set_credential(get_untyped(j, "credential"));
+        x.set_user_name(j.at("userName").get<std::string>());
+    }
+
+    inline void to_json(json & j, const NewUserParams & x) {
+        j = json::object();
+        j["adminSettings"] = x.get_admin_settings();
+        j["credential"] = x.get_credential();
+        j["userName"] = x.get_user_name();
+    }
+
+    inline void from_json(const json & j, SetUserAdminSettingsParams& x) {
+        x.set_admin_settings(j.at("adminSettings").get<UserAdminSettings>());
+        x.set_id(j.at("id").get<std::string>());
+    }
+
+    inline void to_json(json & j, const SetUserAdminSettingsParams & x) {
+        j = json::object();
+        j["adminSettings"] = x.get_admin_settings();
+        j["id"] = x.get_id();
     }
 
     inline void from_json(const json & j, Type & x) {
@@ -774,19 +994,33 @@ namespace IServer {
         }
     }
 
-    inline void from_json(const json & j, Role & x) {
-        if (j == "assistant") x = Role::ASSISTANT;
-        else if (j == "developer") x = Role::DEVELOPER;
-        else if (j == "user") x = Role::USER;
+    inline void from_json(const json & j, MessageRole & x) {
+        if (j == "assistant") x = MessageRole::ASSISTANT;
+        else if (j == "developer") x = MessageRole::DEVELOPER;
+        else if (j == "user") x = MessageRole::USER;
         else { throw std::runtime_error("Input JSON does not conform to schema!"); }
     }
 
-    inline void to_json(json & j, const Role & x) {
+    inline void to_json(json & j, const MessageRole & x) {
         switch (x) {
-            case Role::ASSISTANT: j = "assistant"; break;
-            case Role::DEVELOPER: j = "developer"; break;
-            case Role::USER: j = "user"; break;
-            default: throw std::runtime_error("Unexpected value in enumeration \"Role\": " + std::to_string(static_cast<int>(x)));
+            case MessageRole::ASSISTANT: j = "assistant"; break;
+            case MessageRole::DEVELOPER: j = "developer"; break;
+            case MessageRole::USER: j = "user"; break;
+            default: throw std::runtime_error("Unexpected value in enumeration \"MessageRole\": " + std::to_string(static_cast<int>(x)));
+        }
+    }
+
+    inline void from_json(const json & j, UserAdminSettingsRole & x) {
+        if (j == "admin") x = UserAdminSettingsRole::ADMIN;
+        else if (j == "user") x = UserAdminSettingsRole::USER;
+        else { throw std::runtime_error("Input JSON does not conform to schema!"); }
+    }
+
+    inline void to_json(json & j, const UserAdminSettingsRole & x) {
+        switch (x) {
+            case UserAdminSettingsRole::ADMIN: j = "admin"; break;
+            case UserAdminSettingsRole::USER: j = "user"; break;
+            default: throw std::runtime_error("Unexpected value in enumeration \"UserAdminSettingsRole\": " + std::to_string(static_cast<int>(x)));
         }
     }
 }
