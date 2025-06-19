@@ -4,18 +4,29 @@
 
 static void TestReaderPass()
 {
-    TUI::Application::ResourceVersionManager<std::string> manager{};
-    manager.ReadBy({"test", "resource"}, "1");
-    manager.CheckReaderVersion({"test", "resource"}, "2");
+    auto manager =  TUI::Application::ResourceVersionManager<std::string>::Create();
+    {
+        /** 1 is not up to date. Thus, the read should be valid. */
+        auto lock = manager->GetReadLock({"test", "resource"}, "1");
+        lock.Confirm();
+    }
+    {
+        /** 2 is not up to date. Thus, the read should be valid. */
+        auto lock = manager->GetReadLock({"test", "resource"}, "2");
+    }
 }
 
 static void TestReaderFail()
 {
-    TUI::Application::ResourceVersionManager<std::string> manager{};
-    manager.ReadBy({"test", "resource"}, "1");
+    auto manager = TUI::Application::ResourceVersionManager<std::string>::Create();
+    {
+        auto lock = manager->GetReadLock({"test", "resource"}, "1");
+        lock.Confirm();
+    }
     try
     {
-        manager.CheckReaderVersion({"test", "resource"}, "1");
+        /** 1 is up to date. The read should not be valid. */
+        auto lock = manager->GetReadLock({"test", "resource"}, "1");
         AssertWithMessage(false, "Expected NOT_MODIFIED exception, but none was thrown.");
     }
     catch (const TUI::Schema::Rpc::Exception& e)
@@ -27,18 +38,36 @@ static void TestReaderFail()
 
 static void TestWriterPass()
 {
-    TUI::Application::ResourceVersionManager<std::string> manager{};
-    manager.WrittenBy({"test", "resource"}, "1");
-    manager.CheckWriterVersion({"test", "resource"}, "1");
+    auto manager = TUI::Application::ResourceVersionManager<std::string>::Create();
+    {
+        auto lock = manager->GetReadLock({"test", "resource"}, "1");
+        lock.Confirm();
+    }
+    {
+        auto lock = manager->GetWriteLock({"test", "resource"}, "1");
+    }
 }
 
 static void TestWriterFail()
 {
-    TUI::Application::ResourceVersionManager<std::string> manager{};
-    manager.WrittenBy({"test", "resource"}, "1");
+    auto manager = TUI::Application::ResourceVersionManager<std::string>::Create();
+    {
+        auto lock = manager->GetReadLock({"test", "resource"}, "1");
+        lock.Confirm();
+    }
+    {
+        auto lock = manager->GetReadLock({"test", "resource"}, "2");
+        lock.Confirm();
+    }
+    {
+        /** Now 1 is the only one up to date. */
+        auto lock = manager->GetWriteLock({"test", "resource"}, "1");
+        lock.Confirm();
+    }
     try
     {
-        manager.CheckWriterVersion({"test", "resource"}, "2");
+        /** 2 is not up to date. It should not write. */
+        auto lock = manager->GetWriteLock({"test", "resource"}, "2");
         AssertWithMessage(false, "Expected CONFLICT exception, but none was thrown.");
     }
     catch (const TUI::Schema::Rpc::Exception& e)
@@ -48,27 +77,52 @@ static void TestWriterFail()
     }
 }
 
-static void TestWriteAfterRead()
+static void TestReadWhileReading()
 {
-    TUI::Application::ResourceVersionManager<std::string> manager{};
-    manager.ReadBy({"test", "resource"}, "1");
-    manager.CheckWriterVersion({"test", "resource"}, "1");
+    auto manager = TUI::Application::ResourceVersionManager<std::string>::Create();
+    auto lock1 = manager->GetReadLock({"test", "resource"}, "1");
+    auto lock2 = manager->GetReadLock({"test", "resource"}, "2");
 }
 
-static void TestWrittenByAnother()
+static void TestWriteWhileReading()
 {
-    TUI::Application::ResourceVersionManager<std::string> manager{};
-    manager.WrittenBy({"test", "resource"}, "1");
-    manager.WrittenBy({"test", "resource"}, "2");
+    auto manager = TUI::Application::ResourceVersionManager<std::string>::Create();
+    {
+        /** Make 2 up to date so it can write. */
+        auto lock = manager->GetReadLock({"test", "resource"}, "2");
+        lock.Confirm();
+    }
+    auto lock1 = manager->GetReadLock({"test", "resource"}, "1");
     try
     {
-        manager.CheckWriterVersion({"test", "resource"}, "1");
-        AssertWithMessage(false, "Expected CONFLICT exception, but none was thrown.");
+        auto lock2 = manager->GetWriteLock({"test", "resource"}, "2");
+        AssertWithMessage(false, "Expected LOCKED exception, but none was thrown.");
     }
     catch (const TUI::Schema::Rpc::Exception& e)
     {
-        AssertWithMessage(e.get_code() == TUI::Schema::Rpc::ErrorCode::CONFLICT,
-            "Expected CONFLICT exception, got: " + std::to_string(e.get_code()));
+        AssertWithMessage(e.get_code() == TUI::Schema::Rpc::ErrorCode::LOCKED,
+            "Expected LOCKED exception, got: " + std::to_string(e.get_code()));
+    }
+}
+
+static void TestReadWhileWriting()
+{
+    auto manager = TUI::Application::ResourceVersionManager<std::string>::Create();
+    {
+        /** Make 1 up to date so it can write. */
+        auto lock = manager->GetReadLock({"test", "resource"}, "1");
+        lock.Confirm();
+    }
+    auto lock1 = manager->GetWriteLock({"test", "resource"}, "1");
+    try
+    {
+        auto lock2 = manager->GetReadLock({"test", "resource"}, "2");
+        AssertWithMessage(false, "Expected LOCKED exception, but none was thrown.");
+    }
+    catch (const TUI::Schema::Rpc::Exception& e)
+    {
+        AssertWithMessage(e.get_code() == TUI::Schema::Rpc::ErrorCode::LOCKED,
+            "Expected LOCKED exception, got: " + std::to_string(e.get_code()));
     }
 }
 
@@ -81,8 +135,9 @@ int main(int argc, char const *argv[])
     RunTest(TestReaderFail());
     RunTest(TestWriterPass());
     RunTest(TestWriterFail());
-    RunTest(TestWriteAfterRead());
-    RunTest(TestWrittenByAnother());
+    RunTest(TestReadWhileReading());
+    RunTest(TestWriteWhileReading());
+    RunTest(TestReadWhileWriting());
 
     return 0;
 }
