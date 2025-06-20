@@ -24,7 +24,10 @@ namespace TUI::Application
 
             ~Lock()
             {
-                _release();
+                if (_release)
+                {
+                    _release();
+                }
             }
 
             /**
@@ -33,7 +36,10 @@ namespace TUI::Application
              */
             void Confirm()
             {
-                _confirm();
+                if (_confirm)
+                {
+                    _confirm();
+                }
             }
         private:
             Lock(std::function<void()> confirm, std::function<void()> release)
@@ -57,10 +63,10 @@ namespace TUI::Application
         
         Lock GetReadLock(const std::vector<std::string>& resourcePath, const ID& id)
         {
-            CheckReaderVersion(resourcePath, id);
+            /** Lock first, then check. */
             LockReadLock(resourcePath, id);
             std::weak_ptr<ResourceVersionManager<ID>> manager_ref = this->shared_from_this();
-            return Lock{
+            Lock lock{
                 [=]()
                 {
                     auto manager = manager_ref.lock();
@@ -78,14 +84,15 @@ namespace TUI::Application
                     }
                 }
             };
+            CheckReaderVersion(resourcePath, id);
+            return std::move(lock);
         }
 
         Lock GetWriteLock(const std::vector<std::string>& resourcePath, const ID& id)
         {
-            CheckWriterVersion(resourcePath, id);
             LockWriteLock(resourcePath, id);
             std::weak_ptr<ResourceVersionManager<ID>> manager_ref = this->shared_from_this();
-            return Lock{
+            Lock lock{
                 [=]()
                 {
                     auto manager = manager_ref.lock();
@@ -103,6 +110,8 @@ namespace TUI::Application
                     }
                 }
             };
+            CheckWriterVersion(resourcePath, id);
+            return std::move(lock);
         }
 
     private:

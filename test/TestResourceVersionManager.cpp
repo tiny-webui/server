@@ -126,6 +126,26 @@ static void TestReadWhileWriting()
     }
 }
 
+static void TestWriteWhileWriting()
+{
+    auto manager = TUI::Application::ResourceVersionManager<std::string>::Create();
+    {
+        auto lock = manager->GetReadLock({"test", "resource"}, "1");
+        lock.Confirm();
+    }
+    auto lock1 = manager->GetWriteLock({"test", "resource"}, "1");
+    try
+    {
+        auto lock2 = manager->GetWriteLock({"test", "resource"}, "2");
+        AssertWithMessage(false, "Expected LOCKED exception, but none was thrown.");
+    }
+    catch (const TUI::Schema::Rpc::Exception& e)
+    {
+        AssertWithMessage(e.get_code() == TUI::Schema::Rpc::ErrorCode::LOCKED,
+            "Expected LOCKED exception, got: " + std::to_string(e.get_code()));
+    }
+}
+
 int main(int argc, char const *argv[])
 {
     (void)argc;
@@ -138,6 +158,7 @@ int main(int argc, char const *argv[])
     RunTest(TestReadWhileReading());
     RunTest(TestWriteWhileReading());
     RunTest(TestReadWhileWriting());
+    RunTest(TestWriteWhileWriting());
 
     return 0;
 }
