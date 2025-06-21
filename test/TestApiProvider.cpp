@@ -6,7 +6,7 @@
 #include <tev-cpp/Tev.h>
 #include <js-style-co-routine/Promise.h>
 #include <unistd.h>
-#include "apiProvider/AzureOpenAI.h"
+#include "apiProvider/Factory.h"
 #include "network/HttpClient.h"
 #include "network/HttpStreamResponseParser.h"
 #include "Utility.h"
@@ -38,24 +38,22 @@ static Schema::IServer::LinearHistory LoadChatHistory(const std::filesystem::pat
 JS::Promise<void> TestBulkChatAsync()
 {
     auto client = Http::Client::Create(tev);
-    ApiProvider::AzureOpenAI provider{};
     auto params = LoadJsonFile(configFilePath);
-    provider.Initialize(params);
+    auto provider = ApiProvider::Factory::CreateProvider("AzureOpenAI", params);;
     auto history = LoadChatHistory(historyFilePath);
-    auto requestData = provider.FormatRequest(history, false);
+    auto requestData = provider->FormatRequest(history, false);
     auto response = co_await client->MakeRequest(Http::Method::POST, requestData).GetResponseAsync();
-    auto message = provider.ParseResponse(response);
+    auto message = provider->ParseResponse(response);
     std::cout << nlohmann::json(message).dump(4) << std::endl;
 }
 
 JS::Promise<void> TestStreamChatAsync()
 {
     auto client = Http::Client::Create(tev);
-    ApiProvider::AzureOpenAI provider{};
     auto params = LoadJsonFile(configFilePath);
-    provider.Initialize(params);
+    auto provider = ApiProvider::Factory::CreateProvider("AzureOpenAI", params);
     auto history = LoadChatHistory(historyFilePath);
-    auto requestData = provider.FormatRequest(history, true);
+    auto requestData = provider->FormatRequest(history, true);
     auto streamEventParser = Http::StreamResponse::Parser{};
     auto responseStream = client->MakeStreamRequest(Http::Method::POST, requestData).GetResponseStream();
     auto parser = Http::StreamResponse::AsyncParser(responseStream);
@@ -68,7 +66,7 @@ JS::Promise<void> TestStreamChatAsync()
             std::cout << std::endl;
             break;
         }
-        auto message = provider.ParseStreamResponse(event.value());
+        auto message = provider->ParseStreamResponse(event.value());
         if (message.has_value())
         {
             std::cout << message.value().get_data();

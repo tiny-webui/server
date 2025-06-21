@@ -66,6 +66,7 @@ add_executable(TestApiProvider
     ../src/network/HttpClient.cpp
     ../src/network/CurlTypes.cpp
     ../src/network/HttpStreamResponseParser.cpp
+    ../src/apiProvider/Factory.cpp
     ../src/apiProvider/AzureOpenAI.cpp)
 
 target_include_directories(TestApiProvider
