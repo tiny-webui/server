@@ -8,12 +8,9 @@ static void TestReaderPass()
     {
         /** 1 is not up to date. Thus, the read should be valid. */
         auto lock = manager->GetReadLock({"test", "resource"}, "1");
-        lock.Confirm();
     }
-    {
-        /** 2 is not up to date. Thus, the read should be valid. */
-        auto lock = manager->GetReadLock({"test", "resource"}, "2");
-    }
+    /** 2 is not up to date. Thus, the read should be valid. */
+    auto lock = manager->GetReadLock({"test", "resource"}, "2");
 }
 
 static void TestReaderFail()
@@ -21,7 +18,6 @@ static void TestReaderFail()
     auto manager = TUI::Application::ResourceVersionManager<std::string>::Create();
     {
         auto lock = manager->GetReadLock({"test", "resource"}, "1");
-        lock.Confirm();
     }
     try
     {
@@ -41,11 +37,8 @@ static void TestWriterPass()
     auto manager = TUI::Application::ResourceVersionManager<std::string>::Create();
     {
         auto lock = manager->GetReadLock({"test", "resource"}, "1");
-        lock.Confirm();
     }
-    {
-        auto lock = manager->GetWriteLock({"test", "resource"}, "1");
-    }
+    auto lock = manager->GetWriteLock({"test", "resource"}, "1");
 }
 
 static void TestWriterFail()
@@ -53,16 +46,13 @@ static void TestWriterFail()
     auto manager = TUI::Application::ResourceVersionManager<std::string>::Create();
     {
         auto lock = manager->GetReadLock({"test", "resource"}, "1");
-        lock.Confirm();
     }
     {
         auto lock = manager->GetReadLock({"test", "resource"}, "2");
-        lock.Confirm();
     }
     {
         /** Now 1 is the only one up to date. */
         auto lock = manager->GetWriteLock({"test", "resource"}, "1");
-        lock.Confirm();
     }
     try
     {
@@ -90,7 +80,6 @@ static void TestWriteWhileReading()
     {
         /** Make 2 up to date so it can write. */
         auto lock = manager->GetReadLock({"test", "resource"}, "2");
-        lock.Confirm();
     }
     auto lock1 = manager->GetReadLock({"test", "resource"}, "1");
     try
@@ -111,7 +100,6 @@ static void TestReadWhileWriting()
     {
         /** Make 1 up to date so it can write. */
         auto lock = manager->GetReadLock({"test", "resource"}, "1");
-        lock.Confirm();
     }
     auto lock1 = manager->GetWriteLock({"test", "resource"}, "1");
     try
@@ -131,7 +119,6 @@ static void TestWriteWhileWriting()
     auto manager = TUI::Application::ResourceVersionManager<std::string>::Create();
     {
         auto lock = manager->GetReadLock({"test", "resource"}, "1");
-        lock.Confirm();
     }
     auto lock1 = manager->GetWriteLock({"test", "resource"}, "1");
     try
@@ -144,6 +131,32 @@ static void TestWriteWhileWriting()
         AssertWithMessage(e.get_code() == TUI::Schema::Rpc::ErrorCode::LOCKED,
             "Expected LOCKED exception, got: " + std::to_string(e.get_code()));
     }
+}
+
+static void TestDoNotConfirm()
+{
+    auto manager = TUI::Application::ResourceVersionManager<std::string>::Create();
+    {
+        auto lock = manager->GetReadLock({"test", "resource"}, "1");
+        lock.DoNotConfirm();
+    }
+    /** This should not throw, as the lock was not confirmed. */
+    auto lock = manager->GetReadLock({"test", "resource"}, "1");
+}
+
+static void TestNoConfirmationOnException()
+{
+    auto manager = TUI::Application::ResourceVersionManager<std::string>::Create();
+    try
+    {
+        auto lock = manager->GetReadLock({"test", "resource"}, "1");
+        throw std::runtime_error("Test exception");
+    }
+    catch(...)
+    {
+    }
+    /** This should not throw, as the lock was not confirmed. */
+    auto lock = manager->GetReadLock({"test", "resource"}, "1");
 }
 
 int main(int argc, char const *argv[])
@@ -159,6 +172,8 @@ int main(int argc, char const *argv[])
     RunTest(TestWriteWhileReading());
     RunTest(TestReadWhileWriting());
     RunTest(TestWriteWhileWriting());
+    RunTest(TestDoNotConfirm());
+    RunTest(TestNoConfirmationOnException());
 
     return 0;
 }

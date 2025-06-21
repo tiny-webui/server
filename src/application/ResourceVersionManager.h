@@ -16,7 +16,7 @@ namespace TUI::Application
         {
         public:
             friend class ResourceVersionManager<ID>;
-            
+
             Lock(const Lock&) = delete;
             Lock& operator=(const Lock&) = delete;
             Lock(Lock&&) = default;
@@ -24,6 +24,14 @@ namespace TUI::Application
 
             ~Lock()
             {
+                if ((std::uncaught_exceptions() <= _uncaughtExceptionsOnEnter) && (!_doNotConfirm))
+                {
+                    /** Only confirm the operation if the scope exited normally and do not confirm is not set */
+                    if (_confirm)
+                    {
+                        _confirm();
+                    }
+                }
                 if (_release)
                 {
                     _release();
@@ -31,23 +39,24 @@ namespace TUI::Application
             }
 
             /**
-             * @brief Confirm the operation is successful. This will update the resource version.
-             * If this is not called. The lock will release without modifying the resource version.
+             * @brief Disable the auto confirmation of the lock when destructed.
+             * 
              */
-            void Confirm()
+            void DoNotConfirm()
             {
-                if (_confirm)
-                {
-                    _confirm();
-                }
+                _doNotConfirm = true;
             }
         private:
             Lock(std::function<void()> confirm, std::function<void()> release)
-                : _confirm(std::move(confirm)), _release(std::move(release))
+                : _confirm(std::move(confirm)),
+                  _release(std::move(release)),
+                  _uncaughtExceptionsOnEnter(std::uncaught_exceptions())
             {
             }
             std::function<void()> _confirm;
             std::function<void()> _release;
+            int _uncaughtExceptionsOnEnter;
+            bool _doNotConfirm{false};
         };
 
         static std::shared_ptr<ResourceVersionManager<ID>> Create()
