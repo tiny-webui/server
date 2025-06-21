@@ -24,7 +24,7 @@ void TestClose()
 
 JS::Promise<void> TestModelAsync()
 {
-    auto modelId = co_await db->CreateModelAsync("test-provider");
+    auto modelId = co_await db->CreateModelAsync("test-settings");
     auto models = db->ListModel();
     bool modelFound = false;
     for (const auto& model : models)
@@ -36,14 +36,14 @@ JS::Promise<void> TestModelAsync()
         }
     }
     AssertWithMessage(modelFound, "Newly created model not found");
-    auto provider = db->GetModelProvider(modelId);
-    AssertWithMessage(provider == "test-provider", "Model provider should match");
     co_await db->SetModelMetadataAsync(modelId, "test-metadata");
     auto metadata = db->GetModelMetadata(modelId);
     AssertWithMessage(metadata == "test-metadata", "Model metadata should match");
-    co_await db->SetModelParamsAsync(modelId, "test-params");
-    auto params = db->GetModelParams(modelId);
-    AssertWithMessage(params == "test-params", "Model params should match");
+    auto oldSettings = db->GetModelSettings(modelId);
+    AssertWithMessage(oldSettings == "test-settings", "Model settings should match");
+    co_await db->SetModelSettingsAsync(modelId, "test-settings-new");
+    auto newSettings = db->GetModelSettings(modelId);
+    AssertWithMessage(newSettings == "test-settings-new", "Model settings should match");
     co_await db->DeleteModelAsync(modelId);
     models = db->ListModel();
     modelFound = false;

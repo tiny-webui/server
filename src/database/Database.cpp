@@ -12,9 +12,8 @@ JS::Promise<std::shared_ptr<Database>> Database::CreateAsync(Tev& tev, const std
     co_await db->_db->ExecAsync(
         "CREATE TABLE IF NOT EXISTS model ("
         "id TEXT PRIMARY KEY, "
-        "provider TEXT, "
         "metadata TEXT, "
-        "params TEXT);");
+        "settings TEXT);");
     co_await db->_db->ExecAsync(
         "CREATE TABLE IF NOT EXISTS user ("
         "id TEXT PRIMARY KEY, "
@@ -34,12 +33,12 @@ JS::Promise<std::shared_ptr<Database>> Database::CreateAsync(Tev& tev, const std
     co_return db;
 }
 
-JS::Promise<Uuid> Database::CreateModelAsync(const std::string& provider)
+JS::Promise<Uuid> Database::CreateModelAsync(const std::string& settings)
 {
     Uuid id{};
     co_await _db->ExecAsync(
-        "INSERT INTO model (id, provider) VALUES (?, ?);",
-        static_cast<std::string>(id), provider);
+        "INSERT INTO model (id, settings) VALUES (?, ?);",
+        static_cast<std::string>(id), settings);
     co_return id;
 }
 
@@ -66,19 +65,14 @@ std::string Database::GetModelMetadata(const Uuid& id)
     return GetStringFromTableById("model", id, "metadata");
 }
 
-JS::Promise<void> Database::SetModelParamsAsync(const Uuid& id, std::string params)
+JS::Promise<void> Database::SetModelSettingsAsync(const Uuid& id, std::string settings)
 {
-    return SetStringToTableById("model", id, "params", std::move(params));
+    return SetStringToTableById("model", id, "settings", std::move(settings));
 }
 
-std::string Database::GetModelParams(const Uuid& id)
+std::string Database::GetModelSettings(const Uuid& id)
 {
-    return GetStringFromTableById("model", id, "params");
-}
-
-std::string Database::GetModelProvider(const Uuid& id)
-{
-    return GetStringFromTableById("model", id, "provider");
+    return GetStringFromTableById("model", id, "settings");
 }
 
 JS::Promise<Uuid> Database::CreateUserAsync(

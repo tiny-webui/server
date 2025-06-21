@@ -28,7 +28,7 @@ namespace TUI::Database
         ~Database() = default;
 
         /** Model */
-        JS::Promise<Common::Uuid> CreateModelAsync(const std::string& provider);
+        JS::Promise<Common::Uuid> CreateModelAsync(const std::string& settings);
         JS::Promise<void> DeleteModelAsync(const Common::Uuid& id);
         struct IdMetadataPair
         {
@@ -38,9 +38,8 @@ namespace TUI::Database
         std::list<IdMetadataPair> ListModel();
         JS::Promise<void> SetModelMetadataAsync(const Common::Uuid& id, std::string metadata);
         std::string GetModelMetadata(const Common::Uuid& id);
-        JS::Promise<void> SetModelParamsAsync(const Common::Uuid& id, std::string params);
-        std::string GetModelParams(const Common::Uuid& id);
-        std::string GetModelProvider(const Common::Uuid& id);
+        JS::Promise<void> SetModelSettingsAsync(const Common::Uuid& id, std::string settings);
+        std::string GetModelSettings(const Common::Uuid& id);
 
         /** User */
         JS::Promise<Common::Uuid> CreateUserAsync(
