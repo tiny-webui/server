@@ -123,6 +123,32 @@ namespace TUI::Application
             return std::move(lock);
         }
 
+        Lock GetDeleteLock(const std::vector<std::string>& resourcePath, const ID& id)
+        {
+            LockWriteLock(resourcePath, id);
+            std::weak_ptr<ResourceVersionManager<ID>> manager_ref = this->shared_from_this();
+            Lock lock{
+                [=]()
+                {
+                    auto manager = manager_ref.lock();
+                    if (manager)
+                    {
+                        manager->_states.erase(resourcePath);
+                    }
+                },
+                [=]()
+                {
+                    auto manager = manager_ref.lock();
+                    if (manager)
+                    {
+                        manager->ReleaseWriteLock(resourcePath, id);
+                    }
+                }
+            };
+            CheckWriterVersion(resourcePath, id);
+            return std::move(lock);
+        }
+
     private:
         struct ResourceState
         {

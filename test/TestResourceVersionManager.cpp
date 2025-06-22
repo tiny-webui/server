@@ -159,6 +159,19 @@ static void TestNoConfirmationOnException()
     auto lock = manager->GetReadLock({"test", "resource"}, "1");
 }
 
+static void TestDelete()
+{
+    auto manager = TUI::Application::ResourceVersionManager<std::string>::Create();
+    {
+        auto lock = manager->GetReadLock({"test", "resource"}, "1");
+    }
+    {
+        auto lock = manager->GetDeleteLock({"test", "resource"}, "1");
+    }
+    /** 1 should no longer be up to date with the resource */
+    auto lock = manager->GetReadLock({"test", "resource"}, "1");
+}
+
 int main(int argc, char const *argv[])
 {
     (void)argc;
@@ -174,6 +187,7 @@ int main(int argc, char const *argv[])
     RunTest(TestWriteWhileWriting());
     RunTest(TestDoNotConfirm());
     RunTest(TestNoConfirmationOnException());
+    RunTest(TestDelete());
 
     return 0;
 }
