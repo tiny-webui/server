@@ -151,6 +151,8 @@ namespace Rpc {
     struct ErrorCode
     {
         static constexpr double NOT_MODIFIED = 304;
+        static constexpr double BAD_REQUEST = 400;
+        static constexpr double UNAUTHORIZED = 401;
         static constexpr double NOT_FOUND = 404;
         static constexpr double CONFLICT = 409;
         static constexpr double LOCKED = 423;

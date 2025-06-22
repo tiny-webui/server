@@ -152,3 +152,25 @@ add_executable(TestResourceVersionManager
 target_include_directories(TestResourceVersionManager
     PRIVATE
         ../src)
+
+# Get all .cpp files from ../src except main.cpp
+file(GLOB_RECURSE TEST_SERVICE_SRC_FILES 
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/*.cpp)
+list(REMOVE_ITEM TEST_SERVICE_SRC_FILES 
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/main.cpp)
+
+add_executable(TestService
+    TestService.cpp
+    ${TEST_SERVICE_SRC_FILES})
+
+target_include_directories(TestService
+    PRIVATE
+        ../src)
+
+target_link_libraries(TestService
+    PRIVATE
+        tev-cpp
+        curl
+        websockets
+        sqlite3
+        uuid)

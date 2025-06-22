@@ -433,7 +433,6 @@ namespace IServer {
         private:
         std::string id;
         std::optional<std::map<std::string, nlohmann::json>> metadata;
-        std::string provider_name;
 
         public:
         const std::string & get_id() const { return id; }
@@ -442,10 +441,6 @@ namespace IServer {
 
         std::optional<std::map<std::string, nlohmann::json>> get_metadata() const { return metadata; }
         void set_metadata(std::optional<std::map<std::string, nlohmann::json>> value) { this->metadata = value; }
-
-        const std::string & get_provider_name() const { return provider_name; }
-        std::string & get_mutable_provider_name() { return provider_name; }
-        void set_provider_name(const std::string & value) { this->provider_name = value; }
     };
 
     class ModelSettings {
@@ -874,7 +869,6 @@ namespace IServer {
     inline void from_json(const json & j, GetModelListResultElement& x) {
         x.set_id(j.at("id").get<std::string>());
         x.set_metadata(get_stack_optional<std::map<std::string, nlohmann::json>>(j, "metadata"));
-        x.set_provider_name(j.at("providerName").get<std::string>());
     }
 
     inline void to_json(json & j, const GetModelListResultElement & x) {
@@ -883,7 +877,6 @@ namespace IServer {
         if (x.get_metadata()) {
             j["metadata"] = x.get_metadata();
         }
-        j["providerName"] = x.get_provider_name();
     }
 
     inline void from_json(const json & j, ModelSettings& x) {
