@@ -87,6 +87,8 @@ namespace TUI::Common
         {
             std::string str(UUID_STR_LEN, '\0');
             uuid_unparse(_uuid, str.data());
+            /** remove the tailing zero */
+            str.resize(UUID_STR_LEN - 1);
             return str;
         }
 
