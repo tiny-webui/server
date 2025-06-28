@@ -33,8 +33,9 @@ class TUIClient {
     /** 
      * @typedef {{
      *      timeoutHandle?: ReturnType<typeof setTimeout>;
-     *      resolve?: (value: {value:any, end: boolean}) => void;
-     *      reject?: (error: TUIRequestError) => void;
+     *      resolve?: (undefined) => void;
+     *      messageQueue: Array<{value:any, end?: boolean}>;
+     *      error?: TUIRequestError;
      * }} StreamRequest;
      * @type {Map<number, StreamRequest>} 
      */
@@ -88,7 +89,8 @@ class TUIClient {
         this.#pendingRequests.clear();
         for (const request of this.#pendingStreamRequests.values()) {
             clearTimeout(request.timeoutHandle);
-            request.reject?.(new TUIRequestError(-1, "Connection closed"));
+            request.error = new TUIRequestError(-1, "Connection closed");
+            request.resolve?.(undefined);
         }
         this.#pendingStreamRequests.clear();
     }
@@ -129,21 +131,30 @@ class TUIClient {
     async * makeStreamRequestAsync(method, params, timeoutMs = 30000) {
         const id = this.#sendMessage(method, params);
         /** @type {StreamRequest} */
-        let request = {};
+        let request = {
+            messageQueue: []
+        };
         this.#pendingStreamRequests.set(id, request);
         while(true) {
             request.timeoutHandle = setTimeout(() => {
                 this.#pendingStreamRequests.delete(id);
-                request.reject?.(new TUIRequestError(-1, "Request timeout"));
+                request.error = new TUIRequestError(-1, "Request timeout");
+                request.resolve?.(undefined);
             }, timeoutMs);
-            const response = await new Promise((resolve, reject) => {
+            await new Promise((resolve) => {
                 request.resolve = resolve;
-                request.reject = reject;
             });
-            if (response.end) {
-                return response.value;
-            } else {
-                yield response.value;
+
+            let response = undefined;
+            while ((response = request.messageQueue.shift()) !== undefined) {
+                if (response.end){
+                    return response.value;
+                } else {
+                    yield response.value;
+                }
+            }
+            if (request.error !== undefined) {
+                throw request.error;
             }
         }
     }
@@ -240,23 +251,27 @@ class TUIClient {
                 clearTimeout(request.timeoutHandle);
                 if ('error' in message) {
                     this.#pendingStreamRequests.delete(id);
-                    request.reject?.(new TUIRequestError(
-                        message.error.code, message.error.message));
+                    request.error = new TUIRequestError(message.error.code, message.error.message);
+                    request.resolve?.(undefined);
                 } else if ('result' in message) {
                     if ('end' in message && message.end === true) {
                         this.#pendingStreamRequests.delete(id);
-                        request.resolve?.({value: message.result, end: true});
+                        request.messageQueue.push({value: message.result, end: true});
+                        request.resolve?.(undefined);
                     } else {
-                        request.resolve?.({value: message.result, end: false});
+                        request.messageQueue.push({value: message.result, end: false});
+                        request.resolve?.(undefined);
                     }
                 } else {
                     this.#pendingStreamRequests.delete(id);
-                    request.reject?.(new TUIRequestError(
-                        -1, "Invalid response"));
+                    request.error = new TUIRequestError(
+                        -1, "Invalid response");
+                    request.resolve?.(undefined);
                 }
                 return;
             }
         }
+        console.log(`No pending request for id ${id}, ignoring message.`);
     }
 };
 

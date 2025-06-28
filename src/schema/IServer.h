@@ -264,14 +264,9 @@ namespace IServer {
         virtual ~TreeHistory() = default;
 
         private:
-        std::string head;
         std::map<std::string, MessageNode> nodes;
 
         public:
-        const std::string & get_head() const { return head; }
-        std::string & get_mutable_head() { return head; }
-        void set_head(const std::string & value) { this->head = value; }
-
         const std::map<std::string, MessageNode> & get_nodes() const { return nodes; }
         std::map<std::string, MessageNode> & get_mutable_nodes() { return nodes; }
         void set_nodes(const std::map<std::string, MessageNode> & value) { this->nodes = value; }
@@ -762,13 +757,11 @@ namespace IServer {
     }
 
     inline void from_json(const json & j, TreeHistory& x) {
-        x.set_head(j.at("head").get<std::string>());
         x.set_nodes(j.at("nodes").get<std::map<std::string, MessageNode>>());
     }
 
     inline void to_json(json & j, const TreeHistory & x) {
         j = json::object();
-        j["head"] = x.get_head();
         j["nodes"] = x.get_nodes();
     }
 

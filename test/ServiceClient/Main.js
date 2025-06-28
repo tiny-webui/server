@@ -1,5 +1,7 @@
 import { TUIClient } from "./TUIClient.js";
 import fs from "fs";
+import { exit } from "process";
+import readline from 'readline';
 
 if (process.argv.length < 3) {
     console.error("Usage: node Main.js <config path>");
@@ -20,8 +22,6 @@ const modelId = models[0]?.id ?? await client.makeRequestAsync('newModel', {
     providerParams: config
 });
 
-console.log(modelId);
-
 await client.makeRequestAsync('getChatList', {
     start: 0,
     quantity: 50
@@ -29,30 +29,50 @@ await client.makeRequestAsync('getChatList', {
 
 const chatId = await client.makeRequestAsync('newChat', {});
 
-console.log(chatId);
-
-const stream = client.makeStreamRequestAsync('chatCompletion', {
-    id: chatId,
-    modelId: modelId,
-    userMessage: {
-        role: 'user',
-        content:[{
-            type: 'text',
-            data: 'Tell me a stroy about rockets'
-        }]
-    }
+const lineReader = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout
 });
 
-let result = undefined;
-while(!(result = await stream.next()).done){
-    const chunk = result.value;
-    process.stdout.write(chunk);
+let parentId = undefined;
+while(true)
+{
+    const userMessage = await new Promise((resolve) => {
+        lineReader.question('User: \n', (input) => {
+            resolve(input);
+        })
+    });
+    console.log("")
+
+    const stream = client.makeStreamRequestAsync('chatCompletion', {
+        id: chatId,
+        modelId: modelId,
+        parent: parentId,
+        userMessage: {
+            role: 'user',
+            content:[{
+                type: 'text',
+                data: userMessage
+            }]
+        }
+    });
+
+    console.log("Assistant: ");
+    let result = undefined;
+    while(!(result = await stream.next()).done){
+        const chunk = result.value;
+        process.stdout.write(chunk);
+    }
+    console.log("\n");
+    /** The chat info */
+    if (result === undefined) {
+        console.error("No result received from chat completion.");
+        exit(1);
+    }
+    const info = result.value;
+    parentId = info.assistantMessageId;
 }
-console.log("");
-/** The chat info */
-if (result!== undefined){
-    console.log(JSON.stringify(result.value));
-}
+
 
 
 

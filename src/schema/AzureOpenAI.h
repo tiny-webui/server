@@ -9,6 +9,7 @@
 
 #pragma once
 
+#include <optional>
 #include <nlohmann/json.hpp>
 
 #include <optional>
@@ -159,12 +160,11 @@ namespace AzureOpenAI {
         virtual ~Delta() = default;
 
         private:
-        std::string content;
+        std::optional<std::string> content;
 
         public:
-        const std::string & get_content() const { return content; }
-        std::string & get_mutable_content() { return content; }
-        void set_content(const std::string & value) { this->content = value; }
+        std::optional<std::string> get_content() const { return content; }
+        void set_content(std::optional<std::string> value) { this->content = value; }
     };
 
     class StreamResponseChoice {
@@ -258,12 +258,14 @@ namespace AzureOpenAI {
     }
 
     inline void from_json(const json & j, Delta& x) {
-        x.set_content(j.at("content").get<std::string>());
+        x.set_content(get_stack_optional<std::string>(j, "content"));
     }
 
     inline void to_json(json & j, const Delta & x) {
         j = json::object();
-        j["content"] = x.get_content();
+        if (x.get_content()) {
+            j["content"] = x.get_content();
+        }
     }
 
     inline void from_json(const json & j, StreamResponseChoice& x) {

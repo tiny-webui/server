@@ -198,6 +198,12 @@ JS::AsyncGenerator<nlohmann::json, nlohmann::json> Service::OnChatCompletionAsyn
     using MessageRoleType = std::remove_reference<std::invoke_result_t<decltype(&Schema::IServer::Message::get_role), Schema::IServer::Message&>>::type;
 
     auto params = ParseParams<Schema::IServer::ChatCompletionParams>(paramsJson);
+    if (params.get_user_message().get_role() != MessageRoleType::USER)
+    {
+        throw Schema::Rpc::Exception(
+            Schema::Rpc::ErrorCode::BAD_REQUEST,
+            "The user message must have the role user");
+    }
     Common::Uuid chatId{params.get_id()};
     auto lock = _resourceVersionManager->GetWriteLock(
         {static_cast<std::string>(callerId.userId), "chat", static_cast<std::string>(chatId)}, callerId);
@@ -303,7 +309,7 @@ JS::AsyncGenerator<nlohmann::json, nlohmann::json> Service::OnChatCompletionAsyn
         responseContents.push_back(std::move(responseContent));
         responseMessage.set_content(std::move(responseContents));
         responseNode.set_message(std::move(responseMessage));
-        responseNode.set_parent(static_cast<std::string>(params.get_id()));
+        responseNode.set_parent(static_cast<std::string>(userMessageId));
         nodes.emplace(static_cast<std::string>(responseMessageId), std::move(responseNode));
         
         Schema::IServer::MessageNode userNode{};

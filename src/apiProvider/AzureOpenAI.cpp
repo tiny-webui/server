@@ -144,12 +144,16 @@ std::optional<Schema::IServer::MessageContent> AzureOpenAI::ParseStreamResponse(
     }
     const auto& choice = response.get_choices().front();
     const auto& delta = choice.get_delta();
-    if (delta.get_content().empty())
+    if (!delta.get_content().has_value())
+    {
+        return std::nullopt;
+    }
+    if (delta.get_content().value().empty())
     {
         return std::nullopt;
     }
     Schema::IServer::MessageContent content{};
     content.set_type(Schema::IServer::Type::TEXT);
-    content.set_data(delta.get_content());
+    content.set_data(delta.get_content().value());
     return content;
 }
