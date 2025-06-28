@@ -11,8 +11,6 @@ const modelList = await client.makeRequestAsync('getModelList', {});
 console.log(JSON.stringify(modelList));
 
 for (const model of modelList) {
-    /** Need to get the model before deleting it. May need to change this. */
-    await client.makeRequestAsync('getModel', model.id);
     await client.makeRequestAsync('deleteModel', model.id);
 }
 

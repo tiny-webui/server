@@ -123,6 +123,12 @@ namespace TUI::Application
             return std::move(lock);
         }
 
+        /** 
+         * 
+         * @The caller does not need to be up to date to delete something. 
+         * As they may delete it from the result of a list read.
+         */
+
         Lock GetDeleteLock(const std::vector<std::string>& resourcePath, const ID& id)
         {
             LockWriteLock(resourcePath, id);
@@ -145,7 +151,6 @@ namespace TUI::Application
                     }
                 }
             };
-            CheckWriterVersion(resourcePath, id);
             return std::move(lock);
         }
 

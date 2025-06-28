@@ -163,9 +163,6 @@ static void TestDelete()
 {
     auto manager = TUI::Application::ResourceVersionManager<std::string>::Create();
     {
-        auto lock = manager->GetReadLock({"test", "resource"}, "1");
-    }
-    {
         auto lock = manager->GetDeleteLock({"test", "resource"}, "1");
     }
     /** 1 should no longer be up to date with the resource */
