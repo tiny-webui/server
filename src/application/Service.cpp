@@ -59,25 +59,261 @@ void Service::Close()
     /** @todo more */
 }
 
+/**
+ * @brief 
+ * 
+ * @attention Metadata has no version locking.
+ * 
+ * @param callerId 
+ * @param paramsJson 
+ * @return JS::Promise<nlohmann::json> 
+ */
 JS::Promise<nlohmann::json> Service::OnSetMetadataAsync(CallerId callerId, nlohmann::json paramsJson)
 {
-    (void)callerId;
-    (void)paramsJson;
-    throw std::runtime_error("Not implemented");
+    auto params = ParseParams<Schema::IServer::SetMetadataParams>(paramsJson);
+    auto& path = params.get_path();
+    if (path.empty())
+    {
+        throw Schema::Rpc::Exception(Schema::Rpc::ErrorCode::BAD_REQUEST, "Invalid path");
+    }
+    if (path[0] == "global")
+    {
+        /** Admin */
+        CheckAdmin(callerId.userId);
+        if (path.size() != 1)
+        {
+            throw Schema::Rpc::Exception(Schema::Rpc::ErrorCode::BAD_REQUEST, "Invalid global path");
+        }
+        auto metadataStringOptional = _database->GetGlobalValue("metadata");
+        auto metadataString = metadataStringOptional.has_value() ?
+            metadataStringOptional.value() : "{}";
+        auto newMetadataString = TryMergeMetadata(metadataString, params.get_mutable_entries());
+        co_await _database->SetGlobalValueAsync(
+            "metadata",
+            std::move(newMetadataString));
+    }
+    else if (path[0] == "model")
+    {
+        /** Admin */
+        CheckAdmin(callerId.userId);
+        if (path.size() != 2)
+        {
+            throw Schema::Rpc::Exception(Schema::Rpc::ErrorCode::BAD_REQUEST, "Invalid model path");
+        }
+        Common::Uuid modelId{path[1]};
+        auto metadataString = _database->GetModelMetadata(modelId);
+        auto newMetadataString = TryMergeMetadata(metadataString, params.get_mutable_entries());
+        co_await _database->SetModelMetadataAsync(
+            modelId,
+            std::move(newMetadataString));
+    }
+    else if (path[0] == "user")
+    {
+        /** Current user */
+        if (path.size() != 1)
+        {
+            throw Schema::Rpc::Exception(Schema::Rpc::ErrorCode::BAD_REQUEST, "Invalid user path");
+        }
+        auto metadataString = _database->GetUserMetadata(callerId.userId);
+        auto newMetadataString = TryMergeMetadata(metadataString, params.get_mutable_entries());
+        co_await _database->SetUserMetadataAsync(
+            callerId.userId,
+            std::move(newMetadataString));
+    }
+    else if (path[0] == "userPublic")
+    {
+        /** Current user */
+        if (path.size() != 1)
+        {
+            throw Schema::Rpc::Exception(Schema::Rpc::ErrorCode::BAD_REQUEST, "Invalid user public path");
+        }
+        auto metadataString = _database->GetUserPublicMetadata(callerId.userId);
+        auto newMetadataString = TryMergeMetadata(metadataString, params.get_mutable_entries());
+        co_await _database->SetUserPublicMetadataAsync(
+            callerId.userId,
+            std::move(newMetadataString));
+    }
+    else if (path[0] == "chat")
+    {
+        /** Current user */
+        if (path.size() != 2)
+        {
+            throw Schema::Rpc::Exception(Schema::Rpc::ErrorCode::BAD_REQUEST, "Invalid chat path");
+        }
+        Common::Uuid chatId{path[1]};
+        auto metadataString = _database->GetChatMetadata(callerId.userId, chatId);
+        auto newMetadataString = TryMergeMetadata(metadataString, params.get_mutable_entries());
+        co_await _database->SetChatMetadataAsync(
+            callerId.userId, chatId,
+            std::move(newMetadataString));
+    }
+    else
+    {
+        throw Schema::Rpc::Exception(Schema::Rpc::ErrorCode::BAD_REQUEST, "Invalid path");
+    }
+    /** Return null */
+    co_return nlohmann::json{};
 }
 
 JS::Promise<nlohmann::json> Service::OnGetMetadataAsync(CallerId callerId, nlohmann::json paramsJson)
 {
-    (void)callerId;
-    (void)paramsJson;
-    throw std::runtime_error("Not implemented");
+    auto params = ParseParams<Schema::IServer::GetMetadataParams>(paramsJson);
+    auto& path = params.get_path();
+    std::string metadataString{};
+    if (path.empty())
+    {
+        throw Schema::Rpc::Exception(Schema::Rpc::ErrorCode::BAD_REQUEST, "Invalid path");
+    }
+    if (path[0] == "global")
+    {
+        /** Any */
+        if (path.size() != 1)
+        {
+            throw Schema::Rpc::Exception(Schema::Rpc::ErrorCode::BAD_REQUEST, "Invalid global path");
+        }
+        auto metadataStringOptional = _database->GetGlobalValue("metadata");
+        metadataString = metadataStringOptional.has_value() ?
+            metadataStringOptional.value() : "{}";
+    }
+    else if (path[0] == "model")
+    {
+        /** Any */
+        CheckAdmin(callerId.userId);
+        if (path.size() != 2)
+        {
+            throw Schema::Rpc::Exception(Schema::Rpc::ErrorCode::BAD_REQUEST, "Invalid model path");
+        }
+        Common::Uuid modelId{path[1]};
+        metadataString = _database->GetModelMetadata(modelId);
+    }
+    else if (path[0] == "user")
+    {
+        /** Current user */
+        if (path.size() != 1)
+        {
+            throw Schema::Rpc::Exception(Schema::Rpc::ErrorCode::BAD_REQUEST, "Invalid user path");
+        }
+        metadataString = _database->GetUserMetadata(callerId.userId);
+    }
+    else if (path[0] == "userPublic")
+    {
+        /** Current user or admin */
+        Common::Uuid targetUserId = callerId.userId;
+        if (path.size() == 2)
+        {
+            /** Only admin can read other user's public metadata */
+            CheckAdmin(callerId.userId);
+            targetUserId = Common::Uuid{path[1]};
+        }
+        else if (path.size() != 1)
+        {
+            throw Schema::Rpc::Exception(Schema::Rpc::ErrorCode::BAD_REQUEST, "Invalid user public path");
+        }
+        metadataString = _database->GetUserPublicMetadata(targetUserId);
+    }
+    else if (path[0] == "chat")
+    {
+        /** Current user */
+        if (path.size() != 2)
+        {
+            throw Schema::Rpc::Exception(Schema::Rpc::ErrorCode::BAD_REQUEST, "Invalid chat path");
+        }
+        Common::Uuid chatId{path[1]};
+        metadataString = _database->GetChatMetadata(callerId.userId, chatId);
+    }
+    else
+    {
+        throw Schema::Rpc::Exception(Schema::Rpc::ErrorCode::BAD_REQUEST, "Invalid path");
+    }
+    auto metadata = TryGetMetadata(params.get_keys(), metadataString);
+    co_return nlohmann::json(metadata);
 }
 
 JS::Promise<nlohmann::json> Service::OnDeleteMetadataAsync(CallerId callerId, nlohmann::json paramsJson)
 {
-    (void)callerId;
-    (void)paramsJson;
-    throw std::runtime_error("Not implemented");
+    auto params = ParseParams<Schema::IServer::DeleteMetadataParams>(paramsJson);
+    auto& path = params.get_path();
+    if (path.empty())
+    {
+        throw Schema::Rpc::Exception(Schema::Rpc::ErrorCode::BAD_REQUEST, "Invalid path");
+    }
+    if (path[0] == "global")
+    {
+        /** Admin */
+        CheckAdmin(callerId.userId);
+        if (path.size() != 1)
+        {
+            throw Schema::Rpc::Exception(Schema::Rpc::ErrorCode::BAD_REQUEST, "Invalid global path");
+        }
+        auto metadataStringOptional = _database->GetGlobalValue("metadata");
+        auto metadataString = metadataStringOptional.has_value() ?
+            metadataStringOptional.value() : "{}";
+        auto newMetadataString = TryDeleteMetadata(metadataString, params.get_keys());
+        co_await _database->SetGlobalValueAsync(
+            "metadata",
+            std::move(newMetadataString));
+    }
+    else if (path[0] == "model")
+    {
+        /** Admin */
+        CheckAdmin(callerId.userId);
+        if (path.size() != 2)
+        {
+            throw Schema::Rpc::Exception(Schema::Rpc::ErrorCode::BAD_REQUEST, "Invalid model path");
+        }
+        Common::Uuid modelId{path[1]};
+        auto metadataString = _database->GetModelMetadata(modelId);
+        auto newMetadataString = TryDeleteMetadata(metadataString, params.get_keys());
+        co_await _database->SetModelMetadataAsync(
+            modelId,
+            std::move(newMetadataString));
+    }
+    else if (path[0] == "user")
+    {
+        /** Current user */
+        if (path.size() != 1)
+        {
+            throw Schema::Rpc::Exception(Schema::Rpc::ErrorCode::BAD_REQUEST, "Invalid user path");
+        }
+        auto metadataString = _database->GetUserMetadata(callerId.userId);
+       auto newMetadataString = TryDeleteMetadata(metadataString, params.get_keys());
+        co_await _database->SetUserMetadataAsync(
+            callerId.userId,
+            std::move(newMetadataString));
+    }
+    else if (path[0] == "userPublic")
+    {
+        /** Current user */
+        if (path.size() != 1)
+        {
+            throw Schema::Rpc::Exception(Schema::Rpc::ErrorCode::BAD_REQUEST, "Invalid user public path");
+        }
+        auto metadataString = _database->GetUserPublicMetadata(callerId.userId);
+        auto newMetadataString = TryDeleteMetadata(metadataString, params.get_keys());
+        co_await _database->SetUserPublicMetadataAsync(
+            callerId.userId,
+            std::move(newMetadataString));
+    }
+    else if (path[0] == "chat")
+    {
+        /** Current user */
+        if (path.size() != 2)
+        {
+            throw Schema::Rpc::Exception(Schema::Rpc::ErrorCode::BAD_REQUEST, "Invalid chat path");
+        }
+        Common::Uuid chatId{path[1]};
+        auto metadataString = _database->GetChatMetadata(callerId.userId, chatId);
+        auto newMetadataString = TryDeleteMetadata(metadataString, params.get_keys());
+        co_await _database->SetChatMetadataAsync(
+            callerId.userId, chatId,
+            std::move(newMetadataString));
+    }
+    else
+    {
+        throw Schema::Rpc::Exception(Schema::Rpc::ErrorCode::BAD_REQUEST, "Invalid path");
+    }
+    /** Return null */
+    co_return nlohmann::json{};
 }
 
 /**
@@ -745,6 +981,45 @@ std::map<std::string, nlohmann::json> Service::TryGetMetadata(const std::vector<
     }
     return metadata;
 }
+
+std::string Service::TryMergeMetadata(const std::string& base, std::map<std::string, nlohmann::json>& changes)
+{
+    try
+    {
+        auto metadata = nlohmann::json::parse(base);
+        for (auto& [key, value] : changes)
+        {
+            metadata[key] = std::move(value);
+        }
+        return metadata.dump();
+    }
+    catch(...)
+    {
+        /** @todo logging */
+        /** If anything happens, use the new value as the metadata */
+        return nlohmann::json(changes).dump();
+    }
+}
+
+std::string Service::TryDeleteMetadata(const std::string& base, const std::vector<std::string>& keys)
+{
+    try
+    {
+        auto metadata = nlohmann::json::parse(base);
+        for (const auto& key : keys)
+        {
+            metadata.erase(key);
+        }
+        return metadata.dump();
+    }
+    catch(...)
+    {
+        /** @todo logging */
+        /** If anything happens, just delete the whole thing */
+        return "{}";
+    }
+}
+
 
 void Service::CheckAdmin(const Common::Uuid& userId)
 {

@@ -46,3 +46,5 @@ await client.makeRequestAsync('setUserCredential', {
         password: '654321'
     }
 });
+
+client.close();

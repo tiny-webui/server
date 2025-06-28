@@ -27,6 +27,11 @@ namespace TUI::Database
 
         ~Database() = default;
 
+        /** Global KV */
+        JS::Promise<void> SetGlobalValueAsync(const std::string& key, std::string value);
+        std::optional<std::string> GetGlobalValue(const std::string& key);
+        JS::Promise<void> DeleteGlobalValueAsync(const std::string& key);
+
         /** Model */
         JS::Promise<Common::Uuid> CreateModelAsync(const std::string& settings);
         JS::Promise<void> DeleteModelAsync(const Common::Uuid& id);
@@ -54,7 +59,7 @@ namespace TUI::Database
         };
         std::list<UserListItem> ListUser();
         JS::Promise<void> SetUserPublicMetadataAsync(const Common::Uuid& id, std::string metadata);
-        std::string GetUserPublicMetadataAsync(const Common::Uuid& id);
+        std::string GetUserPublicMetadata(const Common::Uuid& id);
         JS::Promise<void> SetUserMetadataAsync(const Common::Uuid& id, std::string metadata);
         std::string GetUserMetadata(const Common::Uuid& id);
         JS::Promise<void> SetUserAdminSettingsAsync(const Common::Uuid& id, std::string settings);

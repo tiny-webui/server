@@ -11,6 +11,10 @@ JS::Promise<std::shared_ptr<Database>> Database::CreateAsync(Tev& tev, const std
     db->_db = co_await Sqlite::CreateAsync(tev, dbPath);
     /** Create tables */
     co_await db->_db->ExecAsync(
+        "CREATE TABLE IF NOT EXISTS global ("
+        "key TEXT PRIMARY KEY, "
+        "value TEXT);");
+    co_await db->_db->ExecAsync(
         "CREATE TABLE IF NOT EXISTS model ("
         "id TEXT PRIMARY KEY, "
         "metadata TEXT, "
@@ -32,6 +36,38 @@ JS::Promise<std::shared_ptr<Database>> Database::CreateAsync(Tev& tev, const std
         "content TEXT, "
         "PRIMARY KEY (user_id, id));");
     co_return db;
+}
+
+JS::Promise<void> Database::SetGlobalValueAsync(const std::string& key, std::string value)
+{
+    co_await _db->ExecAsync(
+        "INSERT OR REPLACE INTO global (key, value) VALUES (?, ?);",
+        key, std::move(value));
+}
+
+std::optional<std::string> Database::GetGlobalValue(const std::string& key)
+{
+    auto result = _db->Exec(
+        "SELECT value FROM global WHERE key = ?;",
+        key);
+    if (result.empty())
+    {
+        return std::nullopt;
+    }
+    auto& row = result.front();
+    auto it = row.find("value");
+    if (it == row.end() || !std::holds_alternative<std::string>(it->second))
+    {
+        return std::nullopt;
+    }
+    return std::get<std::string>(it->second);
+}
+
+JS::Promise<void> Database::DeleteGlobalValueAsync(const std::string& key)
+{
+    co_await _db->ExecAsync(
+        "DELETE FROM global WHERE key = ?;",
+        key);
 }
 
 JS::Promise<Uuid> Database::CreateModelAsync(const std::string& settings)
@@ -161,7 +197,7 @@ JS::Promise<void> Database::SetUserPublicMetadataAsync(const Uuid& id, std::stri
     return SetStringToTableById("user", id, "public_metadata", std::move(metadata));
 }
 
-std::string Database::GetUserPublicMetadataAsync(const Uuid& id)
+std::string Database::GetUserPublicMetadata(const Uuid& id)
 {
     return GetStringFromTableById("user", id, "public_metadata");
 }

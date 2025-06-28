@@ -22,6 +22,24 @@ void TestClose()
     db = nullptr;
 }
 
+JS::Promise<void> TestGlobalAsync()
+{
+    std::string key = "test-key";
+    std::string value = "test-value";
+    co_await db->SetGlobalValueAsync(key, value);
+    auto retrievedValue = db->GetGlobalValue(key);
+    AssertWithMessage(retrievedValue.has_value(), "Global value should be set");
+    AssertWithMessage(retrievedValue.value() == value, "Global value should match");
+    std::string newValue = "new-test-value";
+    co_await db->SetGlobalValueAsync(key, newValue);
+    retrievedValue = db->GetGlobalValue(key);
+    AssertWithMessage(retrievedValue.has_value(), "Global value should be set");
+    AssertWithMessage(retrievedValue.value() == newValue, "Global value should match");
+    co_await db->DeleteGlobalValueAsync(key);
+    retrievedValue = db->GetGlobalValue(key);
+    AssertWithMessage(!retrievedValue.has_value(), "Global value should be deleted");
+}
+
 JS::Promise<void> TestModelAsync()
 {
     auto modelId = co_await db->CreateModelAsync("test-settings");
@@ -93,7 +111,7 @@ JS::Promise<void> TestUserAsync()
     auto metadata = db->GetUserMetadata(userId);
     AssertWithMessage(metadata == metadataInput2, "User metadata should match");
     co_await db->SetUserPublicMetadataAsync(userId, publicMetadataInput2);
-    auto publicMetadata = db->GetUserPublicMetadataAsync(userId);
+    auto publicMetadata = db->GetUserPublicMetadata(userId);
     AssertWithMessage(publicMetadata == publicMetadataInput2, "User public metadata should match");
     co_await db->SetUserAdminSettingsAsync(userId, adminSettingsInput2);
     auto adminSettings = db->GetUserAdminSettings(userId);
@@ -193,6 +211,7 @@ JS::Promise<void> TestAsync()
 {
     /** Always run this first */
     RunAsyncTest(TestCreateAsync());
+    RunAsyncTest(TestGlobalAsync());
     RunAsyncTest(TestModelAsync());
     RunAsyncTest(TestUserAsync());
     RunAsyncTest(TestChatAsync());

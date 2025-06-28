@@ -85,6 +85,8 @@ namespace TUI::Application
 
         std::shared_ptr<ApiProvider::IProvider> GetProvider(const Common::Uuid& providerId);
         std::map<std::string, nlohmann::json> TryGetMetadata(const std::vector<std::string>& keys, const std::string& metadataString);
+        std::string TryMergeMetadata(const std::string& base, std::map<std::string, nlohmann::json>& changes);
+        std::string TryDeleteMetadata(const std::string& base, const std::vector<std::string>& keys);
         void CheckAdmin(const Common::Uuid& userId);
     };
 }
