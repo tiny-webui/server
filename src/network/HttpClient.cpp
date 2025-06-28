@@ -71,6 +71,14 @@ Http::Client::Client(Tev& tev)
 Http::Client::~Client()
 {
     _tev.ClearTimeout(_curlTimeoutHandle);
+    for (auto&& request : _requests)
+    {
+        request.second.second._state->promise.Reject("Http client closed");
+    }
+    for (auto&& streamRequest : _streamRequests)
+    {
+        streamRequest.second.second._state->generator.Reject("Http client closed");
+    }
 }
 
 Http::Request Http::Client::MakeRequest(Http::Method method, const Http::RequestData& data)
