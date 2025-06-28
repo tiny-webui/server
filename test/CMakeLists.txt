@@ -125,7 +125,7 @@ target_link_libraries(TestUuid
         uuid)
 
 add_executable(TestDatabase
-    TestDatabase
+    TestDatabase.cpp
     ../src/database/Database.cpp
     ../src/database/Sqlite.cpp)
 

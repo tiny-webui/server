@@ -135,7 +135,7 @@ JS::Promise<void> MainAsync(Tev& tev, std::string dbPath)
     auto server = std::make_shared<TestServer>(tev, "127.0.0.1", 12345, userId);
 
     gService = std::make_shared<Application::Service>(
-        server, database,
+        tev, server, database,
         [](const std::string& errorMessage) {
             std::cerr << "Critical error: " << errorMessage << std::endl;
             abort();

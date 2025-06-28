@@ -1,4 +1,12 @@
 import { TUIClient } from "./TUIClient.js";
+import fs from "fs";
+
+if (process.argv.length < 3) {
+    console.error("Usage: node Main.js <config path>");
+    process.exit(1);
+}
+
+const config = JSON.parse(fs.readFileSync(process.argv[2]).toString());
 
 const client = new TUIClient('127.0.0.1', 12345, (error) => {
     console.error(error);
@@ -6,35 +14,45 @@ const client = new TUIClient('127.0.0.1', 12345, (error) => {
 
 await client.connectAsync();
 
-const modelList = await client.makeRequestAsync('getModelList', {});
+const models = await client.makeRequestAsync('getModelList', {});
+const modelId = models[0]?.id ?? await client.makeRequestAsync('newModel', {
+    providerName: 'AzureOpenAI',
+    providerParams: config
+});
 
-console.log(JSON.stringify(modelList));
+console.log(modelId);
 
-for (const model of modelList) {
-    await client.makeRequestAsync('deleteModel', model.id);
+await client.makeRequestAsync('getChatList', {
+    start: 0,
+    quantity: 50
+});
+
+const chatId = await client.makeRequestAsync('newChat', {});
+
+console.log(chatId);
+
+const stream = client.makeStreamRequestAsync('chatCompletion', {
+    id: chatId,
+    modelId: modelId,
+    userMessage: {
+        role: 'user',
+        content:[{
+            type: 'text',
+            data: 'Tell me a stroy about rockets'
+        }]
+    }
+});
+
+let result = undefined;
+while(!(result = await stream.next()).done){
+    const chunk = result.value;
+    process.stdout.write(chunk);
+}
+console.log("");
+/** The chat info */
+if (result!== undefined){
+    console.log(JSON.stringify(result.value));
 }
 
-const id = await client.makeRequestAsync('newModel', {
-    providerName: 'AzureOpenAI',
-    providerParams: {
-        url: 'https://this.is.not/a/real/url',
-        apiKey: 'this is not a real key'
-    }
-});
 
-console.log(id);
 
-const settings = await client.makeRequestAsync('getModel', id);
-
-console.log(JSON.stringify(settings));
-
-await client.makeRequestAsync('modifyModel',{
-    id,
-    settings: {
-        providerName: 'AzureOpenAI',
-        providerParams: {
-            url: 'https://this.is.also.not/a/real/url',
-            apiKey: 'this is also not a real key'
-        }
-    }
-});

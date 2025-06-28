@@ -1,9 +1,11 @@
 #pragma once
 
 #include <memory>
+#include <tev-cpp/Tev.h>
 #include "rpc/RpcServer.h"
 #include "common/Uuid.h"
 #include "network/IServer.h"
+#include "network/HttpClient.h"
 #include "database/Database.h"
 #include "apiProvider/IProvider.h"
 #include "CallerId.h"
@@ -16,6 +18,7 @@ namespace TUI::Application
     public:
         /** @todo more dependencies */
         Service(
+            Tev& tev,
             std::shared_ptr<Network::IServer<CallerId>> server,
             std::shared_ptr<Database::Database> database,
             std::function<void(const std::string&)> onCriticalError);
@@ -31,6 +34,7 @@ namespace TUI::Application
     private:
         std::shared_ptr<Database::Database> _database;
         std::function<void(const std::string&)> _onCriticalError;
+        std::shared_ptr<Network::Http::Client> _httpClient{nullptr};
         std::unique_ptr<Rpc::RpcServer<CallerId>> _rpcServer{nullptr};
         std::shared_ptr<ResourceVersionManager<CallerId>> _resourceVersionManager{ResourceVersionManager<CallerId>::Create()};
         std::unordered_map<Common::Uuid, Schema::IServer::UserAdminSettingsRole> _userRoleCache{};

@@ -156,6 +156,9 @@ namespace Rpc {
         static constexpr double NOT_FOUND = 404;
         static constexpr double CONFLICT = 409;
         static constexpr double LOCKED = 423;
+        static constexpr double INTERNAL_SERVER_ERROR = 500;
+        static constexpr double NOT_IMPLEMENTED = 501;
+        static constexpr double BAD_GATEWAY = 502;
     };
 
     class Exception : public std::runtime_error

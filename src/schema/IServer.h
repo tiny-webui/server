@@ -394,22 +394,17 @@ namespace IServer {
         virtual ~ExecuteGenerationTaskParams() = default;
 
         private:
+        Message message;
         std::string model_id;
-        std::string prompt_template_name;
-        std::vector<std::string> prompt_template_params;
 
         public:
+        const Message & get_message() const { return message; }
+        Message & get_mutable_message() { return message; }
+        void set_message(const Message & value) { this->message = value; }
+
         const std::string & get_model_id() const { return model_id; }
         std::string & get_mutable_model_id() { return model_id; }
         void set_model_id(const std::string & value) { this->model_id = value; }
-
-        const std::string & get_prompt_template_name() const { return prompt_template_name; }
-        std::string & get_mutable_prompt_template_name() { return prompt_template_name; }
-        void set_prompt_template_name(const std::string & value) { this->prompt_template_name = value; }
-
-        const std::vector<std::string> & get_prompt_template_params() const { return prompt_template_params; }
-        std::vector<std::string> & get_mutable_prompt_template_params() { return prompt_template_params; }
-        void set_prompt_template_params(const std::vector<std::string> & value) { this->prompt_template_params = value; }
     };
 
     class GetModelListParams {
@@ -843,16 +838,14 @@ namespace IServer {
     }
 
     inline void from_json(const json & j, ExecuteGenerationTaskParams& x) {
+        x.set_message(j.at("message").get<Message>());
         x.set_model_id(j.at("modelId").get<std::string>());
-        x.set_prompt_template_name(j.at("promptTemplateName").get<std::string>());
-        x.set_prompt_template_params(j.at("promptTemplateParams").get<std::vector<std::string>>());
     }
 
     inline void to_json(json & j, const ExecuteGenerationTaskParams & x) {
         j = json::object();
+        j["message"] = x.get_message();
         j["modelId"] = x.get_model_id();
-        j["promptTemplateName"] = x.get_prompt_template_name();
-        j["promptTemplateParams"] = x.get_prompt_template_params();
     }
 
     inline void from_json(const json & j, GetModelListParams& x) {
