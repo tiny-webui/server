@@ -508,7 +508,7 @@ namespace IServer {
         private:
         UserAdminSettings admin_settings;
         std::string id;
-        std::map<std::string, nlohmann::json> public_metadata;
+        std::optional<std::map<std::string, nlohmann::json>> public_metadata;
         std::string user_name;
 
         public:
@@ -520,9 +520,8 @@ namespace IServer {
         std::string & get_mutable_id() { return id; }
         void set_id(const std::string & value) { this->id = value; }
 
-        const std::map<std::string, nlohmann::json> & get_public_metadata() const { return public_metadata; }
-        std::map<std::string, nlohmann::json> & get_mutable_public_metadata() { return public_metadata; }
-        void set_public_metadata(const std::map<std::string, nlohmann::json> & value) { this->public_metadata = value; }
+        std::optional<std::map<std::string, nlohmann::json>> get_public_metadata() const { return public_metadata; }
+        void set_public_metadata(std::optional<std::map<std::string, nlohmann::json>> value) { this->public_metadata = value; }
 
         const std::string & get_user_name() const { return user_name; }
         std::string & get_mutable_user_name() { return user_name; }
@@ -910,7 +909,7 @@ namespace IServer {
     inline void from_json(const json & j, GetUserListResultElement& x) {
         x.set_admin_settings(j.at("adminSettings").get<UserAdminSettings>());
         x.set_id(j.at("id").get<std::string>());
-        x.set_public_metadata(j.at("publicMetadata").get<std::map<std::string, nlohmann::json>>());
+        x.set_public_metadata(get_stack_optional<std::map<std::string, nlohmann::json>>(j, "publicMetadata"));
         x.set_user_name(j.at("userName").get<std::string>());
     }
 
@@ -918,7 +917,9 @@ namespace IServer {
         j = json::object();
         j["adminSettings"] = x.get_admin_settings();
         j["id"] = x.get_id();
-        j["publicMetadata"] = x.get_public_metadata();
+        if (x.get_public_metadata()) {
+            j["publicMetadata"] = x.get_public_metadata();
+        }
         j["userName"] = x.get_user_name();
     }
 

@@ -127,7 +127,8 @@ target_link_libraries(TestUuid
 add_executable(TestDatabase
     TestDatabase.cpp
     ../src/database/Database.cpp
-    ../src/database/Sqlite.cpp)
+    ../src/database/Sqlite.cpp
+    ../src/common/Utilities.cpp)
 
 target_include_directories(TestDatabase
     PRIVATE

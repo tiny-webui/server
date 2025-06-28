@@ -89,12 +89,6 @@ namespace TUI::Database
             const Common::Uuid& userId, const Common::Uuid& id, const std::string& name, std::string value);
         std::string GetStringFromChat(
             const Common::Uuid& userId, const Common::Uuid& id, const std::string& name);
-        /**
-         * @brief Get the current timestamp in milliseconds.
-         * 
-         * @return int64_t 
-         */
-        int64_t GetTimestamp();
 
         std::shared_ptr<Sqlite> _db;
     };

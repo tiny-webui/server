@@ -1,5 +1,6 @@
 #include <format>
 #include "Database.h"
+#include "common/Utilities.h"
 
 using namespace TUI::Common;
 using namespace TUI::Database;
@@ -218,7 +219,9 @@ JS::Promise<Uuid> Database::CreateChatAsync(const Uuid& userId)
     Uuid id{};
     co_await _db->ExecAsync(
         "INSERT INTO chat (timestamp, user_id, id) VALUES(?, ?, ?);",
-        GetTimestamp(), static_cast<std::string>(userId), static_cast<std::string>(id));
+        Utilities::GetTimestamp(), 
+        static_cast<std::string>(userId),
+        static_cast<std::string>(id));
     co_return id;
 }
 
@@ -364,7 +367,10 @@ JS::Promise<void> Database::SetStringToChatAsync(
         name);
     co_await _db->ExecAsync(
         sql,
-        std::move(value), GetTimestamp(), static_cast<std::string>(userId), static_cast<std::string>(id));
+        std::move(value),
+        Utilities::GetTimestamp(),
+        static_cast<std::string>(userId),
+        static_cast<std::string>(id));
 }
 
 std::string Database::GetStringFromChat(
@@ -401,9 +407,3 @@ std::string Database::GetStringFromChat(
     }
 }
 
-int64_t Database::GetTimestamp()
-{
-    auto now = std::chrono::system_clock::now();
-    auto duration = now.time_since_epoch();
-    return std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
-}

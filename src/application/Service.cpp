@@ -1,6 +1,7 @@
 #include "Service.h"
 #include "apiProvider/Factory.h"
 #include "network/HttpStreamResponseParser.h"
+#include "common/Utilities.h"
 
 using namespace TUI;
 using namespace TUI::Application;
@@ -91,7 +92,8 @@ JS::Promise<nlohmann::json> Service::OnDeleteMetadataAsync(CallerId callerId, nl
 JS::Promise<nlohmann::json> Service::OnGetChatListAsync(CallerId callerId, nlohmann::json paramsJson)
 {
     auto params = ParseParams<Schema::IServer::GetChatListParams>(paramsJson);
-    auto lock = _resourceVersionManager->GetReadLock({static_cast<std::string>(callerId.userId), "chatList"}, callerId);
+    auto lock = _resourceVersionManager->GetReadLock(
+        {"chatList", static_cast<std::string>(callerId.userId)}, callerId);
     auto start = params.get_start();
     auto quantity = params.get_quantity();
     if (start < 0 || quantity < 0)
@@ -133,11 +135,12 @@ JS::Promise<nlohmann::json> Service::OnGetChatListAsync(CallerId callerId, nlohm
 JS::Promise<nlohmann::json> Service::OnNewChatAsync(CallerId callerId, nlohmann::json paramsJson)
 {
     (void)paramsJson;
-    auto lock = _resourceVersionManager->GetWriteLock({static_cast<std::string>(callerId.userId), "chatList"}, callerId);
+    auto lock = _resourceVersionManager->GetWriteLock(
+        {"chatList", static_cast<std::string>(callerId.userId)}, callerId);
     auto chatId = co_await _database->CreateChatAsync(callerId.userId);
     /** Creation equals to the first read. */
     auto readLock = _resourceVersionManager->GetReadLock(
-        {static_cast<std::string>(callerId.userId), "chat", static_cast<std::string>(chatId)}, callerId);
+        {"chat", static_cast<std::string>(callerId.userId), static_cast<std::string>(chatId)}, callerId);
     co_return static_cast<nlohmann::json>(static_cast<std::string>(chatId));
 }
 
@@ -155,7 +158,7 @@ JS::Promise<nlohmann::json> Service::OnGetChatAsync(CallerId callerId, nlohmann:
     auto params = ParseParams<std::string>(paramsJson);
     Common::Uuid chatId{params};
     auto lock = _resourceVersionManager->GetReadLock(
-        {static_cast<std::string>(callerId.userId), "chat", static_cast<std::string>(chatId)}, callerId);
+        {"chat", static_cast<std::string>(callerId.userId), static_cast<std::string>(chatId)}, callerId);
     auto contentStr = _database->GetChatContent(callerId.userId, chatId);
     auto content = nlohmann::json::parse(contentStr).get<Schema::IServer::TreeHistory>();
     co_return static_cast<nlohmann::json>(content);
@@ -175,9 +178,9 @@ JS::Promise<nlohmann::json> Service::DeleteChatAsync(CallerId callerId, nlohmann
     auto params = ParseParams<std::string>(paramsJson);
     Common::Uuid chatId{params};
     auto lock0 = _resourceVersionManager->GetWriteLock(
-        {static_cast<std::string>(callerId.userId), "chatList"}, callerId);
+        {"chatList", static_cast<std::string>(callerId.userId)}, callerId);
     auto lock1 = _resourceVersionManager->GetDeleteLock(
-        {static_cast<std::string>(callerId.userId), "chat", static_cast<std::string>(chatId)}, callerId);
+        {"chat", static_cast<std::string>(callerId.userId), static_cast<std::string>(chatId)}, callerId);
 
     co_await _database->DeleteChatAsync(callerId.userId, chatId);
     /** Return null */
@@ -206,8 +209,9 @@ JS::AsyncGenerator<nlohmann::json, nlohmann::json> Service::OnChatCompletionAsyn
     }
     Common::Uuid chatId{params.get_id()};
     auto lock = _resourceVersionManager->GetWriteLock(
-        {static_cast<std::string>(callerId.userId), "chat", static_cast<std::string>(chatId)}, callerId);
+        {"chat", static_cast<std::string>(callerId.userId), static_cast<std::string>(chatId)}, callerId);
 
+    int64_t userMessageTimestamp = Common::Utilities::GetTimestamp();
     /** Construct the linear history from the tree history and the new user message */
     Schema::IServer::TreeHistory treeHistory{};
     {
@@ -310,8 +314,9 @@ JS::AsyncGenerator<nlohmann::json, nlohmann::json> Service::OnChatCompletionAsyn
         responseMessage.set_content(std::move(responseContents));
         responseNode.set_message(std::move(responseMessage));
         responseNode.set_parent(static_cast<std::string>(userMessageId));
+        responseNode.set_timestamp(static_cast<double>(Common::Utilities::GetTimestamp()));
         nodes.emplace(static_cast<std::string>(responseMessageId), std::move(responseNode));
-        
+
         Schema::IServer::MessageNode userNode{};
         userNode.set_id(static_cast<std::string>(userMessageId));
         userNode.set_message(std::move(params.get_mutable_user_message()));
@@ -327,6 +332,7 @@ JS::AsyncGenerator<nlohmann::json, nlohmann::json> Service::OnChatCompletionAsyn
             auto& parentNode = item->second;
             parentNode.get_mutable_children().push_back(static_cast<std::string>(userMessageId));
         }
+        userNode.set_timestamp(static_cast<double>(userMessageTimestamp));
         nodes.emplace(static_cast<std::string>(userMessageId), std::move(userNode));
     }
     /** Save the tree history back */
@@ -452,7 +458,8 @@ JS::Promise<nlohmann::json> Service::OnGetModelAsync(CallerId callerId, nlohmann
     CheckAdmin(callerId.userId);
     auto params = ParseParams<std::string>(paramsJson);
     Common::Uuid modelId{params};
-    auto lock = _resourceVersionManager->GetReadLock({"model", static_cast<std::string>(modelId)}, callerId);
+    auto lock = _resourceVersionManager->GetReadLock(
+        {"model", static_cast<std::string>(modelId)}, callerId);
 
     auto settingsString = _database->GetModelSettings(modelId);
     auto settings = nlohmann::json::parse(settingsString).get<Schema::IServer::ModelSettings>();
@@ -475,7 +482,8 @@ JS::Promise<nlohmann::json> Service::OnDeleteModelAsync(CallerId callerId, nlohm
     auto params = ParseParams<std::string>(paramsJson);
     Common::Uuid modelId{params};
     auto lock0 = _resourceVersionManager->GetWriteLock({"modelList"}, callerId);
-    auto lock1 = _resourceVersionManager->GetDeleteLock({"model", static_cast<std::string>(modelId)}, callerId);
+    auto lock1 = _resourceVersionManager->GetDeleteLock(
+        {"model", static_cast<std::string>(modelId)}, callerId);
 
     co_await _database->DeleteModelAsync(modelId);
     _providers.erase(modelId);
@@ -498,7 +506,8 @@ JS::Promise<nlohmann::json> Service::OnModifyModelAsync(CallerId callerId, nlohm
     CheckAdmin(callerId.userId);
     auto params = ParseParams<Schema::IServer::ModifyModelSettingsParams>(paramsJson);
     Common::Uuid modelId{params.get_id()};
-    auto lock = _resourceVersionManager->GetWriteLock({"model", static_cast<std::string>(modelId)}, callerId);
+    auto lock = _resourceVersionManager->GetWriteLock(
+        {"model", static_cast<std::string>(modelId)}, callerId);
 
     auto settings = params.get_settings();
     co_await _database->SetModelSettingsAsync(modelId, (static_cast<nlohmann::json>(settings)).dump());
@@ -509,46 +518,161 @@ JS::Promise<nlohmann::json> Service::OnModifyModelAsync(CallerId callerId, nlohm
     co_return nlohmann::json{};
 }
 
+/**
+ * @brief 
+ * 
+ * @attention Access: admin
+ * 
+ * @param callerId 
+ * @param paramsJson 
+ * @return JS::Promise<nlohmann::json> 
+ */
 JS::Promise<nlohmann::json> Service::OnGetUserListAsync(CallerId callerId, nlohmann::json paramsJson)
 {
-    (void)callerId;
-    (void)paramsJson;
-    throw std::runtime_error("Not implemented");
+    CheckAdmin(callerId.userId);
+    auto params = ParseParams<Schema::IServer::GetUserListParams>(paramsJson);
+    auto lock = _resourceVersionManager->GetReadLock({"userList"}, callerId);
+    auto list = _database->ListUser();
+    Schema::IServer::GetUserListResult result{};
+    result.reserve(list.size());
+    for (const auto& item: list)
+    {
+        using EntryType = decltype(result)::value_type;
+        EntryType entry{};
+        entry.set_id(static_cast<std::string>(item.id));
+        entry.set_user_name(item.userName);
+        auto userAdminSettings = nlohmann::json::parse(item.adminSettings).get<Schema::IServer::UserAdminSettings>();
+        /** @todo force up to date the user admin settings */
+        entry.set_admin_settings(std::move(userAdminSettings));
+        if (params.get_metadata_keys().has_value())
+        {
+            using MetadataType = std::remove_reference<decltype(entry.get_public_metadata())>::type;
+            MetadataType metadata{TryGetMetadata(params.get_metadata_keys().value(), item.publicMetadata)};
+            entry.set_public_metadata(std::move(metadata));
+        }
+        result.push_back(std::move(entry));
+    }
+    result.shrink_to_fit();
+    co_return static_cast<nlohmann::json>(result);
 }
 
+/**
+ * @brief 
+ * 
+ * @attention Access: admin
+ * 
+ * @param callerId 
+ * @param paramsJson 
+ * @return JS::Promise<nlohmann::json> 
+ */
 JS::Promise<nlohmann::json> Service::OnNewUserAsync(CallerId callerId, nlohmann::json paramsJson)
 {
-    (void)callerId;
-    (void)paramsJson;
-    throw std::runtime_error("Not implemented");
+    CheckAdmin(callerId.userId);
+    auto params = ParseParams<Schema::IServer::NewUserParams>(paramsJson);
+    auto lock = _resourceVersionManager->GetWriteLock({"userList"}, callerId);
+    auto userId = co_await _database->CreateUserAsync(
+        params.get_user_name(),
+        (static_cast<nlohmann::json>(params.get_admin_settings())).dump(),
+        (static_cast<nlohmann::json>(params.get_credential()).dump()));
+    auto adminSettingsLock = _resourceVersionManager->GetReadLock(
+        {"user", static_cast<std::string>(userId), "adminSettings"}, callerId);
+    co_return static_cast<nlohmann::json>(static_cast<std::string>(userId));
 }
 
+/**
+ * @brief 
+ * 
+ * @attention Access: admin
+ * 
+ * @param callerId 
+ * @param paramsJson 
+ * @return JS::Promise<nlohmann::json> 
+ */
 JS::Promise<nlohmann::json> Service::OnDeleteUserAsync(CallerId callerId, nlohmann::json paramsJson)
 {
-    (void)callerId;
-    (void)paramsJson;
-    throw std::runtime_error("Not implemented");
+    CheckAdmin(callerId.userId);
+    auto params = ParseParams<std::string>(paramsJson);
+    Common::Uuid userId{params};
+    auto lock0 = _resourceVersionManager->GetWriteLock({"userList"}, callerId);
+    auto lock1 = _resourceVersionManager->GetDeleteLock(
+        {"user", static_cast<std::string>(userId), "adminSettings"}, callerId);
+
+    co_await _database->DeleteUserAsync(userId);
+    _userRoleCache.erase(userId);
+    /** Return null */
+    co_return nlohmann::json{};
 }
 
+/**
+ * @brief 
+ * 
+ * @attention Access: admin or current user
+ * 
+ * @param callerId 
+ * @param paramsJson 
+ * @return JS::Promise<nlohmann::json> 
+ */
 JS::Promise<nlohmann::json> Service::OnGetUserAdminSettingsAsync(CallerId callerId, nlohmann::json paramsJson)
 {
-    (void)callerId;
-    (void)paramsJson;
-    throw std::runtime_error("Not implemented");
+    auto params = ParseParams<std::string>(paramsJson);
+    Common::Uuid userId{params};
+    if (callerId.userId != userId)
+    {
+        CheckAdmin(callerId.userId);
+    }
+    auto lock = _resourceVersionManager->GetReadLock(
+        {"user", static_cast<std::string>(userId), "adminSettings"}, callerId);
+    
+    auto settingsString = _database->GetUserAdminSettings(userId);
+    auto settings = nlohmann::json::parse(settingsString).get<Schema::IServer::UserAdminSettings>();
+
+    co_return static_cast<nlohmann::json>(settings);
 }
 
+/**
+ * @brief 
+ * 
+ * @attention Access: admin
+ * 
+ * @param callerId 
+ * @param paramsJson 
+ * @return JS::Promise<nlohmann::json> 
+ */
 JS::Promise<nlohmann::json> Service::OnSetUserAdminSettingsAsync(CallerId callerId, nlohmann::json paramsJson)
 {
-    (void)callerId;
-    (void)paramsJson;
-    throw std::runtime_error("Not implemented");
+    CheckAdmin(callerId.userId);
+    auto params = ParseParams<Schema::IServer::SetUserAdminSettingsParams>(paramsJson);
+    Common::Uuid userId{params.get_id()};
+    auto lock = _resourceVersionManager->GetWriteLock(
+        {"user", static_cast<std::string>(userId), "adminSettings"}, callerId);
+    
+    auto& settings = params.get_admin_settings();
+    auto settingsString = (static_cast<nlohmann::json>(settings)).dump();
+    co_await _database->SetUserAdminSettingsAsync(userId, std::move(settingsString));
+    _userRoleCache[userId] = settings.get_role();
+
+    /** Return null */
+    co_return nlohmann::json{};
 }
 
+/**
+ * @brief 
+ * 
+ * @attention Access: curent user
+ * 
+ * @param callerId 
+ * @param paramsJson 
+ * @return JS::Promise<nlohmann::json> 
+ */
 JS::Promise<nlohmann::json> Service::OnSetUserCredentialAsync(CallerId callerId, nlohmann::json paramsJson)
 {
-    (void)callerId;
-    (void)paramsJson;
-    throw std::runtime_error("Not implemented");
+    auto params = ParseParams<Schema::IServer::UserCredential>(paramsJson);
+    /** DO NOT acquire lock. The credential is write only */
+    co_await _database->SetUserCredentialAsync(
+        callerId.userId,
+        (static_cast<nlohmann::json>(params)).dump());
+    /** Return null */
+    co_return nlohmann::json{};
 }
 
 void Service::OnNewConnection(CallerId callerId)
@@ -570,7 +694,8 @@ void Service::OnNewConnection(CallerId callerId)
 void Service::OnConnectionClosed(CallerId callerId)
 {
     (void)callerId;
-    throw std::runtime_error("Not implemented");
+
+    /** @todo more logic */
 }
 
 void Service::OnCriticalError(const std::string& message)
