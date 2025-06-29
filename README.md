@@ -31,6 +31,10 @@ cmake ..
 make
 sudo make install
 ```
+You may need to update your linker cache after installing these libraries:
+```bash
+sudo ldconfig
+```
 
 ## Build and run tests
 The main entry is currently empty. To test the basic functions out, you need to build and run the tests.
@@ -61,6 +65,7 @@ cd test/build
 ```bash
 # In another console, from project root
 cd test/ServiceClient
+npm i
 node ChatBot.js ../config/AzureOpenAI.json
 ```
 
