@@ -4,16 +4,27 @@ Install the following packages from your package manager:
 * libwebsockets
 * libsqlite3
 * libuuid
+* nlohmann-json
 
 For example, on debian, these can be installed:
 ```bash
-sudo apt install libcurl4-openssl-dev libwebsockets-dev libsqlite3-dev  uuid-dev
+sudo apt install libcurl4-openssl-dev libwebsockets-dev libsqlite3-dev  uuid-dev nlohmann-json3-dev
 ```
 Install the following packages from source:
 * [libtev-cpp](https://github.com/chemwolf6922/tiny-event-loop-cpp)
 ```bash
 git clone https://github.com/chemwolf6922/tiny-event-loop-cpp tev-cpp
 cd tev-cpp
+mkdir build
+cd build
+cmake ..
+make
+sudo make install
+```
+* [js-style-co-routine](https://github.com/chemwolf6922/js-style-co-routine)
+```bash
+git clone https://github.com/chemwolf6922/js-style-co-routine
+cd js-style-co-routine
 mkdir build
 cd build
 cmake ..
