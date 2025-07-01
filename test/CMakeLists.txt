@@ -144,3 +144,36 @@ add_executable(TestRpcServer
 target_include_directories(TestRpcServer
     PRIVATE
         ../src)
+
+add_executable(TestBigUint
+    TestBigUint.cpp)
+
+target_include_directories(TestBigUint
+    PRIVATE
+        ../src)
+
+add_executable(TestAes256Gcm
+    TestAes256Gcm.cpp
+    ../src/cipher/Aes256Gcm.cpp)
+
+target_include_directories(TestAes256Gcm
+    PRIVATE
+        ../src)
+
+target_link_libraries(TestAes256Gcm
+    PRIVATE
+        ssl
+        crypto)
+
+add_executable(TestEcdhePsk
+    TestEcdhePsk.cpp
+    ../src/cipher/EcdhePsk.cpp)
+
+target_include_directories(TestEcdhePsk
+    PRIVATE
+        ../src)
+
+target_link_libraries(TestEcdhePsk
+    PRIVATE
+        ssl
+        crypto)
