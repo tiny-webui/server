@@ -84,14 +84,14 @@ public:
             throw std::runtime_error("Connection closed while waiting for response");
         }
         auto response = ParseResponse(message.value());
-        if (!response.has_value())
+        if (response.first)
         {
             throw std::runtime_error("Invalid end message");
         }
-        co_return response.value();
+        co_return response.second;
     }
 
-    JS::AsyncGenerator<nlohmann::json> MakeStreamRequest(const std::string& method, const nlohmann::json& params)
+    JS::AsyncGenerator<nlohmann::json, nlohmann::json> MakeStreamRequest(const std::string& method, const nlohmann::json& params)
     {
         SendRequest(method, params);
         while (true)
@@ -102,12 +102,13 @@ public:
                 throw std::runtime_error("Connection closed while waiting for response");
             }
             auto response = ParseResponse(message.value());
-            if (!response.has_value())
+            if (response.first)
             {
-                break;
+                co_return response.second;
             }
-            co_yield response.value();
+            co_yield response.second;
         }
+        throw std::runtime_error("Should not be here");
     }
 
     void SendNotification(const std::string& method, const nlohmann::json& params)
@@ -134,7 +135,7 @@ private:
         _txGenerator.Feed(std::move(requestData));
     }
 
-    std::optional<nlohmann::json> ParseResponse(const std::vector<std::uint8_t>& rawData)
+    std::pair<bool, nlohmann::json> ParseResponse(const std::vector<std::uint8_t>& rawData)
     {
         auto responseJson = nlohmann::json::parse(rawData.begin(), rawData.end());
         if (responseJson.contains("error"))
@@ -146,12 +147,13 @@ private:
         }
         else if (responseJson.contains("end"))
         {
-            return std::nullopt;
+            auto response = responseJson.get<Schema::Rpc::StreamEndResponse>();
+            return { true, response.get_result() };
         }
         else
         {
             auto response = responseJson.get<Schema::Rpc::Response>();
-            return std::make_optional<nlohmann::json>(response.get_result());
+            return { false, response.get_result() };
         }
     }
 };
@@ -235,7 +237,7 @@ public:
         co_return "Hello";
     }
 
-    JS::AsyncGenerator<nlohmann::json> TestStreamRequestHandler(int id, nlohmann::json params)
+    JS::AsyncGenerator<nlohmann::json, nlohmann::json> TestStreamRequestHandler(int id, nlohmann::json params)
     {
         std::cout << "Received stream request from connection " << id << ": " << params.dump() << std::endl;
         for (int i = 0; i < 5; ++i)
@@ -243,6 +245,8 @@ public:
             nlohmann::json item = i;
             co_yield item;
         }
+        nlohmann::json finalResult = true;
+        co_return finalResult;
     }
 
     void TestNotificationHandler(int id, nlohmann::json params)
@@ -310,6 +314,9 @@ JS::Promise<void> TestStreamRequestAsync()
         AssertWithMessage(item->get<int>() == count, "Expected item " + std::to_string(count) + ", got " + item->dump());
         ++count;
     }
+    auto finalResult = stream.GetReturnValue();
+    AssertWithMessage(finalResult.is_boolean(), "Expected final result to be a boolean, got " + finalResult.dump());
+    AssertWithMessage(finalResult.get<bool>(), "Expected final result to be true, got " + finalResult.dump());
     AssertWithMessage(count == 5, "Expected 5 items, got " + std::to_string(count));
     co_return;
 }

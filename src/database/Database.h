@@ -27,24 +27,43 @@ namespace TUI::Database
 
         ~Database() = default;
 
+        /** Global KV */
+        JS::Promise<void> SetGlobalValueAsync(const std::string& key, std::string value);
+        std::optional<std::string> GetGlobalValue(const std::string& key);
+        JS::Promise<void> DeleteGlobalValueAsync(const std::string& key);
+
         /** Model */
-        JS::Promise<Common::Uuid> CreateModelAsync(const std::string& provider);
+        JS::Promise<Common::Uuid> CreateModelAsync(const std::string& settings);
         JS::Promise<void> DeleteModelAsync(const Common::Uuid& id);
-        std::list<Common::Uuid> ListModel();
-        std::list<std::pair<Common::Uuid, std::string>> ListModelWithMetadata();
+        struct IdMetadataPair
+        {
+            Common::Uuid id;
+            std::string metadata;
+        };
+        std::list<IdMetadataPair> ListModel();
         JS::Promise<void> SetModelMetadataAsync(const Common::Uuid& id, std::string metadata);
         std::string GetModelMetadata(const Common::Uuid& id);
-        JS::Promise<void> SetModelParamsAsync(const Common::Uuid& id, std::string params);
-        std::string GetModelParams(const Common::Uuid& id);
-        std::string GetModelProvider(const Common::Uuid& id);
+        JS::Promise<void> SetModelSettingsAsync(const Common::Uuid& id, std::string settings);
+        std::string GetModelSettings(const Common::Uuid& id);
 
         /** User */
-        JS::Promise<Common::Uuid> CreateUserAsync(const std::string& username);
+        JS::Promise<Common::Uuid> CreateUserAsync(
+            std::string username, std::string adminSettings, std::string credential);
         JS::Promise<void> DeleteUserAsync(const Common::Uuid& id);
-        std::list<Common::Uuid> ListUser();
-        std::list<std::pair<Common::Uuid, std::string>> ListUserWithMetadata();
+        struct UserListItem
+        {
+            Common::Uuid id;
+            std::string userName;
+            std::string adminSettings;
+            std::string publicMetadata;
+        };
+        std::list<UserListItem> ListUser();
+        JS::Promise<void> SetUserPublicMetadataAsync(const Common::Uuid& id, std::string metadata);
+        std::string GetUserPublicMetadata(const Common::Uuid& id);
         JS::Promise<void> SetUserMetadataAsync(const Common::Uuid& id, std::string metadata);
         std::string GetUserMetadata(const Common::Uuid& id);
+        JS::Promise<void> SetUserAdminSettingsAsync(const Common::Uuid& id, std::string settings);
+        std::string GetUserAdminSettings(const Common::Uuid& id);
         JS::Promise<void> SetUserCredentialAsync(const Common::Uuid& id, std::string credential);
         std::string GetUserCredential(const Common::Uuid& id);
         Common::Uuid GetUserId(const std::string& username);
@@ -53,9 +72,7 @@ namespace TUI::Database
         JS::Promise<Common::Uuid> CreateChatAsync(const Common::Uuid& userId);
         JS::Promise<void> DeleteChatAsync(const Common::Uuid& userId, const Common::Uuid& chatId);
         size_t GetChatCount(const Common::Uuid& userId);
-        std::list<Common::Uuid> ListChat(
-            const Common::Uuid& userId, size_t from = 0, size_t limit = 50);
-        std::list<std::pair<Common::Uuid, std::string>> ListChatWithMetadata(
+        std::list<IdMetadataPair> ListChat(
             const Common::Uuid& userId, size_t from = 0, size_t limit = 50);
         JS::Promise<void> SetChatMetadataAsync(
             const Common::Uuid& userId, const Common::Uuid& chatId, std::string metadata);
@@ -67,11 +84,7 @@ namespace TUI::Database
     private:
         Database() = default;
 
-        std::list<Common::Uuid> ListTableId(const std::string& table);
-        std::list<Common::Uuid> ParseListTableIdResult(Sqlite::ExecResult& result);
-        std::list<std::pair<Common::Uuid, std::string>> ListTableIdWithMetadata(
-            const std::string& table);
-        std::list<std::pair<Common::Uuid, std::string>> ParseListTableIdWithMetadataResult(
+        std::list<IdMetadataPair> ParseListTableIdWithMetadataResult(
             Sqlite::ExecResult& result);
         JS::Promise<void> SetStringToTableById(
             const std::string& table, const Common::Uuid& id, const std::string& name, std::string value);
@@ -81,12 +94,6 @@ namespace TUI::Database
             const Common::Uuid& userId, const Common::Uuid& id, const std::string& name, std::string value);
         std::string GetStringFromChat(
             const Common::Uuid& userId, const Common::Uuid& id, const std::string& name);
-        /**
-         * @brief Get the current timestamp in milliseconds.
-         * 
-         * @return int64_t 
-         */
-        int64_t GetTimestamp();
 
         std::shared_ptr<Sqlite> _db;
     };

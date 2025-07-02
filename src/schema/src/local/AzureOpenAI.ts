@@ -13,7 +13,7 @@ type BulkResponse = {
 type StreamResponse = {
     choices: Array<{
         delta: {
-            content: string;
+            content?: string;
         }
     }>;
 }
