@@ -34,23 +34,30 @@ JS::Promise<void> TestOperationsAsync()
         for (const auto& [columnName, value] : row)
         {
             std::cout << "    " << columnName << ": ";
-            switch (value.GetType())
+            if (std::holds_alternative<std::nullptr_t>(value))
             {
-                case Sqlite::Value::Type::null:
-                    std::cout << "NULL";
-                    break;
-                case Sqlite::Value::Type::integer:
-                    std::cout << value.Get<int64_t>();
-                    break;
-                case Sqlite::Value::Type::real:
-                    std::cout << value.Get<double>();
-                    break;
-                case Sqlite::Value::Type::text:
-                    std::cout << value.Get<std::string>();
-                    break;
-                case Sqlite::Value::Type::blob:
-                    std::cout << "BLOB of size " << value.Get<std::vector<uint8_t>>().size();
-                    break;
+                std::cout << "NULL";
+            }
+            else if (std::holds_alternative<std::string>(value))
+            {
+                std::cout << std::get<std::string>(value);
+            }
+            else if (std::holds_alternative<int64_t>(value))
+            {
+                std::cout << std::get<int64_t>(value);
+            }
+            else if (std::holds_alternative<double>(value))
+            {
+                std::cout << std::get<double>(value);
+            }
+            else if (std::holds_alternative<std::vector<uint8_t>>(value))
+            {
+                const auto& blob = std::get<std::vector<uint8_t>>(value);
+                std::cout << "BLOB of size " << blob.size();
+            }
+            else
+            {
+                std::cout << "Unknown type";
             }
             std::cout << std::endl;
         }

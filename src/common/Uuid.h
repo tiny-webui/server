@@ -59,44 +59,36 @@ namespace TUI::Common
 
         ~Uuid() = default;
 
-        bool operator== (const Uuid& other) const
+        std::strong_ordering operator<=>(const Uuid& other) const
+        {
+            int result = uuid_compare(_uuid, other._uuid);
+            if (result < 0)
+            {
+                return std::strong_ordering::less;
+            }
+            else if(result > 0)
+            {
+                return std::strong_ordering::greater;
+            }
+            return std::strong_ordering::equal;
+        }
+
+        bool operator==(const Uuid& other) const
         {
             return uuid_compare(_uuid, other._uuid) == 0;
         }
-        bool operator!= (const Uuid& other) const
-        {
-            return uuid_compare(_uuid, other._uuid) != 0;
-        }
-        bool operator< (const Uuid& other) const
-        {
-            return uuid_compare(_uuid, other._uuid) < 0;
-        }
-        bool operator> (const Uuid& other) const
-        {
-            return uuid_compare(_uuid, other._uuid) > 0;
-        }
-        bool operator<= (const Uuid& other) const
-        {
-            return uuid_compare(_uuid, other._uuid) <= 0;
-        }
-        bool operator>= (const Uuid& other) const
-        {
-            return uuid_compare(_uuid, other._uuid) >= 0;
-        }
 
-        bool operator== (std::nullptr_t) const
+        bool operator==(std::nullptr_t) const
         {
             return uuid_is_null(_uuid);
-        }
-        bool operator!= (std::nullptr_t) const
-        {
-            return !uuid_is_null(_uuid);
         }
 
         explicit operator std::string() const
         {
             std::string str(UUID_STR_LEN, '\0');
             uuid_unparse(_uuid, str.data());
+            /** remove the tailing zero */
+            str.resize(UUID_STR_LEN - 1);
             return str;
         }
 

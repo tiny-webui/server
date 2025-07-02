@@ -18,7 +18,7 @@ namespace TUI::Rpc
     {
     public:
         using RequestHandler = std::function<JS::Promise<nlohmann::json>(Identity, nlohmann::json)>;
-        using StreamRequestHandler = std::function<JS::AsyncGenerator<nlohmann::json>(Identity, nlohmann::json)>;
+        using StreamRequestHandler = std::function<JS::AsyncGenerator<nlohmann::json, nlohmann::json>(Identity, nlohmann::json)>;
         using NotificationHandler = std::function<void(Identity, nlohmann::json)>;
         using NewConnectionHandler = std::function<void(Identity)>;
         using ConnectionClosedHandler = std::function<void(Identity)>;
@@ -250,7 +250,8 @@ namespace TUI::Rpc
                             auto result = co_await stream.NextAsync();
                             if (!result.has_value())
                             {
-                                TrySendStreamEndResponse(connection, streamId);
+                                auto returnValue = stream.GetReturnValue();
+                                TrySendStreamEndResponse(connection, streamId, returnValue);
                                 break;
                             }
                             TrySendResponse(connection, streamId, result.value());
@@ -361,13 +362,14 @@ namespace TUI::Rpc
         }
 
         void TrySendStreamEndResponse(
-            std::weak_ptr<Network::IConnection<Identity>> connection, double id) const noexcept
+            std::weak_ptr<Network::IConnection<Identity>> connection, double id, const nlohmann::json& result) const noexcept
         {
             try
             {
                 Schema::Rpc::StreamEndResponse response{};
                 response.set_id(id);
                 response.set_end(true);
+                response.set_result(result);
                 nlohmann::json responseJson{};
                 Schema::Rpc::to_json(responseJson, response);
                 auto responseStr = responseJson.dump();

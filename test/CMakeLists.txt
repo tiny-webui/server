@@ -66,6 +66,7 @@ add_executable(TestApiProvider
     ../src/network/HttpClient.cpp
     ../src/network/CurlTypes.cpp
     ../src/network/HttpStreamResponseParser.cpp
+    ../src/apiProvider/Factory.cpp
     ../src/apiProvider/AzureOpenAI.cpp)
 
 target_include_directories(TestApiProvider
@@ -124,9 +125,10 @@ target_link_libraries(TestUuid
         uuid)
 
 add_executable(TestDatabase
-    TestDatabase
+    TestDatabase.cpp
     ../src/database/Database.cpp
-    ../src/database/Sqlite.cpp)
+    ../src/database/Sqlite.cpp
+    ../src/common/Utilities.cpp)
 
 target_include_directories(TestDatabase
     PRIVATE
@@ -188,5 +190,36 @@ target_include_directories(TestSpake2p
 
 target_link_libraries(TestSpake2p
     PRIVATE
+        ssl
+        crypto)
+
+add_executable(TestResourceVersionManager
+    TestResourceVersionManager.cpp)
+
+target_include_directories(TestResourceVersionManager
+    PRIVATE
+        ../src)
+
+# Get all .cpp files from ../src except main.cpp
+file(GLOB_RECURSE TEST_SERVICE_SRC_FILES 
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/*.cpp)
+list(REMOVE_ITEM TEST_SERVICE_SRC_FILES 
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/main.cpp)
+
+add_executable(TestService
+    TestService.cpp
+    ${TEST_SERVICE_SRC_FILES})
+
+target_include_directories(TestService
+    PRIVATE
+        ../src)
+
+target_link_libraries(TestService
+    PRIVATE
+        tev-cpp
+        curl
+        websockets
+        sqlite3
+        uuid
         ssl
         crypto)

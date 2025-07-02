@@ -347,7 +347,7 @@ extern "C" int Server::LwsCallback(
                     }
                     auto connection = std::move(it->second);
                     server->_lwsConnections.erase(it);
-                    lws_close_reason(it->second->wsi, LWS_CLOSE_STATUS_NORMAL, nullptr, 0);
+                    lws_close_reason(connection->wsi, LWS_CLOSE_STATUS_NORMAL, nullptr, 0);
                 } break;
                 case ITCType::CLOSE_SERVER: {
                     /** Signal the server thread to exit */
@@ -397,7 +397,7 @@ extern "C" int Server::LwsCallback(
             auto it = server->_lwsConnections.find(id);
             if (it == server->_lwsConnections.end())
             {
-                lws_close_reason(it->second->wsi, LWS_CLOSE_STATUS_NORMAL, nullptr, 0);
+                lws_close_reason(wsi, LWS_CLOSE_STATUS_NORMAL, nullptr, 0);
                 return -1;
             }
             if (!lws_frame_is_binary(wsi))

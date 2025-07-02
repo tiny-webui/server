@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 #include <list>
+#include <variant>
 #include <unordered_map>
 #include <js-style-co-routine/Promise.h>
 #include <tev-cpp/Tev.h>
@@ -26,66 +27,7 @@ namespace TUI::Database
     class Sqlite
     {
     public:
-        class Value
-        {
-        public:
-            enum class Type
-            {
-                null,
-                integer,
-                real,
-                text,
-                blob
-            };
-
-            Value(std::nullptr_t);
-            Value(int64_t integer);
-            Value(double real);
-            Value(const std::string& text);
-            Value(std::string&& text);
-            Value(const std::vector<uint8_t>& blob);
-            Value(std::vector<uint8_t>&& blob);
-
-            Value(const Value& other);
-            Value(Value&& other) noexcept;
-            Value& operator=(const Value& other);
-            Value& operator=(Value&& other) noexcept;
-
-            ~Value();
-
-            Type GetType() const;
-
-            explicit operator std::nullptr_t() const;
-            explicit operator int64_t() const;
-            explicit operator double() const;
-            explicit operator const std::string&() const;
-            explicit operator std::string&();
-            explicit operator std::string&&() &&;
-            explicit operator const std::vector<uint8_t>&() const;
-            explicit operator std::vector<uint8_t>&();
-            explicit operator std::vector<uint8_t>&&() &&;
-
-            template<typename T>
-            T Get() const
-            {
-                return static_cast<T>(*this);
-            }
-
-        private:
-            union ValueUnion
-            {
-                std::nullptr_t null;
-                int64_t integer;
-                double real;
-                std::string text;
-                std::vector<uint8_t> blob;
-
-                ~ValueUnion() {}
-            };
-
-            Type _type;
-            ValueUnion _value;
-        };
+        using Value = std::variant<std::nullptr_t, int64_t, double, std::string, std::vector<uint8_t>>;
 
         static JS::Promise<std::shared_ptr<Sqlite>> CreateAsync(Tev& tev, const std::filesystem::path& dbPath);
         ~Sqlite() = default;
