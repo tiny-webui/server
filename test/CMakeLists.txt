@@ -177,3 +177,16 @@ target_link_libraries(TestEcdhePsk
     PRIVATE
         ssl
         crypto)
+
+add_executable(TestSpake2p
+    TestSpake2p.cpp
+    ../src/cipher/Spake2p.cpp)
+
+target_include_directories(TestSpake2p
+    PRIVATE
+        ../src)
+
+target_link_libraries(TestSpake2p
+    PRIVATE
+        ssl
+        crypto)

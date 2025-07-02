@@ -256,5 +256,199 @@ namespace TUI::Cipher::Openssl
     private:
         EVP_KDF_CTX* _ctx{nullptr};
     };
+
+    class BigNum
+    {
+    public:
+        BigNum()
+        {
+            _bn = BN_new();
+            if (!_bn)
+            {
+                throw std::runtime_error("Failed to create BIGNUM");
+            }
+        }
+
+        BigNum(uint8_t* data, size_t len)
+        {
+            _bn = BN_new();
+            if (!_bn)
+            {
+                throw std::runtime_error("Failed to create BIGNUM");
+            }
+            if (BN_bin2bn(data, static_cast<int>(len), _bn) == nullptr)
+            {
+                BN_free(_bn);
+                throw std::runtime_error("Failed to initialize BIGNUM from binary data");
+            }
+        }
+
+        explicit BigNum(unsigned long value)
+        {
+            _bn = BN_new();
+            if (!_bn)
+            {
+                throw std::runtime_error("Failed to create BIGNUM");
+            }
+            if (BN_set_word(_bn, value) == 0)
+            {
+                BN_free(_bn);
+                throw std::runtime_error("Failed to set BIGNUM from word");
+            }
+        }
+
+        ~BigNum()
+        {
+            if (_bn)
+            {
+                BN_free(_bn);
+            }
+        }
+
+        BigNum(const BigNum& other)
+            : _bn(BN_new())
+        {
+            if (!_bn)
+            {
+                throw std::runtime_error("Failed to create BIGNUM");
+            }
+            if (BN_copy(_bn, other._bn) == nullptr)
+            {
+                BN_free(_bn);
+                throw std::runtime_error("Failed to copy BIGNUM");
+            }
+        }
+        BigNum& operator=(const BigNum& other)
+        {
+            if (this != &other)
+            {
+                if (_bn)
+                {
+                    BN_free(_bn);
+                }
+                _bn = BN_new();
+                if (!_bn)
+                {
+                    throw std::runtime_error("Failed to create BIGNUM");
+                }
+                if (BN_copy(_bn, other._bn) == nullptr)
+                {
+                    BN_free(_bn);
+                    throw std::runtime_error("Failed to copy BIGNUM");
+                }
+            }
+            return *this;
+        }
+        BigNum(BigNum&& other) noexcept
+            : _bn(other._bn)
+        {
+            other._bn = nullptr;
+        }
+        BigNum& operator=(BigNum&& other) noexcept
+        {
+            if (this != &other)
+            {
+                if (_bn)
+                {
+                    BN_free(_bn);
+                }
+                _bn = other._bn;
+                other._bn = nullptr;
+            }
+            return *this;
+        }
+
+        operator BIGNUM*() const
+        {
+            return _bn;
+        }
+        
+        BigNum operator+(const BigNum& other) const
+        {
+            BigNum result{};
+            if (BN_add(result._bn, _bn, other._bn) == 0)
+            {
+                throw std::runtime_error("Failed to add BIGNUMs");
+            }
+            return result;
+        }
+
+        bool operator==(const BigNum& other) const
+        {
+            return BN_cmp(_bn, other._bn) == 0;
+        }
+        bool operator!=(const BigNum& other) const
+        {
+            return !(*this == other);
+        }
+        bool operator<(const BigNum& other) const
+        {
+            return BN_cmp(_bn, other._bn) < 0;
+        }
+        bool operator<=(const BigNum& other) const
+        {
+            return BN_cmp(_bn, other._bn) <= 0;
+        }
+        bool operator>(const BigNum& other) const
+        {
+            return BN_cmp(_bn, other._bn) > 0;
+        }
+        bool operator>=(const BigNum& other) const
+        {
+            return BN_cmp(_bn, other._bn) >= 0;
+        }
+        
+    private:
+        BIGNUM* _bn{nullptr};
+    };
+
+    class BnCtx
+    {
+    public:
+        BnCtx()
+        {
+            _ctx = BN_CTX_new();
+            if (!_ctx)
+            {
+                throw std::runtime_error("Failed to create BN_CTX");
+            }
+        }
+
+        ~BnCtx()
+        {
+            if (_ctx)
+            {
+                BN_CTX_free(_ctx);
+            }
+        }
+
+        BnCtx(const BnCtx&) = delete;
+        BnCtx& operator=(const BnCtx&) = delete;
+        BnCtx(BnCtx&& other) noexcept
+            : _ctx(other._ctx)
+        {
+            other._ctx = nullptr;
+        }
+        BnCtx& operator=(BnCtx&& other) noexcept
+        {
+            if (this != &other)
+            {
+                if (_ctx)
+                {
+                    BN_CTX_free(_ctx);
+                }
+                _ctx = other._ctx;
+                other._ctx = nullptr;
+            }
+            return *this;
+        }
+
+        operator BN_CTX*() const
+        {
+            return _ctx;
+        }
+    private:
+        BN_CTX* _ctx{nullptr};
+    };
 }
 
