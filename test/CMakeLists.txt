@@ -175,3 +175,14 @@ target_link_libraries(TestService
         websockets
         sqlite3
         uuid)
+
+add_executable(TestStreamBatcher
+    TestStreamBatcher.cpp)
+
+target_include_directories(TestStreamBatcher
+    PRIVATE
+        ../src)
+
+target_link_libraries(TestStreamBatcher
+    PRIVATE
+        tev-cpp)

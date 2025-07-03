@@ -2,6 +2,7 @@
 #include "apiProvider/Factory.h"
 #include "network/HttpStreamResponseParser.h"
 #include "common/Utilities.h"
+#include "common/StreamBatcher.h"
 
 using namespace TUI;
 using namespace TUI::Application;
@@ -11,7 +12,8 @@ Service::Service(
     std::shared_ptr<Network::IServer<CallerId>> server,
     std::shared_ptr<Database::Database> database,
     std::function<void(const std::string&)> onCriticalError)
-    : _database(std::move(database)),
+    : _tev(tev),
+      _database(std::move(database)),
       _onCriticalError(onCriticalError),
       _httpClient(Network::Http::Client::Create(tev))
 {
@@ -506,29 +508,35 @@ JS::AsyncGenerator<nlohmann::json, nlohmann::json> Service::OnChatCompletionAsyn
         auto stream = request.GetResponseStream();
         Network::Http::StreamResponse::AsyncParser parser{stream};
         auto eventStream = parser.Parse();
-        
+        auto streamBatcher = Common::StreamBatcher::BatchStream(_tev, std::move(eventStream), STREAM_BATCHING_INTERVAL_MS);
+
         while (true)
         {
-            auto event = co_await eventStream.NextAsync();
-            if (!event.has_value())
+            auto events = co_await streamBatcher.NextAsync();
+            if (!events.has_value())
             {
                 break;
             }
-            auto content = provider->ParseStreamResponse(event.value());
-            if (!content.has_value())
+            std::string segment = "";
+            for (const auto& event : events.value())
             {
-                continue;
+                auto content = provider->ParseStreamResponse(event);
+                if (!content.has_value())
+                {
+                    continue;
+                }
+                using ContentTypeType = std::remove_reference<decltype(content.value().get_type())>::type;
+                if (content.value().get_type() != ContentTypeType::TEXT)
+                {
+                    throw Schema::Rpc::Exception(
+                        Schema::Rpc::ErrorCode::BAD_GATEWAY,
+                        content.value().get_data());
+                }
+                auto& data = content.value().get_data();
+                segment += data;
             }
-            using ContentTypeType = std::remove_reference<decltype(content.value().get_type())>::type;
-            if (content.value().get_type() != ContentTypeType::TEXT)
-            {
-                throw Schema::Rpc::Exception(
-                    Schema::Rpc::ErrorCode::BAD_GATEWAY,
-                    content.value().get_data());
-            }
-            auto& data = content.value().get_data();
-            wholeResponse += data;
-            co_yield static_cast<nlohmann::json>(data);
+            wholeResponse += segment;
+            co_yield static_cast<nlohmann::json>(segment);
         }
     }
 
