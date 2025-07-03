@@ -373,31 +373,25 @@ namespace TUI::Cipher::Openssl
             return result;
         }
 
+        std::strong_ordering operator<=>(const BigNum& other) const
+        {
+            int cmp = BN_cmp(_bn, other._bn);
+            if (cmp < 0)
+            {
+                return std::strong_ordering::less;
+            }
+            else if (cmp > 0)
+            {
+                return std::strong_ordering::greater;
+            }
+            return std::strong_ordering::equal;
+        }
+
         bool operator==(const BigNum& other) const
         {
             return BN_cmp(_bn, other._bn) == 0;
         }
-        bool operator!=(const BigNum& other) const
-        {
-            return !(*this == other);
-        }
-        bool operator<(const BigNum& other) const
-        {
-            return BN_cmp(_bn, other._bn) < 0;
-        }
-        bool operator<=(const BigNum& other) const
-        {
-            return BN_cmp(_bn, other._bn) <= 0;
-        }
-        bool operator>(const BigNum& other) const
-        {
-            return BN_cmp(_bn, other._bn) > 0;
-        }
-        bool operator>=(const BigNum& other) const
-        {
-            return BN_cmp(_bn, other._bn) >= 0;
-        }
-        
+
     private:
         BIGNUM* _bn{nullptr};
     };

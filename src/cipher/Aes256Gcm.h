@@ -24,7 +24,9 @@ namespace TUI::Cipher::Aes256Gcm
          * @brief Encrypt a message. IV is managed internally.
          * 
          * @param plainText 
-         * @return std::vector<uint8_t> Format: IV (12B) | CipherText (no padding) || Tag (16B)
+         * @return std::vector<uint8_t> 
+         *     IV   | CipherText (no padding) |   Tag
+         *   12B LE |    variable             |   16B
          */
         std::vector<uint8_t> Encrypt(const std::vector<uint8_t>& plainText);
     

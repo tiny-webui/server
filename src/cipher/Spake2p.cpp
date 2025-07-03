@@ -51,7 +51,7 @@ RegistrationResult Spake2p::Register(const std::string& username, const std::str
         std::array<uint8_t, 64> key{};
         uint32_t threads = 1;
         uint32_t lanes = ARGON2ID_LANES;
-        uint32_t memCost = ARGON2ID_MEM_COST;
+        uint32_t memCost = ARGON2ID_MEM_COST_KiB;
         uint32_t iterations = ARGON2ID_ITERATIONS;
         // uint32_t size = static_cast<uint32_t>(key.size());
         OSSL_PARAM params[] = {
