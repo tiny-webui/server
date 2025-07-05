@@ -67,6 +67,15 @@ namespace TUI::Cipher
             });
             return std::move(marker);
         }
+
+        T GetCurrentStep() const
+        {
+            if (_wasted)
+            {
+                throw std::runtime_error("Procedure has been wasted");
+            }
+            return _step;
+        }
     private:
         T _step;
         bool _wasted{false};

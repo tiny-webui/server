@@ -18,7 +18,8 @@ namespace TUI::Cipher::Aes256Gcm
     class Encryptor
     {
     public:
-        Encryptor(const Key& key);
+        explicit Encryptor(const Key& key);
+        explicit Encryptor(const std::vector<uint8_t>& key);
 
         /**
          * @brief Encrypt a message. IV is managed internally.
@@ -29,7 +30,12 @@ namespace TUI::Cipher::Aes256Gcm
          *   12B LE |    variable             |   16B
          */
         std::vector<uint8_t> Encrypt(const std::vector<uint8_t>& plainText);
-    
+        template<size_t N>
+        std::vector<uint8_t> Encrypt(const std::array<uint8_t, N>& plainText)
+        {
+            return Encrypt(std::vector<uint8_t>(plainText.begin(), plainText.end()));
+        }
+
     private:
         Iv _iv{};
         Openssl::EvpCipherCtx _ctx{};
@@ -38,7 +44,8 @@ namespace TUI::Cipher::Aes256Gcm
     class Decryptor
     {
     public:
-        Decryptor(const Key& key);
+        explicit Decryptor(const Key& key);
+        explicit Decryptor(const std::vector<uint8_t>& key);
 
         /**
          * @brief Decrypt a message encrypted with the Encryptor
@@ -47,7 +54,12 @@ namespace TUI::Cipher::Aes256Gcm
          * @return std::vector<uint8_t> 
          */
         std::vector<uint8_t> Decrypt(const std::vector<uint8_t>& cipherText);
-    
+        template<size_t N>
+        std::vector<uint8_t> Decrypt(const std::array<uint8_t, N>& cipherText)
+        {
+            return Decrypt(std::vector<uint8_t>(cipherText.begin(), cipherText.end()));
+        }
+
     private:
         std::optional<Iv> _lastIv{std::nullopt};
         Openssl::EvpCipherCtx _ctx{};

@@ -169,7 +169,9 @@ target_link_libraries(TestAes256Gcm
 
 add_executable(TestEcdhePsk
     TestEcdhePsk.cpp
-    ../src/cipher/EcdhePsk.cpp)
+    ../src/cipher/EcdhePsk.cpp
+    ../src/cipher/HandshakeMessage.cpp
+    ../src/cipher/Aes256Gcm.cpp)
 
 target_include_directories(TestEcdhePsk
     PRIVATE

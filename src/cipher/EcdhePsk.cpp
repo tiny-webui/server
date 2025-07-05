@@ -5,205 +5,308 @@
 #include <openssl/param_build.h>
 #include <openssl/core_names.h>
 #include "EcdhePsk.h"
+#include "Aes256Gcm.h"
 
+using namespace TUI::Cipher;
 using namespace TUI::Cipher::EcdhePsk;
 
-Client::Client(const Psk& psk, size_t keySize)
+static Openssl::EvpPkey GeneratePriKey()
+{
+    Openssl::EvpPkeyCtx keyGenCtx(EVP_PKEY_CTX_new_id(EVP_PKEY_X25519, nullptr));
+    int rc = EVP_PKEY_keygen_init(keyGenCtx);
+    if (rc != 1)
+    {
+        throw std::runtime_error("Cannot init keygen context");
+    }
+    EVP_PKEY* pkey = nullptr;
+    rc = EVP_PKEY_keygen(keyGenCtx, &pkey);
+    if (rc != 1)
+    {
+        throw std::runtime_error("Cannot generate key pair");
+    }
+    return Openssl::EvpPkey(pkey);
+}
+
+static std::vector<uint8_t> GetRawPubKeyFromPriKey(const Openssl::EvpPkey& priKey)
+{
+    size_t pubKeyLen = 0;
+    int rc = EVP_PKEY_get_raw_public_key(priKey, nullptr, &pubKeyLen);
+    if (rc != 1)
+    {
+        throw std::runtime_error("Cannot get public key length");
+    }
+    if (pubKeyLen != PUBKEY_SIZE)
+    {
+        throw std::runtime_error("Invalid public key length");
+    }
+    std::vector<uint8_t> pubKey(PUBKEY_SIZE, 0);
+    rc = EVP_PKEY_get_raw_public_key(priKey, pubKey.data(), &pubKeyLen);
+    if (rc != 1)
+    {
+        throw std::runtime_error("Cannot get public key");
+    }
+    return pubKey;
+}
+
+static std::vector<uint8_t> GenerateNonce(size_t size)
+{
+    std::vector<uint8_t> nonce(size, 0);
+    int rc = RAND_priv_bytes(nonce.data(), size);
+    if (rc != 1)
+    {
+        throw std::runtime_error("Cannot generate nonce");
+    }
+    return nonce;
+}
+
+static std::vector<uint8_t> GenerateZ(
+    const Openssl::EvpPkey& priKey,
+    const Openssl::EvpPkey& pubKey)
+{
+    Openssl::EvpPkeyCtx deriveCtx{EVP_PKEY_CTX_new(priKey, nullptr)};
+    int rc = EVP_PKEY_derive_init(deriveCtx);
+    if (rc != 1)
+    {
+        throw std::runtime_error("Cannot init derive context");
+    }
+    rc = EVP_PKEY_derive_set_peer(deriveCtx, pubKey);
+    if (rc != 1)
+    {
+        throw std::runtime_error("Cannot set peer public key");
+    }
+    size_t keyLen = 0;
+    rc = EVP_PKEY_derive(deriveCtx, nullptr, &keyLen);
+    if (rc != 1)
+    {
+        throw std::runtime_error("Cannot derive key length");
+    }
+    std::vector<uint8_t> Z(keyLen, 0);
+    rc = EVP_PKEY_derive(deriveCtx, Z.data(), &keyLen);
+    if (rc != 1)
+    {
+        throw std::runtime_error("Cannot derive key");
+    }
+    return Z;
+}
+
+static std::array<uint8_t, 32> GetTranscriptHash(
+    const HandshakeMessage& clientMessage,
+    const HandshakeMessage& serverMessage)
+{
+    auto clientMessageBytes = clientMessage.Serialize();
+    auto serverMessageBytes = serverMessage.Serialize();
+    std::vector<uint8_t> transcript(clientMessageBytes.size() + serverMessageBytes.size(), 0);
+    std::copy(clientMessageBytes.begin(), clientMessageBytes.end(), transcript.begin());
+    std::copy(serverMessageBytes.begin(), serverMessageBytes.end(), transcript.begin() + clientMessageBytes.size());
+    std::vector<uint8_t> md(EVP_MAX_MD_SIZE, 0);
+    size_t mdLen = 0;
+    int rc = EVP_Q_digest(nullptr, "SHA256", nullptr,
+        transcript.data(), transcript.size(), md.data(), &mdLen);
+    if (rc != 1 || mdLen != 32)
+    {
+        throw std::runtime_error("Cannot calculate transcript hash");
+    }
+    std::array<uint8_t, 32> transcriptHash{};
+    std::copy(md.begin(), md.begin() + 32, transcriptHash.begin());
+    return transcriptHash;
+}
+
+/**
+ * @brief 
+ * 
+ * @attention Not using reference for key materials because 
+ *     the OSSL option does not take const pointer. 
+ *     There is risk of modification.
+ * 
+ * @param key 
+ * @param salt 
+ * @param info 
+ * @param keySize 
+ * @return std::vector<uint8_t> 
+ */
+template<typename KeyContainer, typename SaltContainer>
+static std::vector<uint8_t> GenerateKey(
+    KeyContainer key, 
+    SaltContainer salt,
+    std::string info,
+    size_t keySize)
+{
+    static_assert(
+        std::is_same_v<typename KeyContainer::value_type, uint8_t> &&
+        std::is_same_v<typename SaltContainer::value_type, uint8_t>,
+        "Key and salt containers must contain uint8_t elements"
+    );
+
+    std::vector<uint8_t> generatedKey(keySize, 0);
+    Openssl::EvpKdf kdf(EVP_KDF_fetch(nullptr, "HKDF", nullptr));
+    Openssl::EvpKdfCtx kdfCtx(EVP_KDF_CTX_new(kdf));
+    std::string mdName = SN_sha256;
+    OSSL_PARAM params[] = {
+        OSSL_PARAM_construct_utf8_string(
+            OSSL_KDF_PARAM_DIGEST, mdName.data(), mdName.size()),
+        OSSL_PARAM_construct_octet_string(
+            OSSL_KDF_PARAM_KEY, key.data(), key.size()),
+        OSSL_PARAM_construct_octet_string(
+            OSSL_KDF_PARAM_SALT, salt.data(), salt.size()),
+        OSSL_PARAM_construct_octet_string(
+            OSSL_KDF_PARAM_INFO, const_cast<char*>(info.c_str()), info.length()),
+        OSSL_PARAM_construct_end()
+    };
+    int rc = EVP_KDF_derive(kdfCtx, generatedKey.data(), generatedKey.size(), params);
+    if (rc != 1)
+    {
+        throw std::runtime_error("Cannot derive " + info);
+    }
+    return generatedKey;
+}
+
+/** Client */
+
+Client::Client(
+    const Psk& psk,
+    const std::vector<uint8_t>& keyIndex,
+    const std::unordered_map<HandshakeMessage::Type, std::vector<uint8_t>>& additionalElements,
+    size_t keySize)
     : _psk(psk), _keySize(keySize)
 {
     if (keySize == 0)
     {
         throw std::invalid_argument("Key size must be greater than 0");
     }
+    _firstMessageAdditionalElements.emplace(HandshakeMessage::Type::KeyIndex, keyIndex);
+    for (const auto& element : additionalElements)
+    {
+        if (element.first == HandshakeMessage::Type::KeyIndex || element.first == HandshakeMessage::Type::CipherMessage)
+        {
+            throw std::invalid_argument("KeyIndex and CipherMessage elements are reserved for protocol use");
+        }
+        _firstMessageAdditionalElements.emplace(element.first, element.second);
+    }
 }
 
-std::vector<uint8_t> Client::GetClientMessage(const std::vector<uint8_t>& keyIndex)
+HandshakeMessage Client::GetClientMessage()
 {
     auto marker = _stepChecker->CheckStep(Step::Init, Step::ClientMessage);
-    int rc = 0;
     /** Generate key pair */
-    {
-        Openssl::EvpPkeyCtx keyGenCtx(EVP_PKEY_CTX_new_id(EVP_PKEY_X25519, nullptr));
-        rc = EVP_PKEY_keygen_init(keyGenCtx);
-        if (rc != 1)
-        {
-            throw std::runtime_error("Cannot init keygen context");
-        }
-        EVP_PKEY* pkey = nullptr;
-        rc = EVP_PKEY_keygen(keyGenCtx, &pkey);
-        if (rc != 1)
-        {
-            throw std::runtime_error("Cannot generate key pair");
-        }
-        _pkey = Openssl::EvpPkey(pkey);
-    }
-    std::vector<uint8_t> pubkey(PUBKEY_SIZE, 0);
-    {
-        size_t pubkeyLen = 0;
-        rc = EVP_PKEY_get_raw_public_key(_pkey, nullptr, &pubkeyLen);
-        if (rc != 1)
-        {
-            throw std::runtime_error("Cannot get public key length");
-        }
-        if (pubkeyLen != PUBKEY_SIZE)
-        {
-            throw std::runtime_error("Invalid public key length");
-        }
-        rc = EVP_PKEY_get_raw_public_key(_pkey, pubkey.data(), &pubkeyLen);
-        if (rc != 1)
-        {
-            throw std::runtime_error("Cannot get public key");
-        }
-    }
+    _pkey = GeneratePriKey();
+    auto pubkey = GetRawPubKeyFromPriKey(_pkey);
     /** Generate nonce */
-    std::vector<uint8_t> nonce(NONCE_SIZE, 0);
-    {
-        rc = RAND_priv_bytes(nonce.data(), NONCE_SIZE);
-        if (rc != 1)
-        {
-            throw std::runtime_error("Cannot generate nonce");
-        }
-    }
+    auto nonce = GenerateNonce(NONCE_SIZE);
     /** Generate client message */
-    std::vector<uint8_t> clientMessage(PUBKEY_SIZE + NONCE_SIZE + keyIndex.size(), 0);
+    std::vector<uint8_t> clientMessage(PUBKEY_SIZE + NONCE_SIZE, 0);
     {
         std::copy(pubkey.begin(), pubkey.end(), clientMessage.begin());
         std::copy(nonce.begin(), nonce.end(), clientMessage.begin() + PUBKEY_SIZE);
-        std::copy(keyIndex.begin(), keyIndex.end(), clientMessage.begin() + PUBKEY_SIZE + NONCE_SIZE);
     }
-    _clientMessage = std::move(clientMessage);
+    /** Assemble handshake message */
+    _firstMessageAdditionalElements.emplace(
+        HandshakeMessage::Type::CipherMessage, std::move(clientMessage));
+    _clientMessage = HandshakeMessage(_firstMessageAdditionalElements);
     return _clientMessage.value();
 }
 
-void Client::TakeServerMessage(const std::vector<uint8_t>& serverMessage)
+HandshakeMessage Client::TakeServerMessage(const HandshakeMessage& handshakeMessage)
 {
     auto marker = _stepChecker->CheckStep(Step::ClientMessage, Step::ServerMessage);
+    auto serverMessageOpt = handshakeMessage.GetElement(HandshakeMessage::Type::CipherMessage);
+    if (!serverMessageOpt.has_value())
+    {
+        throw std::runtime_error("Server message is missing CipherMessage element");
+    }
+    auto serverMessage = serverMessageOpt.value();
     if (serverMessage.size() != PUBKEY_SIZE + NONCE_SIZE)
     {
         throw std::runtime_error("Invalid server message size");
     }
-    int rc = 0;
     /** Generate shared secret */
-    std::vector<uint8_t> Z{};
-    {
-        Openssl::EvpPkey serverPubKey{EVP_PKEY_new_raw_public_key(
-            EVP_PKEY_X25519, nullptr, serverMessage.data(), PUBKEY_SIZE)};
-        Openssl::EvpPkeyCtx deriveCtx{EVP_PKEY_CTX_new(_pkey, nullptr)};
-        rc = EVP_PKEY_derive_init(deriveCtx);
-        if (rc != 1)
-        {
-            throw std::runtime_error("Cannot init derive context");
-        }
-        rc = EVP_PKEY_derive_set_peer(deriveCtx, serverPubKey);
-        if (rc != 1)
-        {
-            throw std::runtime_error("Cannot set peer public key");
-        }
-        size_t keyLen = 0;
-        rc = EVP_PKEY_derive(deriveCtx, nullptr, &keyLen);
-        if (rc != 1)
-        {
-            throw std::runtime_error("Cannot derive key length");
-        }
-        Z.resize(keyLen);
-        rc = EVP_PKEY_derive(deriveCtx, Z.data(), &keyLen);
-        if (rc != 1)
-        {
-            throw std::runtime_error("Cannot derive key");
-        }
-    }
+    Openssl::EvpPkey serverPubKey{EVP_PKEY_new_raw_public_key(
+        EVP_PKEY_X25519, nullptr, serverMessage.data(), PUBKEY_SIZE)};
+    auto Z = GenerateZ(_pkey, serverPubKey);
     /** Generate prk */
-    std::vector<uint8_t> prk(32, 0);
-    {
-        Openssl::EvpKdf kdf(EVP_KDF_fetch(nullptr, "HKDF", nullptr));
-        Openssl::EvpKdfCtx kdfCtx(EVP_KDF_CTX_new(kdf));
-        std::string info = "prk";
-        OSSL_PARAM params[] = {
-            OSSL_PARAM_construct_utf8_string(
-                OSSL_KDF_PARAM_DIGEST, SN_sha256, strlen(SN_sha256)),
-            OSSL_PARAM_construct_octet_string(
-                OSSL_KDF_PARAM_KEY, Z.data(), Z.size()),
-            OSSL_PARAM_construct_octet_string(
-                OSSL_KDF_PARAM_SALT, _psk.data(), _psk.size()),
-            OSSL_PARAM_construct_octet_string(
-                OSSL_KDF_PARAM_INFO, const_cast<void*>(static_cast<const void*>(info.c_str())), info.length()),
-            OSSL_PARAM_construct_end()
-        };
-        rc = EVP_KDF_derive(kdfCtx, prk.data(), prk.size(), params);
-        if (rc != 1)
-        {
-            throw std::runtime_error("Cannot derive PRK");
-        }
-    }
+    auto prk = GenerateKey(Z, _psk, "prk", 32);
     /** Calculate transcript hash */
-    std::array<uint8_t, 32> transcriptHash{};
+    _transcriptHash = GetTranscriptHash(_clientMessage.value(), handshakeMessage);
+    /** Generate confirmation keys and session keys */
+    auto clientConfirmKey = GenerateKey(prk, _transcriptHash.value(), "client confirm key", _keySize);
+    _serverConfirmKey = GenerateKey(prk, _transcriptHash.value(), "server confirm key", _keySize);
+    _clientKey = GenerateKey(prk, _transcriptHash.value(), "client key", _keySize);
+    _serverKey = GenerateKey(prk, _transcriptHash.value(), "server key", _keySize);
+    /** Generate client confirmation message */
+    std::vector<uint8_t> clientConfirmMessage{};
     {
-        std::vector<uint8_t> transcript(_clientMessage->size() + serverMessage.size(), 0);
-        std::copy(_clientMessage->begin(), _clientMessage->end(), transcript.begin());
-        std::copy(serverMessage.begin(), serverMessage.end(), transcript.begin() + _clientMessage->size());
-        std::vector<uint8_t> md(EVP_MAX_MD_SIZE, 0);
-        size_t mdLen = 0;
-        rc = EVP_Q_digest(nullptr, "SHA256", nullptr,
-            transcript.data(), transcript.size(), md.data(), &mdLen);
-        if (rc != 1 || mdLen != 32)
-        {
-            throw std::runtime_error("Cannot calculate transcript hash");
-        }
-        std::copy(md.begin(), md.begin() + 32, transcriptHash.begin());
+        Aes256Gcm::Encryptor encryptor{clientConfirmKey};
+        clientConfirmMessage = encryptor.Encrypt(_transcriptHash.value());
     }
-    _transcriptHash = std::move(transcriptHash);
-    /** Generate session keys */
-    std::vector<uint8_t> clientKey(_keySize, 0);
+    /** Assemble handshake message */
+    HandshakeMessage clientConfirmation{
+        {{HandshakeMessage::Type::CipherMessage, std::move(clientConfirmMessage)}}};
+    return clientConfirmation;
+}
+
+void Client::TakeServerConfirmation(const HandshakeMessage& handshakeMessage)
+{
+    auto marker = _stepChecker->CheckStep(Step::ServerMessage, Step::ServerConfirmation);
+    auto serverConfirmOpt = handshakeMessage.GetElement(HandshakeMessage::Type::CipherMessage);
+    if (!serverConfirmOpt.has_value())
     {
-        Openssl::EvpKdf kdf(EVP_KDF_fetch(nullptr, "HKDF", nullptr));
-        Openssl::EvpKdfCtx kdfCtx(EVP_KDF_CTX_new(kdf));
-        std::string info = "client key";
-        OSSL_PARAM params[] = {
-            OSSL_PARAM_construct_utf8_string(
-                OSSL_KDF_PARAM_DIGEST, SN_sha256, strlen(SN_sha256)),
-            OSSL_PARAM_construct_octet_string(
-                OSSL_KDF_PARAM_KEY, prk.data(), prk.size()),
-            OSSL_PARAM_construct_octet_string(
-                OSSL_KDF_PARAM_SALT, _transcriptHash->data(), _transcriptHash->size()),
-            OSSL_PARAM_construct_octet_string(
-                OSSL_KDF_PARAM_INFO, const_cast<void*>(static_cast<const void*>(info.c_str())), info.length()),
-            OSSL_PARAM_construct_end()
-        };
-        rc = EVP_KDF_derive(kdfCtx, clientKey.data(), clientKey.size(), params);
-        if (rc != 1)
-        {
-            throw std::runtime_error("Cannot derive client key");
-        }
+        throw std::runtime_error("Server confirmation is missing CipherMessage element");
     }
-    _clientKey = std::move(clientKey);
-    std::vector<uint8_t> serverKey(_keySize, 0);
+    auto serverConfirm = serverConfirmOpt.value();
+    if (!_serverConfirmKey.has_value())
     {
-        Openssl::EvpKdf kdf(EVP_KDF_fetch(nullptr, "HKDF", nullptr));
-        Openssl::EvpKdfCtx kdfCtx(EVP_KDF_CTX_new(kdf));
-        std::string info = "server key";
-        OSSL_PARAM params[] = {
-            OSSL_PARAM_construct_utf8_string(
-                OSSL_KDF_PARAM_DIGEST, SN_sha256, strlen(SN_sha256)),
-            OSSL_PARAM_construct_octet_string(
-                OSSL_KDF_PARAM_KEY, prk.data(), prk.size()),
-            OSSL_PARAM_construct_octet_string(
-                OSSL_KDF_PARAM_SALT, _transcriptHash->data(), _transcriptHash->size()),
-            OSSL_PARAM_construct_octet_string(
-                OSSL_KDF_PARAM_INFO, const_cast<void*>(static_cast<const void*>(info.c_str())), info.length()),
-            OSSL_PARAM_construct_end()
-        };
-        rc = EVP_KDF_derive(kdfCtx, serverKey.data(), serverKey.size(), params);
-        if (rc != 1)
-        {
-            throw std::runtime_error("Cannot derive client key");
-        }
+        throw std::runtime_error("Server confirmation key is not available");
     }
-    _serverKey = std::move(serverKey);
+    Aes256Gcm::Decryptor decryptor{_serverConfirmKey.value()};
+    auto decryptedHash = decryptor.Decrypt(serverConfirm);
+    if (!_transcriptHash.has_value())
+    {
+        throw std::runtime_error("Transcript hash is not available");
+    }
+    if (!std::equal(
+        decryptedHash.begin(), decryptedHash.end(),
+        _transcriptHash->begin(), _transcriptHash->end()))
+    {
+        throw std::runtime_error("Server confirmation does not match transcript hash");
+    }
+}
+
+std::optional<HandshakeMessage> Client::GetNextMessage(
+    const std::optional<HandshakeMessage>& peerMessage)
+{
+    switch (_numCalls++)
+    {
+        case 0:
+            if (peerMessage.has_value())
+            {
+                throw std::runtime_error("Peer message is unexpected");
+            }
+            return GetClientMessage();
+        case 1:
+            if (!peerMessage.has_value())
+            {
+                throw std::runtime_error("Peer message is required");
+            }
+            return TakeServerMessage(peerMessage.value());
+        case 2:
+            if (!peerMessage.has_value())
+            {
+                throw std::runtime_error("Peer message is required");
+            }
+            TakeServerConfirmation(peerMessage.value());
+            return std::nullopt;
+        default:
+            throw std::runtime_error("Exceeding max call count");
+    }
+}
+
+bool Client::IsHandshakeComplete()
+{
+    return _stepChecker->GetCurrentStep() == Step::ServerConfirmation;
 }
 
 std::vector<uint8_t> Client::GetClientKey()
 {
-    auto marker = _stepChecker->CheckStep(Step::ServerMessage, Step::ServerMessage);
+    auto marker = _stepChecker->CheckStep(Step::ServerConfirmation, Step::ServerConfirmation);
     if (!_clientKey.has_value())
     {
         throw std::runtime_error("Client key is not available");
@@ -213,7 +316,7 @@ std::vector<uint8_t> Client::GetClientKey()
 
 std::vector<uint8_t> Client::GetServerKey()
 {
-    auto marker = _stepChecker->CheckStep(Step::ServerMessage, Step::ServerMessage);
+    auto marker = _stepChecker->CheckStep(Step::ServerConfirmation, Step::ServerConfirmation);
     if (!_serverKey.has_value())
     {
         throw std::runtime_error("Server key is not available");
@@ -221,214 +324,146 @@ std::vector<uint8_t> Client::GetServerKey()
     return _serverKey.value();
 }
 
-std::array<uint8_t, 32> Client::GetTranscriptHash()
-{
-    auto marker = _stepChecker->CheckStep(Step::ServerMessage, Step::ServerMessage);
-    if (!_transcriptHash.has_value())
-    {
-        throw std::runtime_error("Transcript hash is not available");
-    }
-    return _transcriptHash.value();
-}
+/** Server */
 
-Server::Server(const Psk& psk, size_t keySize)
-    : _psk(psk), _keySize(keySize)
+Server::Server(
+    std::function<Psk(const std::vector<uint8_t>&)> getPsk,
+    size_t keySize)
+    : _getPsk(getPsk), _keySize(keySize)
 {
+    if (getPsk == nullptr)
+    {
+        throw std::invalid_argument("getPsk function cannot be null");
+    }
     if (keySize == 0)
     {
         throw std::invalid_argument("Key size must be greater than 0");
     }
 }
 
-std::vector<uint8_t> Server::ParseKeyIndexFromClientMessage(const std::vector<uint8_t>& clientMessage)
+HandshakeMessage Server::TakeClientMessage(const HandshakeMessage& handshakeMessage)
 {
-    if (clientMessage.size() < PUBKEY_SIZE + NONCE_SIZE)
+    auto marker = _stepChecker->CheckStep(Step::Init, Step::ClientMessage);
+    auto keyIndexOpt = handshakeMessage.GetElement(HandshakeMessage::Type::KeyIndex);
+    if (!keyIndexOpt.has_value())
+    {
+        throw std::runtime_error("Handshake message is missing KeyIndex element");
+    }
+    auto psk = _getPsk(keyIndexOpt.value());
+    auto clientMessageOpt = handshakeMessage.GetElement(HandshakeMessage::Type::CipherMessage);
+    if (!clientMessageOpt.has_value())
+    {
+        throw std::runtime_error("Handshake message is missing CipherMessage element");
+    }
+    auto clientMessage = clientMessageOpt.value();
+    if (clientMessage.size() != PUBKEY_SIZE + NONCE_SIZE)
     {
         throw std::runtime_error("Invalid client message size");
     }
-    return std::vector<uint8_t>(clientMessage.begin() + PUBKEY_SIZE + NONCE_SIZE, clientMessage.end());
+    /** Generate key pair */
+    auto priKey = GeneratePriKey();
+    auto pubKey = GetRawPubKeyFromPriKey(priKey);
+    /** Generate nonce */
+    auto nonce = GenerateNonce(NONCE_SIZE);
+    /** Generate server message */
+    std::vector<uint8_t> cipherMessage(PUBKEY_SIZE + NONCE_SIZE, 0);
+    {
+        std::copy(pubKey.begin(), pubKey.end(), cipherMessage.begin());
+        std::copy(nonce.begin(), nonce.end(), cipherMessage.begin() + PUBKEY_SIZE);
+    }
+    /** Assemble handshake message */
+    HandshakeMessage serverMessage{
+        {{HandshakeMessage::Type::CipherMessage, std::move(cipherMessage)}}}; 
+    /** Calculate Z */
+    Openssl::EvpPkey clientPubKey{EVP_PKEY_new_raw_public_key(
+        EVP_PKEY_X25519, nullptr, clientMessage.data(), PUBKEY_SIZE)};
+    auto Z = GenerateZ(priKey, clientPubKey);
+    /** Generate prk */
+    auto prk = GenerateKey(Z, psk, "prk", 32);
+    /** Calculate transcript hash */
+    _transcriptHash = GetTranscriptHash(handshakeMessage, serverMessage);
+    /** Generate confirmation keys and session keys */
+    _serverConfirmKey = GenerateKey(prk, _transcriptHash.value(), "server confirm key", _keySize);
+    _clientConfirmKey = GenerateKey(prk, _transcriptHash.value(), "client confirm key", _keySize);
+    _clientKey = GenerateKey(prk, _transcriptHash.value(), "client key", _keySize);
+    _serverKey = GenerateKey(prk, _transcriptHash.value(), "server key", _keySize);
+    return serverMessage;
 }
 
-std::vector<uint8_t> Server::GetServerMessage(const std::vector<uint8_t>& clientMessage)
+HandshakeMessage Server::TakeClientConfirmation(const HandshakeMessage& handshakeMessage)
 {
-    auto marker = _stepChecker->CheckStep(Step::Init, Step::ServerMessage);
-    if (clientMessage.size() < PUBKEY_SIZE + NONCE_SIZE)
+    auto marker = _stepChecker->CheckStep(Step::ClientMessage, Step::ClientConfirmation);
+    /** validate client confirm */
     {
-        throw std::runtime_error("Invalid client message size");
-    }
-    int rc = 0;
-    /** Generate key pair */
-    Openssl::EvpPkey pkey{};
-    {
-        Openssl::EvpPkeyCtx keyGenCtx(EVP_PKEY_CTX_new_id(EVP_PKEY_X25519, nullptr));
-        rc = EVP_PKEY_keygen_init(keyGenCtx);
-        if (rc != 1)
+        auto clientConfirmOpt = handshakeMessage.GetElement(HandshakeMessage::Type::CipherMessage);
+        if (!clientConfirmOpt.has_value())
         {
-            throw std::runtime_error("Cannot init keygen context");
+            throw std::runtime_error("Client confirmation is missing CipherMessage element");
         }
-        EVP_PKEY* pkeyRaw = nullptr;
-        rc = EVP_PKEY_keygen(keyGenCtx, &pkeyRaw);
-        if (rc != 1)
+        auto clientConfirm = clientConfirmOpt.value();
+        if (!_clientConfirmKey.has_value())
         {
-            throw std::runtime_error("Cannot generate key pair");
+            throw std::runtime_error("Client confirmation key is not available");
         }
-        pkey = Openssl::EvpPkey(pkeyRaw);
-    }
-    std::vector<uint8_t> pubKey(PUBKEY_SIZE, 0);
-    {
-        size_t pubkeyLen = 0;
-        rc = EVP_PKEY_get_raw_public_key(pkey, nullptr, &pubkeyLen);
-        if (rc != 1)
+        Aes256Gcm::Decryptor decryptor{_clientConfirmKey.value()};
+        auto decryptedHash = decryptor.Decrypt(clientConfirm);
+        if (!_transcriptHash.has_value())
         {
-            throw std::runtime_error("Cannot get public key length");
+            throw std::runtime_error("Transcript hash is not available");
         }
-        if (pubkeyLen != PUBKEY_SIZE)
+        if (!std::equal(
+            decryptedHash.begin(), decryptedHash.end(),
+            _transcriptHash->begin(), _transcriptHash->end()))
         {
-            throw std::runtime_error("Invalid public key length");
-        }
-        rc = EVP_PKEY_get_raw_public_key(pkey, pubKey.data(), &pubkeyLen);
-        if (rc != 1)
-        {
-            throw std::runtime_error("Cannot get public key");
+            throw std::runtime_error("Client confirmation does not match transcript hash");
         }
     }
-    /** Generate nonce */
-    std::vector<uint8_t> nonce(NONCE_SIZE, 0);
+    /** Generate server confirm */
+    std::vector<uint8_t> cipherMessage{};
     {
-        rc = RAND_priv_bytes(nonce.data(), NONCE_SIZE);
-        if (rc != 1)
+        if (!_serverConfirmKey.has_value())
         {
-            throw std::runtime_error("Cannot generate nonce");
+            throw std::runtime_error("Server confirmation key is not available");
         }
+        Aes256Gcm::Encryptor encryptor{_serverConfirmKey.value()};
+        cipherMessage = encryptor.Encrypt(_transcriptHash.value());
     }
-    /** Generate server message */
-    std::vector<uint8_t> serverMessage(PUBKEY_SIZE + NONCE_SIZE, 0);
+    /** Assemble handshake message */
+    HandshakeMessage serverConfirmation{
+        {{HandshakeMessage::Type::CipherMessage, std::move(cipherMessage)}}};
+    return serverConfirmation;
+}
+
+std::optional<HandshakeMessage> Server::GetNextMessage(
+    const std::optional<HandshakeMessage>& peerMessage)
+{
+    switch (_numCalls++)
     {
-        std::copy(pubKey.begin(), pubKey.end(), serverMessage.begin());
-        std::copy(nonce.begin(), nonce.end(), serverMessage.begin() + PUBKEY_SIZE);
+        case 0:
+            if (!peerMessage.has_value())
+            {
+                throw std::runtime_error("Peer message is required");
+            }
+            return TakeClientMessage(peerMessage.value());
+        case 1:
+            if (!peerMessage.has_value())
+            {
+                throw std::runtime_error("Peer message is required");
+            }
+            return TakeClientConfirmation(peerMessage.value());
+        default:
+            throw std::runtime_error("Exceeding max call count");
     }
-    /** Calculate Z */
-    std::vector<uint8_t> Z{};
-    {
-        Openssl::EvpPkey serverPubKey{EVP_PKEY_new_raw_public_key(
-            EVP_PKEY_X25519, nullptr, clientMessage.data(), PUBKEY_SIZE)};
-        Openssl::EvpPkeyCtx deriveCtx{EVP_PKEY_CTX_new(pkey, nullptr)};
-        rc = EVP_PKEY_derive_init(deriveCtx);
-        if (rc != 1)
-        {
-            throw std::runtime_error("Cannot init derive context");
-        }
-        rc = EVP_PKEY_derive_set_peer(deriveCtx, serverPubKey);
-        if (rc != 1)
-        {
-            throw std::runtime_error("Cannot set peer public key");
-        }
-        size_t keyLen = 0;
-        rc = EVP_PKEY_derive(deriveCtx, nullptr, &keyLen);
-        if (rc != 1)
-        {
-            throw std::runtime_error("Cannot derive key length");
-        }
-        Z.resize(keyLen);
-        rc = EVP_PKEY_derive(deriveCtx, Z.data(), &keyLen);
-        if (rc != 1)
-        {
-            throw std::runtime_error("Cannot derive key");
-        }
-    }
-    /** Generate prk */
-    std::vector<uint8_t> prk(32, 0);
-    {
-        Openssl::EvpKdf kdf(EVP_KDF_fetch(nullptr, "HKDF", nullptr));
-        Openssl::EvpKdfCtx kdfCtx(EVP_KDF_CTX_new(kdf));
-        std::string info = "prk";
-        OSSL_PARAM params[] = {
-            OSSL_PARAM_construct_utf8_string(
-                OSSL_KDF_PARAM_DIGEST, SN_sha256, strlen(SN_sha256)),
-            OSSL_PARAM_construct_octet_string(
-                OSSL_KDF_PARAM_KEY, Z.data(), Z.size()),
-            OSSL_PARAM_construct_octet_string(
-                OSSL_KDF_PARAM_SALT, _psk.data(), _psk.size()),
-            OSSL_PARAM_construct_octet_string(
-                OSSL_KDF_PARAM_INFO, const_cast<void*>(static_cast<const void*>(info.c_str())), info.length()),
-            OSSL_PARAM_construct_end()
-        };
-        rc = EVP_KDF_derive(kdfCtx, prk.data(), prk.size(), params);
-        if (rc != 1)
-        {
-            throw std::runtime_error("Cannot derive PRK");
-        }
-    }
-    /** Calculate transcript hash */
-    std::array<uint8_t, 32> transcriptHash{};
-    {
-        std::vector<uint8_t> transcript(clientMessage.size() + serverMessage.size(), 0);
-        std::copy(clientMessage.begin(), clientMessage.end(), transcript.begin());
-        std::copy(serverMessage.begin(), serverMessage.end(), transcript.begin() + clientMessage.size());
-        std::vector<uint8_t> md(EVP_MAX_MD_SIZE, 0);
-        size_t mdLen = 0;
-        rc = EVP_Q_digest(nullptr, "SHA256", nullptr,
-            transcript.data(), transcript.size(), md.data(), &mdLen);
-        if (rc != 1 || mdLen != 32)
-        {
-            throw std::runtime_error("Cannot calculate transcript hash");
-        }
-        std::copy(md.begin(), md.begin() + 32, transcriptHash.begin());
-    }
-    _transcriptHash = std::move(transcriptHash);
-    /** Generate session keys */
-    std::vector<uint8_t> clientKey(_keySize, 0);
-    {
-        Openssl::EvpKdf kdf(EVP_KDF_fetch(nullptr, "HKDF", nullptr));
-        Openssl::EvpKdfCtx kdfCtx(EVP_KDF_CTX_new(kdf));
-        std::string info = "client key";
-        OSSL_PARAM params[] = {
-            OSSL_PARAM_construct_utf8_string(
-                OSSL_KDF_PARAM_DIGEST, SN_sha256, strlen(SN_sha256)),
-            OSSL_PARAM_construct_octet_string(
-                OSSL_KDF_PARAM_KEY, prk.data(), prk.size()),
-            OSSL_PARAM_construct_octet_string(
-                OSSL_KDF_PARAM_SALT, _transcriptHash->data(), _transcriptHash->size()),
-            OSSL_PARAM_construct_octet_string(
-                OSSL_KDF_PARAM_INFO, const_cast<void*>(static_cast<const void*>(info.c_str())), info.length()),
-            OSSL_PARAM_construct_end()
-        };
-        rc = EVP_KDF_derive(kdfCtx, clientKey.data(), clientKey.size(), params);
-        if (rc != 1)
-        {
-            throw std::runtime_error("Cannot derive client key");
-        }
-    }
-    _clientKey = std::move(clientKey);
-    std::vector<uint8_t> serverKey(_keySize, 0);
-    {
-        Openssl::EvpKdf kdf(EVP_KDF_fetch(nullptr, "HKDF", nullptr));
-        Openssl::EvpKdfCtx kdfCtx(EVP_KDF_CTX_new(kdf));
-        std::string info = "server key";
-        OSSL_PARAM params[] = {
-            OSSL_PARAM_construct_utf8_string(
-                OSSL_KDF_PARAM_DIGEST, SN_sha256, strlen(SN_sha256)),
-            OSSL_PARAM_construct_octet_string(
-                OSSL_KDF_PARAM_KEY, prk.data(), prk.size()),
-            OSSL_PARAM_construct_octet_string(
-                OSSL_KDF_PARAM_SALT, _transcriptHash->data(), _transcriptHash->size()),
-            OSSL_PARAM_construct_octet_string(
-                OSSL_KDF_PARAM_INFO, const_cast<void*>(static_cast<const void*>(info.c_str())), info.length()),
-            OSSL_PARAM_construct_end()
-        };
-        rc = EVP_KDF_derive(kdfCtx, serverKey.data(), serverKey.size(), params);
-        if (rc != 1)
-        {
-            throw std::runtime_error("Cannot derive client key");
-        }
-    }
-    _serverKey = std::move(serverKey);
-    return serverMessage;
+}
+
+bool Server::IsHandshakeComplete()
+{
+    return _stepChecker->GetCurrentStep() == Step::ClientConfirmation;
 }
 
 std::vector<uint8_t> Server::GetClientKey()
 {
-    auto marker = _stepChecker->CheckStep(Step::ServerMessage, Step::ServerMessage);
+    auto marker = _stepChecker->CheckStep(Step::ClientConfirmation, Step::ClientConfirmation);
     if (!_clientKey.has_value())
     {
         throw std::runtime_error("Client key is not available");
@@ -438,21 +473,11 @@ std::vector<uint8_t> Server::GetClientKey()
 
 std::vector<uint8_t> Server::GetServerKey()
 {
-    auto marker = _stepChecker->CheckStep(Step::ServerMessage, Step::ServerMessage);
+    auto marker = _stepChecker->CheckStep(Step::ClientConfirmation, Step::ClientConfirmation);
     if (!_serverKey.has_value())
     {
         throw std::runtime_error("Server key is not available");
     }
     return _serverKey.value();
-}
-
-std::array<uint8_t, 32> Server::GetTranscriptHash()
-{
-    auto marker = _stepChecker->CheckStep(Step::ServerMessage, Step::ServerMessage);
-    if (!_transcriptHash.has_value())
-    {
-        throw std::runtime_error("Transcript hash is not available");
-    }
-    return _transcriptHash.value();
 }
 
