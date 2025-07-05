@@ -6,8 +6,8 @@
 
 namespace TUI::Cipher::Spake2p
 {
-    constexpr uint32_t ARGON2ID_LANES = 4;
-    constexpr uint32_t ARGON2ID_MEM_COST_KiB = 65536;
+    constexpr uint32_t ARGON2ID_LANES = 1;
+    constexpr uint32_t ARGON2ID_MEM_COST_BYTES = 64 * 1024 * 1024;
     constexpr uint32_t ARGON2ID_ITERATIONS = 3;
 
     struct RegistrationResult

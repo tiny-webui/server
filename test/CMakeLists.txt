@@ -182,9 +182,22 @@ target_link_libraries(TestEcdhePsk
         ssl
         crypto)
 
+add_executable(TestEd25519
+    TestEd25519.cpp
+    ../src/cipher/Ed25519.cpp)
+
+target_include_directories(TestEd25519
+    PRIVATE
+        ../src)
+
+target_link_libraries(TestEd25519
+    PRIVATE
+        sodium)
+
 add_executable(TestSpake2p
     TestSpake2p.cpp
-    ../src/cipher/Spake2p.cpp)
+    ../src/cipher/Spake2p.cpp
+    ../src/cipher/Ed25519.cpp)
 
 target_include_directories(TestSpake2p
     PRIVATE
@@ -192,8 +205,7 @@ target_include_directories(TestSpake2p
 
 target_link_libraries(TestSpake2p
     PRIVATE
-        ssl
-        crypto)
+        sodium)
 
 add_executable(TestResourceVersionManager
     TestResourceVersionManager.cpp)
@@ -224,4 +236,5 @@ target_link_libraries(TestService
         sqlite3
         uuid
         ssl
-        crypto)
+        crypto
+        sodium)

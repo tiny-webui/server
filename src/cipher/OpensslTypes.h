@@ -362,35 +362,6 @@ namespace TUI::Cipher::Openssl
         {
             return _bn;
         }
-        
-        BigNum operator+(const BigNum& other) const
-        {
-            BigNum result{};
-            if (BN_add(result._bn, _bn, other._bn) == 0)
-            {
-                throw std::runtime_error("Failed to add BIGNUMs");
-            }
-            return result;
-        }
-
-        std::strong_ordering operator<=>(const BigNum& other) const
-        {
-            int cmp = BN_cmp(_bn, other._bn);
-            if (cmp < 0)
-            {
-                return std::strong_ordering::less;
-            }
-            else if (cmp > 0)
-            {
-                return std::strong_ordering::greater;
-            }
-            return std::strong_ordering::equal;
-        }
-
-        bool operator==(const BigNum& other) const
-        {
-            return BN_cmp(_bn, other._bn) == 0;
-        }
 
     private:
         BIGNUM* _bn{nullptr};
