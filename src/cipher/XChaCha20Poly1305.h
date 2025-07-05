@@ -3,17 +3,13 @@
 #include <array>
 #include <vector>
 #include <cstdint>
-#include <stdexcept>
-#include <optional>
-#include <openssl/evp.h>
-#include "BigUint.h"
-#include "OpensslTypes.h"
+#include <cstddef>
 
-namespace TUI::Cipher::Aes256Gcm
+namespace TUI::Cipher::XChaCha20Poly1305
 {
     using Key = std::array<uint8_t, 32>;
-    using Tag = std::array<uint8_t, 16>;
-    using Iv = BigUint<12>;
+    constexpr size_t NonceSize = 24;
+    constexpr size_t TagSize = 16;
 
     class Encryptor
     {
@@ -22,23 +18,22 @@ namespace TUI::Cipher::Aes256Gcm
         explicit Encryptor(const std::vector<uint8_t>& key);
 
         /**
-         * @brief Encrypt a message. IV is managed internally.
+         * @brief 
          * 
          * @param plainText 
-         * @return std::vector<uint8_t> 
-         *     IV   | CipherText (no padding) |   Tag
-         *   12B LE |    variable             |   16B
+         * @return std::vector<uint8_t>
+         *  Nonce  | CipherText | Tag
+         *   24B   |   variable | 16B
          */
+        std::vector<uint8_t> Encrypt(const uint8_t* plainText, size_t size);
         std::vector<uint8_t> Encrypt(const std::vector<uint8_t>& plainText);
         template<size_t N>
         std::vector<uint8_t> Encrypt(const std::array<uint8_t, N>& plainText)
         {
-            return Encrypt(std::vector<uint8_t>(plainText.begin(), plainText.end()));
+            return Encrypt(plainText.data(), plainText.size());
         }
-
     private:
-        Iv _iv{};
-        Openssl::EvpCipherCtx _ctx{};
+        Key _key{};
     };
 
     class Decryptor
@@ -51,19 +46,16 @@ namespace TUI::Cipher::Aes256Gcm
          * @brief Decrypt a message encrypted with the Encryptor
          * 
          * @param cipherText 
-         * @return std::vector<uint8_t> 
+         * @return std::vector<uint8_t>
          */
+        std::vector<uint8_t> Decrypt(const uint8_t* cipherText, size_t size);
         std::vector<uint8_t> Decrypt(const std::vector<uint8_t>& cipherText);
         template<size_t N>
         std::vector<uint8_t> Decrypt(const std::array<uint8_t, N>& cipherText)
         {
-            return Decrypt(std::vector<uint8_t>(cipherText.begin(), cipherText.end()));
+            return Decrypt(cipherText.data(), cipherText.size());
         }
-
     private:
-        std::optional<Iv> _lastIv{std::nullopt};
-        Openssl::EvpCipherCtx _ctx{};
+        Key _key{};
     };
 }
-
-

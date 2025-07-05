@@ -5,7 +5,7 @@
 #include <openssl/param_build.h>
 #include <openssl/core_names.h>
 #include "EcdhePsk.h"
-#include "Aes256Gcm.h"
+#include "XChaCha20Poly1305.h"
 
 using namespace TUI::Cipher;
 using namespace TUI::Cipher::EcdhePsk;
@@ -234,7 +234,7 @@ HandshakeMessage Client::TakeServerMessage(const HandshakeMessage& handshakeMess
     /** Generate client confirmation message */
     std::vector<uint8_t> clientConfirmMessage{};
     {
-        Aes256Gcm::Encryptor encryptor{clientConfirmKey};
+        XChaCha20Poly1305::Encryptor encryptor{clientConfirmKey};
         clientConfirmMessage = encryptor.Encrypt(_transcriptHash.value());
     }
     /** Assemble handshake message */
@@ -256,7 +256,7 @@ void Client::TakeServerConfirmation(const HandshakeMessage& handshakeMessage)
     {
         throw std::runtime_error("Server confirmation key is not available");
     }
-    Aes256Gcm::Decryptor decryptor{_serverConfirmKey.value()};
+    XChaCha20Poly1305::Decryptor decryptor{_serverConfirmKey.value()};
     auto decryptedHash = decryptor.Decrypt(serverConfirm);
     if (!_transcriptHash.has_value())
     {
@@ -405,7 +405,7 @@ HandshakeMessage Server::TakeClientConfirmation(const HandshakeMessage& handshak
         {
             throw std::runtime_error("Client confirmation key is not available");
         }
-        Aes256Gcm::Decryptor decryptor{_clientConfirmKey.value()};
+        XChaCha20Poly1305::Decryptor decryptor{_clientConfirmKey.value()};
         auto decryptedHash = decryptor.Decrypt(clientConfirm);
         if (!_transcriptHash.has_value())
         {
@@ -425,7 +425,7 @@ HandshakeMessage Server::TakeClientConfirmation(const HandshakeMessage& handshak
         {
             throw std::runtime_error("Server confirmation key is not available");
         }
-        Aes256Gcm::Encryptor encryptor{_serverConfirmKey.value()};
+        XChaCha20Poly1305::Encryptor encryptor{_serverConfirmKey.value()};
         cipherMessage = encryptor.Encrypt(_transcriptHash.value());
     }
     /** Assemble handshake message */

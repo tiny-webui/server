@@ -147,31 +147,23 @@ target_include_directories(TestRpcServer
     PRIVATE
         ../src)
 
-add_executable(TestBigUint
-    TestBigUint.cpp)
+add_executable(TestXChaCha20Poly1305
+    TestXChaCha20Poly1305.cpp
+    ../src/cipher/XChaCha20Poly1305.cpp)
 
-target_include_directories(TestBigUint
+target_include_directories(TestXChaCha20Poly1305
     PRIVATE
         ../src)
 
-add_executable(TestAes256Gcm
-    TestAes256Gcm.cpp
-    ../src/cipher/Aes256Gcm.cpp)
-
-target_include_directories(TestAes256Gcm
+target_link_libraries(TestXChaCha20Poly1305
     PRIVATE
-        ../src)
-
-target_link_libraries(TestAes256Gcm
-    PRIVATE
-        ssl
-        crypto)
+        sodium)
 
 add_executable(TestEcdhePsk
     TestEcdhePsk.cpp
     ../src/cipher/EcdhePsk.cpp
     ../src/cipher/HandshakeMessage.cpp
-    ../src/cipher/Aes256Gcm.cpp)
+    ../src/cipher/XChaCha20Poly1305.cpp)
 
 target_include_directories(TestEcdhePsk
     PRIVATE
@@ -180,7 +172,8 @@ target_include_directories(TestEcdhePsk
 target_link_libraries(TestEcdhePsk
     PRIVATE
         ssl
-        crypto)
+        crypto
+        sodium)
 
 add_executable(TestEd25519
     TestEd25519.cpp

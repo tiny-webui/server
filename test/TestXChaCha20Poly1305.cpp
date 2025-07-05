@@ -1,8 +1,8 @@
 #include <iostream>
-#include "cipher/Aes256Gcm.h"
+#include "cipher/XChaCha20Poly1305.h"
 #include "Utility.h"
 
-using namespace TUI::Cipher::Aes256Gcm;
+using namespace TUI::Cipher::XChaCha20Poly1305;
 
 int main(int argc, char const *argv[])
 {
