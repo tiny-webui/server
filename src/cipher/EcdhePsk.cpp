@@ -92,7 +92,7 @@ static std::array<uint8_t, IAuthenticationPeer::KEY_SIZE> HkdfExpendKey(
 Client::Client(
     const Psk& psk,
     const std::vector<uint8_t>& keyIndex,
-    const std::unordered_map<HandshakeMessage::Type, std::vector<uint8_t>>& additionalElements)
+    const std::map<HandshakeMessage::Type, std::vector<uint8_t>>& additionalElements)
     : _psk(psk)
 {
     _firstMessageAdditionalElements.emplace(HandshakeMessage::Type::KeyIndex, keyIndex);

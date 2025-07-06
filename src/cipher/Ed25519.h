@@ -8,7 +8,6 @@
 namespace TUI::Cipher::Ed25519
 {
     class PubKey;
-
     class PriKey
     {
     public:
@@ -63,6 +62,8 @@ namespace TUI::Cipher::Ed25519
     {
         friend class PriKey;
     public:
+        static constexpr size_t size = crypto_core_ed25519_BYTES;
+
         static PubKey Generate();
 
         /**
@@ -91,4 +92,13 @@ namespace TUI::Cipher::Ed25519
 
     using Scalar = PriKey;
     using Point = PubKey;
+
+    constexpr std::array<uint8_t, PriKey::size> cofactor_bytes = {
+        0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    };
+
+    PriKey GetCofactor();
 }

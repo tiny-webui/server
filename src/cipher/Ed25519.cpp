@@ -3,7 +3,13 @@
 #include <sodium/crypto_scalarmult_ed25519.h>
 #include "Ed25519.h"
 
+using namespace TUI::Cipher;
 using namespace TUI::Cipher::Ed25519;
+
+PriKey Ed25519::GetCofactor()
+{
+    return PriKey{cofactor_bytes};
+}
 
 PriKey::PriKey()
     : _bytes()

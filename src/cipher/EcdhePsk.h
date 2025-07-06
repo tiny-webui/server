@@ -49,7 +49,7 @@ namespace TUI::Cipher::EcdhePsk
         Client(
             const Psk& psk,
             const std::vector<uint8_t>& keyIndex,
-            const std::unordered_map<HandshakeMessage::Type, std::vector<uint8_t>>& additionalElements = {});
+            const std::map<HandshakeMessage::Type, std::vector<uint8_t>>& additionalElements = {});
 
         std::optional<HandshakeMessage> GetNextMessage(
             const std::optional<HandshakeMessage>& peerMessage) override;

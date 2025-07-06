@@ -196,7 +196,9 @@ target_link_libraries(TestEd25519
 add_executable(TestSpake2p
     TestSpake2p.cpp
     ../src/cipher/Spake2p.cpp
-    ../src/cipher/Ed25519.cpp)
+    ../src/cipher/Ed25519.cpp
+    ../src/cipher/XChaCha20Poly1305.cpp
+    ../src/cipher/HandshakeMessage.cpp)
 
 target_include_directories(TestSpake2p
     PRIVATE
