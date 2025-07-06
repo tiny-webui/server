@@ -18,6 +18,14 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # Strict warnings and errors
 add_compile_options(-Wall -Wextra -Werror -pedantic)
 
+# Add extra include and library paths for local libraries.
+if(DEFINED ENV{TUI_EXTRA_INCLUDE_PATH})
+    include_directories($ENV{TUI_EXTRA_INCLUDE_PATH})
+endif()
+if(DEFINED ENV{TUI_EXTRA_LIB_PATH})
+    link_directories($ENV{TUI_EXTRA_LIB_PATH})
+endif()
+
 # Find all .cpp files under ./src
 file(GLOB_RECURSE SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp")
 
@@ -38,5 +46,4 @@ target_link_libraries(tui-server
         websockets
         sqlite3
         uuid
-        ssl
-        crypto)
+        sodium)

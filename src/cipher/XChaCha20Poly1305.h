@@ -8,8 +8,8 @@
 namespace TUI::Cipher::XChaCha20Poly1305
 {
     using Key = std::array<uint8_t, 32>;
-    constexpr size_t NonceSize = 24;
-    constexpr size_t TagSize = 16;
+    constexpr size_t NONCE_SIZE = 24;
+    constexpr size_t TAG_SIZE = 16;
 
     class Encryptor
     {

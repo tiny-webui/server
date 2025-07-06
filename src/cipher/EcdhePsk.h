@@ -7,7 +7,6 @@
 #include <cstdint>
 #include <optional>
 #include <functional>
-#include "OpensslTypes.h"
 #include "StepChecker.h"
 #include "IAuthenticationPeer.h"
 #include "HandshakeMessage.h"
@@ -40,7 +39,9 @@ namespace TUI::Cipher::EcdhePsk
 {
     using Psk = std::array<uint8_t, 32>;
     constexpr size_t PUBKEY_SIZE = 32;
+    constexpr size_t PRIKEY_SIZE = 32;
     constexpr size_t NONCE_SIZE = 32;
+    constexpr size_t HASH_SIZE = 32;
 
     class Client : public IAuthenticationPeer
     {
@@ -48,14 +49,13 @@ namespace TUI::Cipher::EcdhePsk
         Client(
             const Psk& psk,
             const std::vector<uint8_t>& keyIndex,
-            const std::unordered_map<HandshakeMessage::Type, std::vector<uint8_t>>& additionalElements = {},
-            size_t keySize = 32);
+            const std::unordered_map<HandshakeMessage::Type, std::vector<uint8_t>>& additionalElements = {});
 
         std::optional<HandshakeMessage> GetNextMessage(
             const std::optional<HandshakeMessage>& peerMessage) override;
         bool IsHandshakeComplete() override;
-        std::vector<uint8_t> GetClientKey() override;
-        std::vector<uint8_t> GetServerKey() override;
+        std::array<uint8_t, KEY_SIZE> GetClientKey() override;
+        std::array<uint8_t, KEY_SIZE> GetServerKey() override;
     private:
         enum class Step
         {
@@ -66,14 +66,13 @@ namespace TUI::Cipher::EcdhePsk
         };
         
         Psk _psk;
-        size_t _keySize;
         std::map<HandshakeMessage::Type, std::vector<uint8_t>> _firstMessageAdditionalElements{};
-        Openssl::EvpPkey _pkey{};
+        std::array<uint8_t, PRIKEY_SIZE> _priKey{};
         std::optional<HandshakeMessage> _clientMessage{std::nullopt};
-        std::optional<std::vector<uint8_t>> _serverConfirmKey{std::nullopt};
-        std::optional<std::vector<uint8_t>> _clientKey{std::nullopt};
-        std::optional<std::vector<uint8_t>> _serverKey{std::nullopt};
-        std::optional<std::array<uint8_t, 32>> _transcriptHash{std::nullopt};
+        std::array<uint8_t, KEY_SIZE> _serverConfirmKey{};
+        std::array<uint8_t, KEY_SIZE> _clientKey{};
+        std::array<uint8_t, KEY_SIZE> _serverKey{};
+        std::array<uint8_t, HASH_SIZE> _transcriptHash{};
         std::shared_ptr<StepChecker<Step>> _stepChecker{StepChecker<Step>::Create(Step::Init)};
         int64_t _numCalls{0};
 
@@ -116,14 +115,13 @@ namespace TUI::Cipher::EcdhePsk
     public:
 
         Server(
-            std::function<Psk(const std::vector<uint8_t>&)> getPsk,
-            size_t keySize = 32);
+            std::function<Psk(const std::vector<uint8_t>&)> getPsk);
 
         std::optional<HandshakeMessage> GetNextMessage(
             const std::optional<HandshakeMessage>& peerMessage) override;
         bool IsHandshakeComplete() override;
-        std::vector<uint8_t> GetClientKey() override;
-        std::vector<uint8_t> GetServerKey() override;
+        std::array<uint8_t, KEY_SIZE> GetClientKey() override;
+        std::array<uint8_t, KEY_SIZE> GetServerKey() override;
     private:
         enum class Step
         {
@@ -133,12 +131,11 @@ namespace TUI::Cipher::EcdhePsk
         };
 
         std::function<Psk(const std::vector<uint8_t>&)> _getPsk;
-        size_t _keySize;
-        std::optional<std::vector<uint8_t>> _clientConfirmKey{std::nullopt};
-        std::optional<std::vector<uint8_t>> _serverConfirmKey{std::nullopt};
-        std::optional<std::vector<uint8_t>> _clientKey{std::nullopt};
-        std::optional<std::vector<uint8_t>> _serverKey{std::nullopt};
-        std::optional<std::array<uint8_t, 32>> _transcriptHash{std::nullopt};
+        std::array<uint8_t, KEY_SIZE> _clientConfirmKey{};
+        std::array<uint8_t, KEY_SIZE> _serverConfirmKey{};
+        std::array<uint8_t, KEY_SIZE> _clientKey{};
+        std::array<uint8_t, KEY_SIZE> _serverKey{};
+        std::array<uint8_t, HASH_SIZE> _transcriptHash{};
         std::shared_ptr<StepChecker<Step>> _stepChecker{StepChecker<Step>::Create(Step::Init)};
         int64_t _numCalls{0};
 

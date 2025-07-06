@@ -18,6 +18,14 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # Strict warnings and errors
 add_compile_options(-Wall -Wextra -Werror -pedantic)
 
+# Add extra include and library paths for local libraries.
+if(DEFINED ENV{TUI_EXTRA_INCLUDE_PATH})
+    include_directories($ENV{TUI_EXTRA_INCLUDE_PATH})
+endif()
+if(DEFINED ENV{TUI_EXTRA_LIB_PATH})
+    link_directories($ENV{TUI_EXTRA_LIB_PATH})
+endif()
+
 add_executable(TestHttpClient
     TestHttpClient.cpp
     ../src/network/CurlTypes.cpp
@@ -171,8 +179,6 @@ target_include_directories(TestEcdhePsk
 
 target_link_libraries(TestEcdhePsk
     PRIVATE
-        ssl
-        crypto
         sodium)
 
 add_executable(TestEd25519
@@ -228,6 +234,4 @@ target_link_libraries(TestService
         websockets
         sqlite3
         uuid
-        ssl
-        crypto
         sodium)
