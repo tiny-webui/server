@@ -237,3 +237,14 @@ target_link_libraries(TestService
         sqlite3
         uuid
         sodium)
+
+add_executable(TestStreamBatcher
+    TestStreamBatcher.cpp)
+
+target_include_directories(TestStreamBatcher
+    PRIVATE
+        ../src)
+
+target_link_libraries(TestStreamBatcher
+    PRIVATE
+        tev-cpp)
