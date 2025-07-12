@@ -18,6 +18,14 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # Strict warnings and errors
 add_compile_options(-Wall -Wextra -Werror -pedantic)
 
+# Add extra include and library paths for local libraries.
+if(DEFINED ENV{TUI_EXTRA_INCLUDE_PATH})
+    include_directories($ENV{TUI_EXTRA_INCLUDE_PATH})
+endif()
+if(DEFINED ENV{TUI_EXTRA_LIB_PATH})
+    link_directories($ENV{TUI_EXTRA_LIB_PATH})
+endif()
+
 add_executable(TestHttpClient
     TestHttpClient.cpp
     ../src/network/CurlTypes.cpp
@@ -147,6 +155,59 @@ target_include_directories(TestRpcServer
     PRIVATE
         ../src)
 
+add_executable(TestXChaCha20Poly1305
+    TestXChaCha20Poly1305.cpp
+    ../src/cipher/XChaCha20Poly1305.cpp)
+
+target_include_directories(TestXChaCha20Poly1305
+    PRIVATE
+        ../src)
+
+target_link_libraries(TestXChaCha20Poly1305
+    PRIVATE
+        sodium)
+
+add_executable(TestEcdhePsk
+    TestEcdhePsk.cpp
+    ../src/cipher/EcdhePsk.cpp
+    ../src/cipher/HandshakeMessage.cpp
+    ../src/cipher/XChaCha20Poly1305.cpp)
+
+target_include_directories(TestEcdhePsk
+    PRIVATE
+        ../src)
+
+target_link_libraries(TestEcdhePsk
+    PRIVATE
+        sodium)
+
+add_executable(TestEd25519
+    TestEd25519.cpp
+    ../src/cipher/Ed25519.cpp)
+
+target_include_directories(TestEd25519
+    PRIVATE
+        ../src)
+
+target_link_libraries(TestEd25519
+    PRIVATE
+        sodium)
+
+add_executable(TestSpake2p
+    TestSpake2p.cpp
+    ../src/cipher/Spake2p.cpp
+    ../src/cipher/Ed25519.cpp
+    ../src/cipher/XChaCha20Poly1305.cpp
+    ../src/cipher/HandshakeMessage.cpp)
+
+target_include_directories(TestSpake2p
+    PRIVATE
+        ../src)
+
+target_link_libraries(TestSpake2p
+    PRIVATE
+        sodium)
+
 add_executable(TestResourceVersionManager
     TestResourceVersionManager.cpp)
 
@@ -174,7 +235,8 @@ target_link_libraries(TestService
         curl
         websockets
         sqlite3
-        uuid)
+        uuid
+        sodium)
 
 add_executable(TestStreamBatcher
     TestStreamBatcher.cpp)

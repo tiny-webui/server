@@ -5,6 +5,7 @@ Install the following packages from your package manager:
 * libsqlite3
 * libuuid
 * nlohmann-json
+* libsodium (>=1.0.19)
 
 For example, on debian, these can be installed:
 ```bash
@@ -30,6 +31,26 @@ cd build
 cmake ..
 make
 sudo make install
+```
+* [libsodium](https://github.com/jedisct1/libsodium)<br>
+Distros like debian and ubuntu only have the older version of libsodium available in their package manager. Thus, you may need to install the latest stable libsodium from source to a local location. And build and run tui-server against it.
+```bash
+# Create a directory to install the library locally.
+mkdir -p $YOUR_LOCAL_LIBRARY_PATH
+wget https://download.libsodium.org/libsodium/releases/libsodium-1.0.20-stable.tar.gz
+tar -xf libsodium-1.0.20-stable.tar.gz
+cd libsodium-stable
+./configure --prefix="$YOUR_LOCAL_LIBRARY_PATH" --enable-shared
+make -j${nproc}
+# This will install to the local path. Root is not required if you have write access to it.
+make install
+
+# Now configure tui-server to use that library
+cd $TUI_SERVER_PROJECT_PATH
+echo "$YOUR_LOCAL_LIBRARY_PATH" > local-lib-path
+
+# Each time you activate a shell to build or run tui-server
+. set-local-lib-path.sh
 ```
 You may need to update your linker cache after installing these libraries:
 ```bash
