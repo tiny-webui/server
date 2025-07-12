@@ -233,6 +233,28 @@ target_include_directories(TestCache
     PRIVATE
         ../src)
 
+add_executable(TestFakeCredentialGenerator
+    TestFakeCredentialGenerator.cpp
+    ../src/cipher/FakeCredentialGenerator.cpp
+    ../src/cipher/Ed25519.cpp)
+
+target_include_directories(TestFakeCredentialGenerator
+    PRIVATE
+        ../src)
+
+target_link_libraries(TestFakeCredentialGenerator
+    PRIVATE
+        sodium)
+
+add_executable(TestBruteForceLimiter
+    TestBruteForceLimiter.cpp
+    ../src/cipher/BruteForceLimiter.cpp
+    ../src/common/Utilities.cpp)
+
+target_include_directories(TestBruteForceLimiter
+    PRIVATE
+        ../src)
+
 # Get all .cpp files from ../src except main.cpp
 file(GLOB_RECURSE TEST_SERVICE_SRC_FILES 
     ${CMAKE_CURRENT_SOURCE_DIR}/../src/*.cpp)
