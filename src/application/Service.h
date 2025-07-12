@@ -32,6 +32,9 @@ namespace TUI::Application
 
         void Close();
     private:
+        static constexpr uint64_t STREAM_BATCHING_INTERVAL_MS = 300;
+
+        Tev& _tev;
         std::shared_ptr<Database::Database> _database;
         std::function<void(const std::string&)> _onCriticalError;
         std::shared_ptr<Network::Http::Client> _httpClient{nullptr};

@@ -4,7 +4,7 @@ import { exit } from "process";
 import readline from 'readline';
 
 if (process.argv.length < 3) {
-    console.error("Usage: node Main.js <config path>");
+    console.error("Usage: node ChatBot.js <config path>");
     process.exit(1);
 }
 
