@@ -87,6 +87,15 @@ static std::array<uint8_t, IAuthenticationPeer::KEY_SIZE> HkdfExpendKey(
     return key;
 }
 
+/** Static */
+
+Psk EcdhePsk::GeneratePsk()
+{
+    Psk psk{};
+    randombytes_buf(psk.data(), psk.size());
+    return psk;
+}
+
 /** Client */
 
 Client::Client(
