@@ -215,6 +215,24 @@ target_include_directories(TestResourceVersionManager
     PRIVATE
         ../src)
 
+add_executable(TestStreamBatcher
+    TestStreamBatcher.cpp)
+
+target_include_directories(TestStreamBatcher
+    PRIVATE
+        ../src)
+
+target_link_libraries(TestStreamBatcher
+    PRIVATE
+        tev-cpp)
+
+add_executable(TestCache
+    TestCache.cpp)
+
+target_include_directories(TestCache
+    PRIVATE
+        ../src)
+
 # Get all .cpp files from ../src except main.cpp
 file(GLOB_RECURSE TEST_SERVICE_SRC_FILES 
     ${CMAKE_CURRENT_SOURCE_DIR}/../src/*.cpp)
@@ -237,14 +255,3 @@ target_link_libraries(TestService
         sqlite3
         uuid
         sodium)
-
-add_executable(TestStreamBatcher
-    TestStreamBatcher.cpp)
-
-target_include_directories(TestStreamBatcher
-    PRIVATE
-        ../src)
-
-target_link_libraries(TestStreamBatcher
-    PRIVATE
-        tev-cpp)
