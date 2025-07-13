@@ -255,6 +255,28 @@ target_include_directories(TestBruteForceLimiter
     PRIVATE
         ../src)
 
+add_executable(TestSecureSession
+    TestSecureSession.cpp
+    ../src/application/SecureSession.cpp
+    ../src/cipher/XChaCha20Poly1305.cpp
+    ../src/cipher/HandshakeMessage.cpp
+    ../src/cipher/EcdhePsk.cpp
+    ../src/cipher/Ed25519.cpp
+    ../src/cipher/Spake2p.cpp
+    ../src/cipher/FakeCredentialGenerator.cpp
+    ../src/cipher/BruteForceLimiter.cpp
+    ../src/common/Utilities.cpp)
+
+target_include_directories(TestSecureSession
+    PRIVATE
+        ../src)
+
+target_link_libraries(TestSecureSession
+    PRIVATE
+        tev-cpp
+        uuid
+        sodium)
+
 # Get all .cpp files from ../src except main.cpp
 file(GLOB_RECURSE TEST_SERVICE_SRC_FILES 
     ${CMAKE_CURRENT_SOURCE_DIR}/../src/*.cpp)

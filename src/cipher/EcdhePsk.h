@@ -43,7 +43,7 @@ namespace TUI::Cipher::EcdhePsk
     constexpr size_t NONCE_SIZE = 32;
     constexpr size_t HASH_SIZE = 32;
 
-    static Psk GeneratePsk();
+    Psk GeneratePsk();
 
     class Client : public IAuthenticationPeer
     {
