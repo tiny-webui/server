@@ -28,6 +28,8 @@
 //     GetUserAnyParams data = nlohmann::json::parse(jsonString);
 //     NewUserParams data = nlohmann::json::parse(jsonString);
 //     SetUserAdminSettingsParams data = nlohmann::json::parse(jsonString);
+//     ProtocolNegotiationRequest data = nlohmann::json::parse(jsonString);
+//     ProtocolNegotiationResponse data = nlohmann::json::parse(jsonString);
 
 #pragma once
 
@@ -487,6 +489,39 @@ namespace IServer {
         void set_role(const UserAdminSettingsRole & value) { this->role = value; }
     };
 
+    class UserCredential {
+        public:
+        UserCredential() = default;
+        virtual ~UserCredential() = default;
+
+        private:
+        std::string l;
+        std::string salt;
+        std::string w0;
+
+        public:
+        /**
+         * Hex string
+         */
+        const std::string & get_l() const { return l; }
+        std::string & get_mutable_l() { return l; }
+        void set_l(const std::string & value) { this->l = value; }
+
+        /**
+         * Hex string
+         */
+        const std::string & get_salt() const { return salt; }
+        std::string & get_mutable_salt() { return salt; }
+        void set_salt(const std::string & value) { this->salt = value; }
+
+        /**
+         * Hex string
+         */
+        const std::string & get_w0() const { return w0; }
+        std::string & get_mutable_w0() { return w0; }
+        void set_w0(const std::string & value) { this->w0 = value; }
+    };
+
     class GetUserListParams {
         public:
         GetUserListParams() = default;
@@ -552,7 +587,7 @@ namespace IServer {
 
         private:
         UserAdminSettings admin_settings;
-        nlohmann::json credential;
+        UserCredential credential;
         std::string user_name;
 
         public:
@@ -560,9 +595,9 @@ namespace IServer {
         UserAdminSettings & get_mutable_admin_settings() { return admin_settings; }
         void set_admin_settings(const UserAdminSettings & value) { this->admin_settings = value; }
 
-        const nlohmann::json & get_credential() const { return credential; }
-        nlohmann::json & get_mutable_credential() { return credential; }
-        void set_credential(const nlohmann::json & value) { this->credential = value; }
+        const UserCredential & get_credential() const { return credential; }
+        UserCredential & get_mutable_credential() { return credential; }
+        void set_credential(const UserCredential & value) { this->credential = value; }
 
         /**
          * User name cannot be changed. As this is how the admin identifies a user.
@@ -591,10 +626,47 @@ namespace IServer {
         void set_id(const std::string & value) { this->id = value; }
     };
 
+    class ProtocolNegotiationRequest {
+        public:
+        ProtocolNegotiationRequest() = default;
+        virtual ~ProtocolNegotiationRequest() = default;
+
+        private:
+        bool turn_off_encryption;
+
+        public:
+        const bool & get_turn_off_encryption() const { return turn_off_encryption; }
+        bool & get_mutable_turn_off_encryption() { return turn_off_encryption; }
+        void set_turn_off_encryption(const bool & value) { this->turn_off_encryption = value; }
+    };
+
+    class ProtocolNegotiationResponse {
+        public:
+        ProtocolNegotiationResponse() = default;
+        virtual ~ProtocolNegotiationResponse() = default;
+
+        private:
+        std::string session_resumption_key;
+        std::string session_resumption_key_index;
+        bool was_under_attack;
+
+        public:
+        const std::string & get_session_resumption_key() const { return session_resumption_key; }
+        std::string & get_mutable_session_resumption_key() { return session_resumption_key; }
+        void set_session_resumption_key(const std::string & value) { this->session_resumption_key = value; }
+
+        const std::string & get_session_resumption_key_index() const { return session_resumption_key_index; }
+        std::string & get_mutable_session_resumption_key_index() { return session_resumption_key_index; }
+        void set_session_resumption_key_index(const std::string & value) { this->session_resumption_key_index = value; }
+
+        const bool & get_was_under_attack() const { return was_under_attack; }
+        bool & get_mutable_was_under_attack() { return was_under_attack; }
+        void set_was_under_attack(const bool & value) { this->was_under_attack = value; }
+    };
+
     using GetMetadataResult = std::map<std::string, nlohmann::json>;
     using LinearHistory = std::vector<Message>;
     using GetModelListResult = std::vector<GetModelListResultElement>;
-    using UserCredential = nlohmann::json;
     using GetUserListResult = std::vector<GetUserListResultElement>;
 }
 }
@@ -657,6 +729,9 @@ namespace IServer {
     void from_json(const json & j, UserAdminSettings & x);
     void to_json(json & j, const UserAdminSettings & x);
 
+    void from_json(const json & j, UserCredential & x);
+    void to_json(json & j, const UserCredential & x);
+
     void from_json(const json & j, GetUserListParams & x);
     void to_json(json & j, const GetUserListParams & x);
 
@@ -671,6 +746,12 @@ namespace IServer {
 
     void from_json(const json & j, SetUserAdminSettingsParams & x);
     void to_json(json & j, const SetUserAdminSettingsParams & x);
+
+    void from_json(const json & j, ProtocolNegotiationRequest & x);
+    void to_json(json & j, const ProtocolNegotiationRequest & x);
+
+    void from_json(const json & j, ProtocolNegotiationResponse & x);
+    void to_json(json & j, const ProtocolNegotiationResponse & x);
 
     void from_json(const json & j, Type & x);
     void to_json(json & j, const Type & x);
@@ -895,6 +976,19 @@ namespace IServer {
         j["role"] = x.get_role();
     }
 
+    inline void from_json(const json & j, UserCredential& x) {
+        x.set_l(j.at("L").get<std::string>());
+        x.set_salt(j.at("salt").get<std::string>());
+        x.set_w0(j.at("w0").get<std::string>());
+    }
+
+    inline void to_json(json & j, const UserCredential & x) {
+        j = json::object();
+        j["L"] = x.get_l();
+        j["salt"] = x.get_salt();
+        j["w0"] = x.get_w0();
+    }
+
     inline void from_json(const json & j, GetUserListParams& x) {
         x.set_metadata_keys(get_stack_optional<std::vector<std::string>>(j, "metadataKeys"));
     }
@@ -936,7 +1030,7 @@ namespace IServer {
 
     inline void from_json(const json & j, NewUserParams& x) {
         x.set_admin_settings(j.at("adminSettings").get<UserAdminSettings>());
-        x.set_credential(get_untyped(j, "credential"));
+        x.set_credential(j.at("credential").get<UserCredential>());
         x.set_user_name(j.at("userName").get<std::string>());
     }
 
@@ -956,6 +1050,28 @@ namespace IServer {
         j = json::object();
         j["adminSettings"] = x.get_admin_settings();
         j["id"] = x.get_id();
+    }
+
+    inline void from_json(const json & j, ProtocolNegotiationRequest& x) {
+        x.set_turn_off_encryption(j.at("turnOffEncryption").get<bool>());
+    }
+
+    inline void to_json(json & j, const ProtocolNegotiationRequest & x) {
+        j = json::object();
+        j["turnOffEncryption"] = x.get_turn_off_encryption();
+    }
+
+    inline void from_json(const json & j, ProtocolNegotiationResponse& x) {
+        x.set_session_resumption_key(j.at("sessionResumptionKey").get<std::string>());
+        x.set_session_resumption_key_index(j.at("sessionResumptionKeyIndex").get<std::string>());
+        x.set_was_under_attack(j.at("wasUnderAttack").get<bool>());
+    }
+
+    inline void to_json(json & j, const ProtocolNegotiationResponse & x) {
+        j = json::object();
+        j["sessionResumptionKey"] = x.get_session_resumption_key();
+        j["sessionResumptionKeyIndex"] = x.get_session_resumption_key_index();
+        j["wasUnderAttack"] = x.get_was_under_attack();
     }
 
     inline void from_json(const json & j, Type & x) {
