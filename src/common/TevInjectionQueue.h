@@ -76,7 +76,7 @@ namespace TUI::Common
             {
                 throw std::runtime_error("Failed to create eventfd: " + std::string(strerror(errno)));
             }
-            _tev.SetReadHandler(_eventFd, std::bind(&TevInjectionQueue<T>::ReadHandler, this));
+            _readHandler = _tev.SetReadHandler(_eventFd, std::bind(&TevInjectionQueue<T>::ReadHandler, this));
         }
 
         void ReadHandler()
@@ -130,9 +130,12 @@ namespace TUI::Common
 
         void CloseInternal(bool isError = false)
         {
+            if (_readHandler != nullptr)
+            {
+                _readHandler.Clear();
+            }
             if (_eventFd >= 0)
             {
-                _tev.SetReadHandler(_eventFd, nullptr);
                 _eventFd = Unique::Fd(-1);
             }
             {
@@ -154,5 +157,6 @@ namespace TUI::Common
         std::queue<T> _queue{};
         std::mutex _mutex{};
         Unique::Fd _eventFd{-1};
+        Tev::FdHandler _readHandler{};
     };
 }

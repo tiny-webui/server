@@ -70,7 +70,7 @@ Http::Client::Client(Tev& tev)
 
 Http::Client::~Client()
 {
-    _tev.ClearTimeout(_curlTimeoutHandle);
+    _curlTimeout.Clear();
     for (auto&& request : _requests)
     {
         request.second.second._state->promise.Reject("Http client closed");
@@ -168,27 +168,31 @@ extern "C" int Http::Client::CurlSocketFunction(CURL*, curl_socket_t s, int what
     Client* client = static_cast<Client*>(clientp);
     try
     {
+        /**
+         * Use insert_or_assign to avoid the old handler being cleared.
+         * Is should just be an update. Which will be the case if the handler is move assigned.
+         */
         switch (what)
         {
         case CURL_POLL_IN:
-            client->_tev.SetReadHandler(s, 
-                std::bind(&Client::SocketActionHandler, client, s, 0));
-            client->_tev.SetWriteHandler(s, nullptr);
+            client->_readHandlers.insert_or_assign(s, client->_tev.SetReadHandler(s, 
+                std::bind(&Client::SocketActionHandler, client, s, 0)));
+            client->_writeHandlers.erase(s);
             break;
         case CURL_POLL_OUT:
-            client->_tev.SetReadHandler(s, nullptr);
-            client->_tev.SetWriteHandler(s, 
-                std::bind(&Client::SocketActionHandler, client, s, 0));
+            client->_readHandlers.erase(s);
+            client->_writeHandlers.insert_or_assign(s, client->_tev.SetWriteHandler(s, 
+                std::bind(&Client::SocketActionHandler, client, s, 0)));
             break;
         case CURL_POLL_INOUT:
-            client->_tev.SetReadHandler(s, 
-                std::bind(&Client::SocketActionHandler, client, s, 0));
-            client->_tev.SetWriteHandler(s, 
-                std::bind(&Client::SocketActionHandler, client, s, 0));
+            client->_readHandlers.insert_or_assign(s, client->_tev.SetReadHandler(s, 
+                std::bind(&Client::SocketActionHandler, client, s, 0)));
+            client->_writeHandlers.insert_or_assign(s, client->_tev.SetWriteHandler(s, 
+                std::bind(&Client::SocketActionHandler, client, s, 0)));
             break;
         case CURL_POLL_REMOVE:
-            client->_tev.SetReadHandler(s, nullptr);
-            client->_tev.SetWriteHandler(s, nullptr);
+            client->_readHandlers.erase(s);
+            client->_writeHandlers.erase(s);
             break;
         }
     }
@@ -204,24 +208,19 @@ extern "C" int Http::Client::CurlTimeoutFunction(CURLM*, long timeout_ms, void* 
     Client* client = static_cast<Client*>(clientp);
     try
     {
-        client->_tev.ClearTimeout(client->_curlTimeoutHandle);
-        client->_curlTimeoutHandle = 0;
+        client->_curlTimeout.Clear();
         if (timeout_ms >= 0)
         {
-            client->_curlTimeoutHandle = client->_tev.SetTimeout(
+            client->_curlTimeout = client->_tev.SetTimeout(
                 std::bind(&Client::SocketActionHandler, client, CURL_SOCKET_TIMEOUT, CURL_SOCKET_TIMEOUT),
                 timeout_ms);
-            if (client->_curlTimeoutHandle == 0)
-            {
-                return -1;
-            }
         }
         return 0;
     }
     catch(...)
     {
         /** @todo log */
-        client->_tev.ClearTimeout(client->_curlTimeoutHandle);
+        client->_curlTimeout.Clear();
         return -1;
     }
 }

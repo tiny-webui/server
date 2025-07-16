@@ -131,10 +131,6 @@ void Server::Close()
     }
     _closed = true;
     /** Clear all resumption timeouts */
-    for (auto& [_, timeoutHandle] : _resumptionKeyTimeouts)
-    {
-        _tev.ClearTimeout(timeoutHandle);
-    }
     _resumptionKeyTimeouts.clear();
     /** Clear all resumption keys so the timeouts do not get set during close */
     _sessionResumptionKeys.clear();
@@ -197,10 +193,10 @@ JS::Promise<void> Server::HandleHandshakeAsync(std::shared_ptr<IConnection<void>
     std::optional<std::string> usernameOpt;
     try
     {
-        Common::Unique::TimeoutHandle uniqueTimeoutHandle{_tev, _tev.SetTimeout(
+        auto handshakeTimeout = _tev.SetTimeout(
             [connection]() {
                 connection->Close();
-            }, AUTH_TIMEOUT_MS)};
+            }, AUTH_TIMEOUT_MS);
         std::shared_ptr<Cipher::IAuthenticationPeer> auth{nullptr};
         /** 
          * This will generate both the userId and the connectionId.'
@@ -279,7 +275,6 @@ JS::Promise<void> Server::HandleHandshakeAsync(std::shared_ptr<IConnection<void>
                             auto timeoutItem = _resumptionKeyTimeouts.find(keyIndexStr);
                             if (timeoutItem != _resumptionKeyTimeouts.end())
                             {
-                                _tev.ClearTimeout(timeoutItem->second);
                                 _resumptionKeyTimeouts.erase(timeoutItem);
                             }
                             auto item = _sessionResumptionKeys.find(keyIndexStr);
@@ -297,7 +292,6 @@ JS::Promise<void> Server::HandleHandshakeAsync(std::shared_ptr<IConnection<void>
                         throw std::runtime_error("Unknown protocol type");
                     }
                 }
-
                 auto replyOpt = auth->GetNextMessage(message);
                 if (replyOpt.has_value())
                 {
@@ -384,7 +378,7 @@ JS::Promise<void> Server::HandleHandshakeAsync(std::shared_ptr<IConnection<void>
                             }, RESUMPTION_KEY_TIMEOUT_MS);
                         self->_resumptionKeyTimeouts.emplace(
                             resumptionKeyIndexStr,
-                            resumptionKeyTimeout);
+                            std::move(resumptionKeyTimeout));
                     });
                 _connections.emplace(callerId, secureConnection);
                 /** Add the connection to the generator */

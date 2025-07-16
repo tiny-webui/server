@@ -11,10 +11,10 @@ Tev tev{};
 JS::Promise<void> DelayAsync(int ms)
 {
     JS::Promise<void> promise;
-    tev.SetTimeout([=]() mutable {
+    auto timeout = tev.SetTimeout([=]() mutable {
         promise.Resolve();
     }, ms);
-    return promise;
+    co_await promise;
 }
 
 JS::Promise<void> TestVoidSuccessAsync()
