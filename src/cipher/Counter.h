@@ -68,11 +68,6 @@ namespace TUI::Cipher
             return _value;
         }
 
-        explicit operator std::vector<uint8_t>() const
-        {
-            return std::vector<uint8_t>(_value.begin(), _value.end());
-        }
-
         Counter& operator++()
         {
             for (size_t i = 0; i < N; ++i)
@@ -111,6 +106,11 @@ namespace TUI::Cipher
         bool operator==(const Counter& other) const
         {
             return _value == other._value;
+        }
+
+        const ValueType& GetBytes() const
+        {
+            return _value;
         }
 
     private:

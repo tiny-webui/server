@@ -4,11 +4,12 @@
 #include <vector>
 #include <cstdint>
 #include <cstddef>
+#include "Counter.h"
 
-namespace TUI::Cipher::XChaCha20Poly1305
+namespace TUI::Cipher::ChaCha20Poly1305
 {
     using Key = std::array<uint8_t, 32>;
-    constexpr size_t NONCE_SIZE = 24;
+    constexpr size_t NONCE_SIZE = 12;
     constexpr size_t TAG_SIZE = 16;
 
     class Encryptor
@@ -23,7 +24,7 @@ namespace TUI::Cipher::XChaCha20Poly1305
          * @param plainText 
          * @return std::vector<uint8_t>
          *  Nonce  | CipherText | Tag
-         *   24B   |   variable | 16B
+         *   12B   |   variable | 16B
          */
         std::vector<uint8_t> Encrypt(const uint8_t* plainText, size_t size);
         std::vector<uint8_t> Encrypt(const std::vector<uint8_t>& plainText);
@@ -34,6 +35,7 @@ namespace TUI::Cipher::XChaCha20Poly1305
         }
     private:
         Key _key{};
+        Counter<NONCE_SIZE> _counter{};
     };
 
     class Decryptor
@@ -57,5 +59,6 @@ namespace TUI::Cipher::XChaCha20Poly1305
         }
     private:
         Key _key{};
+        Counter<NONCE_SIZE> _counter{};
     };
 }

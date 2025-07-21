@@ -162,15 +162,15 @@ target_include_directories(TestCounter
     PRIVATE
         ../src)
 
-add_executable(TestXChaCha20Poly1305
-    TestXChaCha20Poly1305.cpp
-    ../src/cipher/XChaCha20Poly1305.cpp)
+add_executable(TestChaCha20Poly1305
+    TestChaCha20Poly1305.cpp
+    ../src/cipher/ChaCha20Poly1305.cpp)
 
-target_include_directories(TestXChaCha20Poly1305
+target_include_directories(TestChaCha20Poly1305
     PRIVATE
         ../src)
 
-target_link_libraries(TestXChaCha20Poly1305
+target_link_libraries(TestChaCha20Poly1305
     PRIVATE
         sodium)
 
@@ -178,7 +178,7 @@ add_executable(TestEcdhePsk
     TestEcdhePsk.cpp
     ../src/cipher/EcdhePsk.cpp
     ../src/cipher/HandshakeMessage.cpp
-    ../src/cipher/XChaCha20Poly1305.cpp)
+    ../src/cipher/ChaCha20Poly1305.cpp)
 
 target_include_directories(TestEcdhePsk
     PRIVATE
@@ -204,7 +204,7 @@ add_executable(TestSpake2p
     TestSpake2p.cpp
     ../src/cipher/Spake2p.cpp
     ../src/cipher/Ed25519.cpp
-    ../src/cipher/XChaCha20Poly1305.cpp
+    ../src/cipher/ChaCha20Poly1305.cpp
     ../src/cipher/HandshakeMessage.cpp)
 
 target_include_directories(TestSpake2p
@@ -265,7 +265,7 @@ target_include_directories(TestBruteForceLimiter
 add_executable(TestSecureSession
     TestSecureSession.cpp
     ../src/application/SecureSession.cpp
-    ../src/cipher/XChaCha20Poly1305.cpp
+    ../src/cipher/ChaCha20Poly1305.cpp
     ../src/cipher/HandshakeMessage.cpp
     ../src/cipher/EcdhePsk.cpp
     ../src/cipher/Ed25519.cpp

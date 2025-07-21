@@ -6,7 +6,7 @@
 #include <sodium/crypto_kdf_hkdf_sha256.h>
 #include "Spake2p.h"
 #include "Ed25519.h"
-#include "XChaCha20Poly1305.h"
+#include "ChaCha20Poly1305.h"
 
 using namespace TUI::Cipher;
 using namespace TUI::Cipher::Spake2p;
@@ -244,7 +244,7 @@ HandshakeMessage Client::GetConfirmP(const HandshakeMessage& serverMessage)
     auto confirmPKey = HkdfExpendKey(prk, "confirmP key");
     auto confirmVKey = HkdfExpendKey(prk, "confirmV key");
     /** Decrypt confirm V */
-    XChaCha20Poly1305::Decryptor decryptor{confirmVKey};
+    ChaCha20Poly1305::Decryptor decryptor{confirmVKey};
     auto decryptedShareP = decryptor.Decrypt(cipherMessage.data() + Ed25519::Point::size, cipherMessage.size() - Ed25519::Point::size);
     if (decryptedShareP.size() != Ed25519::Point::size)
     {
@@ -258,7 +258,7 @@ HandshakeMessage Client::GetConfirmP(const HandshakeMessage& serverMessage)
         throw std::runtime_error("ShareP ConfirmV mismatch");
     }
     /** Calculate confirmP = MAC(K_confirmP, shareV) */
-    XChaCha20Poly1305::Encryptor encryptor{confirmPKey};
+    ChaCha20Poly1305::Encryptor encryptor{confirmPKey};
     auto confirmP = encryptor.Encrypt(Y.Dump());
     /** Assemble the handshake message */
     std::vector<uint8_t> cipherMessageToSend(confirmP.size(), 0);
@@ -381,7 +381,7 @@ HandshakeMessage Server::GetShareVConfirmV(const HandshakeMessage& clientMessage
     _confirmPKey = HkdfExpendKey(prk, "confirmP key");
     auto confirmVkey = HkdfExpendKey(prk, "confirmV key");
     /** Calculate confirmV = MAC(K_configmV, shareP) */
-    XChaCha20Poly1305::Encryptor encryptor{confirmVkey};
+    ChaCha20Poly1305::Encryptor encryptor{confirmVkey};
     auto confirmV = encryptor.Encrypt(X.Dump());
     /** Assemble the handshake message */
     auto shareV = _Y.value().Dump();
@@ -402,7 +402,7 @@ void Server::TakeConfirmP(const HandshakeMessage& clientMessage)
         throw std::runtime_error("Client message is missing CipherMessage element");
     }
     auto cipherMessage = std::move(cipherMessageOpt.value());
-    XChaCha20Poly1305::Decryptor decryptor{_confirmPKey};
+    ChaCha20Poly1305::Decryptor decryptor{_confirmPKey};
     auto decryptedYBytes =  decryptor.Decrypt(cipherMessage);
     if (decryptedYBytes.size() != Ed25519::Point::size)
     {

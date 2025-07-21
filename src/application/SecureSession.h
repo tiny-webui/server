@@ -11,7 +11,7 @@
 #include "network/IConnection.h"
 #include "network/IServer.h"
 #include "CallerId.h"
-#include "cipher/XChaCha20Poly1305.h"
+#include "cipher/ChaCha20Poly1305.h"
 #include "cipher/EcdhePsk.h"
 #include "cipher/FakeCredentialGenerator.h"
 #include "cipher/BruteForceLimiter.h"
@@ -26,8 +26,8 @@ namespace TUI::Application::SecureSession
         Connection(
             std::shared_ptr<Network::IConnection<void>> connection,
             const CallerId& callerId,
-            Cipher::XChaCha20Poly1305::Encryptor encryptor,
-            Cipher::XChaCha20Poly1305::Decryptor decryptor,
+            Cipher::ChaCha20Poly1305::Encryptor encryptor,
+            Cipher::ChaCha20Poly1305::Decryptor decryptor,
             bool turnOffEncryption,
             std::function<void(CallerId)> onClose);
         ~Connection() override;
@@ -45,8 +45,8 @@ namespace TUI::Application::SecureSession
     private:
         std::shared_ptr<Network::IConnection<void>> _connection;
         CallerId _callerId;
-        Cipher::XChaCha20Poly1305::Encryptor _encryptor;
-        Cipher::XChaCha20Poly1305::Decryptor _decryptor;
+        Cipher::ChaCha20Poly1305::Encryptor _encryptor;
+        Cipher::ChaCha20Poly1305::Decryptor _decryptor;
         bool _turnOffEncryption;
         std::function<void(CallerId)> _onClose;
         bool _closed{false};
