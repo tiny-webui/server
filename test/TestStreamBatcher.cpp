@@ -10,10 +10,10 @@ using namespace TUI::Common;
 JS::Promise<void> DelayAsync(Tev& tev, uint64_t delay_ms)
 {
     JS::Promise<void> promise{};
-    tev.SetTimeout([&promise]() {
+    auto timeout = tev.SetTimeout([&promise]() {
         promise.Resolve();
     }, delay_ms);
-    return promise;
+    co_await promise;
 }
 
 JS::AsyncGenerator<int, int> GenerateNumbers(Tev& tev, int n, uint64_t interval_ms)
@@ -129,8 +129,8 @@ JS::Promise<void> TestExceptionAsync(Tev& tev)
 
 JS::Promise<void> TestAsync(Tev& tev)
 {
-    // RunAsyncTest(TestBatchingAsync(tev));
-    // RunAsyncTest(TestNoBatchingAsync(tev));
+    RunAsyncTest(TestBatchingAsync(tev));
+    RunAsyncTest(TestNoBatchingAsync(tev));
     RunAsyncTest(TestExceptionAsync(tev));
 }
 

@@ -130,7 +130,8 @@ namespace TUI::Network::WebSocket
         bool _closed{false};
         std::mutex _txMutex{};                                  /** Both threads */
         std::deque<ITCMessage> _txQueue{};                      /** Both threads */
-        Common::Unique::Fd _rxEventFd{-1};                        /** Both threads */
+        Common::Unique::Fd _rxEventFd{-1};                      /** Both threads */
+        Tev::FdHandler _rxHandler{};
         std::mutex _rxMutex{};                                  /** Both threads */
         std::deque<ITCMessage> _rxQueue{};                      /** Both threads */
 

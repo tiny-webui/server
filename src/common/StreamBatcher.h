@@ -18,13 +18,13 @@ namespace TUI::Common::StreamBatcher
     };
 
     template<typename AsyncGen>
-    auto BatchStream(Tev& tev, AsyncGen source, uint64_t interval_ms)
+    auto BatchStream(Tev& tev, AsyncGen source, uint64_t intervalMs)
         -> JS::AsyncGenerator<std::list<typename async_generator_traits<AsyncGen>::value_type>,
             typename async_generator_traits<AsyncGen>::return_type>
     {
         using T = async_generator_traits<AsyncGen>::value_type;
 
-        Tev::TimeoutHandle interval_handle = 0;
+        Tev::Timeout intervalTimeout{};
         std::list<T> buffer{};
         std::optional<JS::Promise<bool>> awaitPromise{std::nullopt};
         std::optional<JS::Promise<std::optional<T>>> resultPromise{std::nullopt};
@@ -42,11 +42,7 @@ namespace TUI::Common::StreamBatcher
                     resultPromise.reset();
                     if (!value.has_value())
                     {
-                        if (interval_handle != 0)
-                        {
-                            tev.ClearTimeout(interval_handle);
-                            interval_handle = 0;
-                        }
+                        intervalTimeout.Clear();
                         ended = true;
                         if (awaitPromise.has_value())
                         {
@@ -54,13 +50,14 @@ namespace TUI::Common::StreamBatcher
                         }
                         return;
                     }
-                    if (interval_handle == 0)
+                    if (intervalTimeout == nullptr)
                     {
-                        interval_handle = tev.SetTimeout([&](){
-                            interval_handle = 0;
+                        intervalTimeout = tev.SetTimeout([&](){
+                            /** Must call this to clear the handle */
+                            intervalTimeout.Clear();
                             /** awaitPromise MUST has value here. */
                             awaitPromise->Resolve(true);
-                        }, interval_ms);
+                        }, intervalMs);
                     }
                     buffer.push_back(std::move(value.value()));
                     awaitPromise->Resolve(false);
@@ -70,11 +67,7 @@ namespace TUI::Common::StreamBatcher
                     resultPromise->Catch([&](const std::exception &) {
                         auto ref = std::move(resultPromise.value());
                         resultPromise.reset();
-                        if (interval_handle != 0)
-                        {
-                            tev.ClearTimeout(interval_handle);
-                            interval_handle = 0;
-                        }
+                        intervalTimeout.Clear();
                         exception = std::current_exception();
                         awaitPromise->Resolve(false);
                     });

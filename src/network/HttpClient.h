@@ -88,7 +88,9 @@ namespace TUI::Network::Http
         Tev& _tev;
         CurlTypes::CurlEnv _curlEnv{};
         std::unique_ptr<CurlTypes::CurlM> _curlm{nullptr};
-        Tev::TimeoutHandle _curlTimeoutHandle{0};
+        Tev::Timeout _curlTimeout{};
+        std::unordered_map<int, Tev::FdHandler> _readHandlers{};
+        std::unordered_map<int, Tev::FdHandler> _writeHandlers{};
         /** 
          * The Client MUST live longer than Curl, While Request can outlive Client.
          * Thus Client holds a shared_ptr to Curl, while Request holds a weak_ptr.

@@ -58,10 +58,11 @@ int main(int argc, char const *argv[])
         return 1;
     }
 
-    tev.SetReadHandler(exitFd, [=](){
+    Tev::FdHandler exitReadHandler{};
+    exitReadHandler = tev.SetReadHandler(exitFd, [&](){
         eventfd_t value = 0;
         eventfd_read(exitFd, &value);
-        tev.SetReadHandler(exitFd, nullptr);
+        exitReadHandler.Clear();
         close(exitFd);
         std::cout << "Closing server..." << std::endl;
         if (server)

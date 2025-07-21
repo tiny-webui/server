@@ -88,7 +88,7 @@ namespace TUI::Application::SecureSession
         std::function<std::optional<std::pair<std::string, Common::Uuid>>(const std::string&)> _getUserCredential;
         JS::AsyncGenerator<std::shared_ptr<Network::IConnection<CallerId>>> _connectionGenerator{};
         std::map<std::string, std::pair<Cipher::EcdhePsk::Psk, CallerId>> _sessionResumptionKeys{};
-        std::map<std::string, Tev::TimeoutHandle> _resumptionKeyTimeouts{};
+        std::map<std::string, Tev::Timeout> _resumptionKeyTimeouts{};
         std::unordered_map<CallerId, std::shared_ptr<Connection>> _connections{};
         bool _closed{false};
         Cipher::FakeCredentialGenerator _fakeCredentialGenerator{10000};

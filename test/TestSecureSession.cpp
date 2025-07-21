@@ -17,10 +17,10 @@ using namespace TUI::Application;
 static JS::Promise<void> DelayAsync(Tev& tev, uint64_t delayMs)
 {
     JS::Promise<void> promise;
-    tev.SetTimeout([promise]() mutable {
+    auto timeout = tev.SetTimeout([promise]() mutable {
         promise.Resolve();
     }, delayMs);
-    return promise;
+    co_await promise;
 }
 
 class TestConnection : public TUI::Network::IConnection<void>
@@ -95,10 +95,9 @@ public:
                 if (replyOpt.has_value())
                 {
                     /** Push the sending to the next cycle to break the call stack. */
-                    _tev.SetTimeout(
-                        [=, this]() {
+                    _tev.RunInNextCycle([=, this]() {
                             _messageGenerator.Feed(replyOpt->Serialize());
-                        }, 0);
+                        });
                 }
                 if (_auth->IsHandshakeComplete())
                 {
@@ -110,10 +109,9 @@ public:
                     Cipher::XChaCha20Poly1305::Encryptor encryptor{_auth->GetClientKey()};
                     auto negotiationRequestCipher = encryptor.Encrypt(negotiationRequestBytes);
                     /** Push this message after the potential last auth reply to the server */
-                    _tev.SetTimeout(
-                        [=, this]() {
+                    _tev.RunInNextCycle([=, this]() {
                             _messageGenerator.Feed(std::move(negotiationRequestCipher));
-                        }, 100);
+                        });
                 }
             }
             else
@@ -203,10 +201,9 @@ private:
          * Push the send to the next cycle to simulate the real interaction.
          * (Client & Server not on the same call stack)
          */
-        _tev.SetTimeout(
-            [=, this](){
+        _tev.RunInNextCycle([=, this](){
                 _messageGenerator.Feed(message->Serialize());
-            }, 0);
+            });
     }
 };
 

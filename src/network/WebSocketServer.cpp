@@ -119,7 +119,7 @@ Server::Server(Tev& tev, const std::string& address, int port, bool addressIsUds
         throw std::runtime_error("Failed to create LWS thread");
     }
 
-    _tev.SetReadHandler(_rxEventFd, std::bind(&Server::ITCRxCallback, this));
+    _rxHandler = _tev.SetReadHandler(_rxEventFd, std::bind(&Server::ITCRxCallback, this));
 }
 
 Server::~Server()
@@ -144,9 +144,12 @@ void Server::CloseInternal(bool closedByLws)
         return;
     }
     _closed = true;
+    if (_rxHandler != nullptr)
+    {
+        _rxHandler.Clear();
+    }
     if (_rxEventFd != -1)
     {
-        _tev.SetReadHandler(_rxEventFd, nullptr);
         _rxEventFd = Unique::Fd(-1);
     }
     if (!closedByLws)
