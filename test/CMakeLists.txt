@@ -155,6 +155,13 @@ target_include_directories(TestRpcServer
     PRIVATE
         ../src)
 
+add_executable(TestCounter
+    TestCounter.cpp)
+
+target_include_directories(TestCounter
+    PRIVATE
+        ../src)
+
 add_executable(TestXChaCha20Poly1305
     TestXChaCha20Poly1305.cpp
     ../src/cipher/XChaCha20Poly1305.cpp)
