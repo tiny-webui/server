@@ -53,8 +53,6 @@ namespace TUI::Common::StreamBatcher
                     if (intervalTimeout == nullptr)
                     {
                         intervalTimeout = tev.SetTimeout([&](){
-                            /** Must call this to clear the handle */
-                            intervalTimeout.Clear();
                             /** awaitPromise MUST has value here. */
                             awaitPromise->Resolve(true);
                         }, intervalMs);
