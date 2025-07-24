@@ -41,7 +41,6 @@ target_include_directories(tui-server
 
 target_link_libraries(tui-server
     PRIVATE
-        tev-cpp
         curl
         websockets
         sqlite3

@@ -37,8 +37,7 @@ target_include_directories(TestHttpClient
 
 target_link_libraries(TestHttpClient
     PRIVATE
-        curl
-        tev-cpp)
+        curl)
 
 add_executable(TestWebSocketServer
     TestWebSocketServer.cpp
@@ -51,7 +50,6 @@ target_include_directories(TestWebSocketServer
 
 target_link_libraries(TestWebSocketServer
     PRIVATE
-        tev-cpp
         websockets)
 
 add_executable(TestHttpStreamResponseParser
@@ -83,7 +81,6 @@ target_include_directories(TestApiProvider
 
 target_link_libraries(TestApiProvider
     PRIVATE
-        tev-cpp
         curl)
 
 add_executable(TestTevInjectionQueue
@@ -93,20 +90,12 @@ target_include_directories(TestTevInjectionQueue
     PRIVATE
         ../src)
 
-target_link_libraries(TestTevInjectionQueue
-    PRIVATE
-        tev-cpp)
-
 add_executable(TestWorkerThread
     TestWorkerThread.cpp)
 
 target_include_directories(TestWorkerThread
     PRIVATE
         ../src)
-
-target_link_libraries(TestWorkerThread
-    PRIVATE
-        tev-cpp)
 
 add_executable(TestSqlite
     TestSqlite.cpp
@@ -118,7 +107,6 @@ target_include_directories(TestSqlite
 
 target_link_libraries(TestSqlite
     PRIVATE
-        tev-cpp
         sqlite3)
 
 add_executable(TestUuid
@@ -144,7 +132,6 @@ target_include_directories(TestDatabase
 
 target_link_libraries(TestDatabase
     PRIVATE
-        tev-cpp
         sqlite3
         uuid)
 
@@ -229,10 +216,6 @@ target_include_directories(TestStreamBatcher
     PRIVATE
         ../src)
 
-target_link_libraries(TestStreamBatcher
-    PRIVATE
-        tev-cpp)
-
 add_executable(TestCache
     TestCache.cpp)
 
@@ -280,7 +263,6 @@ target_include_directories(TestSecureSession
 
 target_link_libraries(TestSecureSession
     PRIVATE
-        tev-cpp
         uuid
         sodium)
 
@@ -300,7 +282,6 @@ target_include_directories(TestService
 
 target_link_libraries(TestService
     PRIVATE
-        tev-cpp
         curl
         websockets
         sqlite3
