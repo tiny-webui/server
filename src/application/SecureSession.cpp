@@ -18,8 +18,8 @@ using namespace TUI::Application::SecureSession;
 Connection::Connection(
     std::shared_ptr<IConnection<void>> connection,
     const CallerId& callerId,
-    Cipher::XChaCha20Poly1305::Encryptor encryptor,
-    Cipher::XChaCha20Poly1305::Decryptor decryptor,
+    Cipher::ChaCha20Poly1305::Encryptor encryptor,
+    Cipher::ChaCha20Poly1305::Decryptor decryptor,
     bool turnOffEncryption,
     std::function<void(CallerId)> onClose)
     : _connection(std::move(connection)), _callerId(callerId), _encryptor(std::move(encryptor)),
@@ -307,7 +307,7 @@ JS::Promise<void> Server::HandleHandshakeAsync(std::shared_ptr<IConnection<void>
                  * So no further checks are implemented.
                  */
                 /** authentication pass. This message would be the protocol negotiation message */
-                Cipher::XChaCha20Poly1305::Decryptor decryptor{auth->GetClientKey()};
+                Cipher::ChaCha20Poly1305::Decryptor decryptor{auth->GetClientKey()};
                 auto plainTextBytes = decryptor.Decrypt(data);
                 std::string plainText(plainTextBytes.begin(), plainTextBytes.end());
                 auto negotiationRequest = nlohmann::json::parse(plainText).get<Schema::IServer::ProtocolNegotiationRequest>();
@@ -341,7 +341,7 @@ JS::Promise<void> Server::HandleHandshakeAsync(std::shared_ptr<IConnection<void>
                 /** Reply negotiation. This will always be encrypted no matter how turnOffEncryption is set */
                 auto negotiationResponseStr = static_cast<nlohmann::json>(negotiationResponse).dump();
                 std::vector<uint8_t> negotiationResponseBytes(negotiationResponseStr.begin(), negotiationResponseStr.end());
-                Cipher::XChaCha20Poly1305::Encryptor encryptor{auth->GetServerKey()};
+                Cipher::ChaCha20Poly1305::Encryptor encryptor{auth->GetServerKey()};
                 auto negotiationResponseCipher = encryptor.Encrypt(negotiationResponseBytes);
                 connection->Send(std::move(negotiationResponseCipher));
                 /** Create the secure connection */

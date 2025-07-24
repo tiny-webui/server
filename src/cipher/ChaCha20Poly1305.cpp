@@ -1,13 +1,13 @@
 #include <stdexcept>
-#include <sodium/crypto_aead_xchacha20poly1305.h>
+#include <sodium/crypto_aead_chacha20poly1305.h>
 #include <sodium/randombytes.h>
-#include "XChaCha20Poly1305.h"
+#include "ChaCha20Poly1305.h"
 
-using namespace TUI::Cipher::XChaCha20Poly1305;
+using namespace TUI::Cipher::ChaCha20Poly1305;
 
-static_assert(sizeof(Key) == crypto_aead_xchacha20poly1305_ietf_KEYBYTES, "Key size mismatch");
-static_assert(NONCE_SIZE == crypto_aead_xchacha20poly1305_ietf_NPUBBYTES, "Nonce size mismatch");
-static_assert(TAG_SIZE == crypto_aead_xchacha20poly1305_ietf_ABYTES, "Tag size mismatch");
+static_assert(sizeof(Key) == crypto_aead_chacha20poly1305_ietf_KEYBYTES, "Key size mismatch");
+static_assert(NONCE_SIZE == crypto_aead_chacha20poly1305_IETF_NPUBBYTES, "Nonce size mismatch");
+static_assert(TAG_SIZE == crypto_aead_chacha20poly1305_ietf_ABYTES, "Tag size mismatch");
 
 Encryptor::Encryptor(const Key& key)
     : _key(key)
@@ -27,9 +27,12 @@ Encryptor::Encryptor(const std::vector<uint8_t>& key)
 std::vector<uint8_t> Encryptor::Encrypt(const uint8_t* plainText, size_t size)
 {
     std::vector<uint8_t> cipherText(NONCE_SIZE + size + TAG_SIZE, 0);
-    randombytes_buf(cipherText.data(), NONCE_SIZE);
+    const auto& nonce = _counter.GetBytes();
+    /** Increment the counter first to start with 1 */
+    _counter++;
+    std::copy(nonce.begin(), nonce.end(), cipherText.begin());
     unsigned long long outputLen = 0;
-    int rc = crypto_aead_xchacha20poly1305_ietf_encrypt(
+    int rc = crypto_aead_chacha20poly1305_ietf_encrypt(
         cipherText.data() + NONCE_SIZE, &outputLen,
         plainText, size,
         nullptr, 0,
@@ -70,9 +73,15 @@ std::vector<uint8_t> Decryptor::Decrypt(const uint8_t* cipherText, size_t size)
     {
         throw std::invalid_argument("Ciphertext too short");
     }
+    /** Check the counter first */
+    Cipher::Counter<NONCE_SIZE> counter(cipherText, NONCE_SIZE);
+    if (counter <= _counter)
+    {
+        throw std::runtime_error("Replay message detected");
+    }
     std::vector<uint8_t> plainText(size - NONCE_SIZE - TAG_SIZE, 0);
     unsigned long long outputLen = 0;
-    int rc = crypto_aead_xchacha20poly1305_ietf_decrypt(
+    int rc = crypto_aead_chacha20poly1305_ietf_decrypt(
         plainText.data(), &outputLen,
         nullptr, 
         cipherText + NONCE_SIZE, size - NONCE_SIZE,
@@ -83,6 +92,8 @@ std::vector<uint8_t> Decryptor::Decrypt(const uint8_t* cipherText, size_t size)
     {
         throw std::runtime_error("Decryption failed");
     }
+    /** Update the counter only if the message is valid */
+    _counter = counter;
     return plainText;
 }
 

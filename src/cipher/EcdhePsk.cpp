@@ -5,12 +5,12 @@
 #include <sodium/crypto_generichash.h>
 #include <sodium/crypto_kdf_hkdf_sha256.h>
 #include "EcdhePsk.h"
-#include "XChaCha20Poly1305.h"
+#include "ChaCha20Poly1305.h"
 
 using namespace TUI::Cipher;
 using namespace TUI::Cipher::EcdhePsk;
 
-static_assert(IAuthenticationPeer::KEY_SIZE == sizeof(XChaCha20Poly1305::Key), "Key size mismatch");
+static_assert(IAuthenticationPeer::KEY_SIZE == sizeof(ChaCha20Poly1305::Key), "Key size mismatch");
 static_assert(PUBKEY_SIZE == crypto_kx_PUBLICKEYBYTES, "Public key size mismatch");
 static_assert(PRIKEY_SIZE == crypto_kx_SECRETKEYBYTES, "Private key size mismatch");
 static_assert(PUBKEY_SIZE == crypto_scalarmult_BYTES, "Public key size mismatch for scalar multiplication");
@@ -172,7 +172,7 @@ HandshakeMessage Client::TakeServerMessage(const HandshakeMessage& handshakeMess
     /** Generate client confirmation message */
     std::vector<uint8_t> clientConfirmMessage{};
     {
-        XChaCha20Poly1305::Encryptor encryptor{clientConfirmKey};
+        ChaCha20Poly1305::Encryptor encryptor{clientConfirmKey};
         clientConfirmMessage = encryptor.Encrypt(_transcriptHash);
     }
     /** Assemble handshake message */
@@ -190,7 +190,7 @@ void Client::TakeServerConfirmation(const HandshakeMessage& handshakeMessage)
         throw std::runtime_error("Server confirmation is missing CipherMessage element");
     }
     auto serverConfirm = serverConfirmOpt.value();
-    XChaCha20Poly1305::Decryptor decryptor{_serverConfirmKey};
+    ChaCha20Poly1305::Decryptor decryptor{_serverConfirmKey};
     auto decryptedHash = decryptor.Decrypt(serverConfirm);
     if (!std::equal(
         decryptedHash.begin(), decryptedHash.end(),
@@ -326,7 +326,7 @@ HandshakeMessage Server::TakeClientConfirmation(const HandshakeMessage& handshak
             throw std::runtime_error("Client confirmation is missing CipherMessage element");
         }
         auto clientConfirm = clientConfirmOpt.value();
-        XChaCha20Poly1305::Decryptor decryptor{_clientConfirmKey};
+        ChaCha20Poly1305::Decryptor decryptor{_clientConfirmKey};
         auto decryptedHash = decryptor.Decrypt(clientConfirm);
         if (!std::equal(
             decryptedHash.begin(), decryptedHash.end(),
@@ -338,7 +338,7 @@ HandshakeMessage Server::TakeClientConfirmation(const HandshakeMessage& handshak
     /** Generate server confirm */
     std::vector<uint8_t> cipherMessage{};
     {
-        XChaCha20Poly1305::Encryptor encryptor{_serverConfirmKey};
+        ChaCha20Poly1305::Encryptor encryptor{_serverConfirmKey};
         cipherMessage = encryptor.Encrypt(_transcriptHash);
     }
     /** Assemble handshake message */

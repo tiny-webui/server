@@ -106,7 +106,7 @@ public:
                     negotiationRequest.set_turn_off_encryption(false);
                     auto negotiationRequestStr = static_cast<nlohmann::json>(negotiationRequest).dump();
                     std::vector<uint8_t> negotiationRequestBytes(negotiationRequestStr.begin(), negotiationRequestStr.end());
-                    Cipher::XChaCha20Poly1305::Encryptor encryptor{_auth->GetClientKey()};
+                    Cipher::ChaCha20Poly1305::Encryptor encryptor{_auth->GetClientKey()};
                     auto negotiationRequestCipher = encryptor.Encrypt(negotiationRequestBytes);
                     /** Push this message after the potential last auth reply to the server */
                     _tev.RunInNextCycle([=, this]() {
@@ -117,7 +117,7 @@ public:
             else
             {
                 /** Protocol negotiation message */
-                Cipher::XChaCha20Poly1305::Decryptor decryptor{_auth->GetServerKey()};
+                Cipher::ChaCha20Poly1305::Decryptor decryptor{_auth->GetServerKey()};
                 auto decryptedMessage = decryptor.Decrypt(message);
                 std::string decryptedMessageStr(decryptedMessage.begin(), decryptedMessage.end());
                 auto negotiationResponse = nlohmann::json::parse(decryptedMessageStr).get<Schema::IServer::ProtocolNegotiationResponse>();

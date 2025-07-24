@@ -1,8 +1,8 @@
 #include <iostream>
-#include "cipher/XChaCha20Poly1305.h"
+#include "cipher/ChaCha20Poly1305.h"
 #include "Utility.h"
 
-using namespace TUI::Cipher::XChaCha20Poly1305;
+using namespace TUI::Cipher::ChaCha20Poly1305;
 
 int main(int argc, char const *argv[])
 {
