@@ -75,6 +75,25 @@ namespace TUI::Common
             _elements[type] = std::move(value);
         }
 
+        template<size_t N>
+        void SetElement(E type, const std::array<uint8_t, N>& value)
+        {
+            if (N > static_cast<size_t>(std::numeric_limits<LengthType>::max()))
+            {
+                throw std::invalid_argument("Value size exceeds maximum length");
+            }
+            _elements[type] = std::vector<uint8_t>(value.begin(), value.end());
+        }
+
+        void SetElement(E type, const std::string& value)
+        {
+            if (value.size() > static_cast<size_t>(std::numeric_limits<LengthType>::max()))
+            {
+                throw std::invalid_argument("Value size exceeds maximum length");
+            }
+            _elements[type] = std::vector<uint8_t>(value.begin(), value.end());
+        }
+
         std::optional<std::vector<uint8_t>> GetElement(E type) const
         {
             auto item = _elements.find(type);

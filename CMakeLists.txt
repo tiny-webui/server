@@ -49,3 +49,20 @@ target_link_libraries(tui-server
         sqlite3
         uuid
         sodium)
+
+add_executable(tui-register
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/tui-register.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/common/Base64.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/common/Timestamp.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/common/Utf8.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/database/Database.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/database/Sqlite.cpp)
+
+target_include_directories(tui-register
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src)
+
+target_link_libraries(tui-register
+    PRIVATE
+        sqlite3
+        uuid)

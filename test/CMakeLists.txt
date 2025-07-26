@@ -282,6 +282,30 @@ target_include_directories(TestTlv
     PRIVATE
         ../src)
 
+add_executable(TestUtf8
+    TestUtf8.cpp
+    ../src/common/Utf8.cpp)
+
+target_include_directories(TestUtf8
+    PRIVATE
+        ../src)
+
+add_executable(TestRegister
+    TestRegister.cpp
+    ../src/cipher/ChaCha20Poly1305.cpp
+    ../src/cipher/Ed25519.cpp
+    ../src/cipher/HandshakeMessage.cpp
+    ../src/cipher/Spake2p.cpp
+    ../src/common/Base64.cpp)
+
+target_include_directories(TestRegister
+    PRIVATE
+        ../src)
+
+target_link_libraries(TestRegister
+    PRIVATE
+        sodium)
+
 # Get all .cpp files from ../src except main.cpp
 file(GLOB_RECURSE TEST_SERVICE_SRC_FILES 
     ${CMAKE_CURRENT_SOURCE_DIR}/../src/*.cpp)
