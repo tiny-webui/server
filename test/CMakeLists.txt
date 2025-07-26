@@ -124,7 +124,7 @@ add_executable(TestDatabase
     TestDatabase.cpp
     ../src/database/Database.cpp
     ../src/database/Sqlite.cpp
-    ../src/common/Utilities.cpp)
+    ../src/common/Timestamp.cpp)
 
 target_include_directories(TestDatabase
     PRIVATE
@@ -239,7 +239,7 @@ target_link_libraries(TestFakeCredentialGenerator
 add_executable(TestBruteForceLimiter
     TestBruteForceLimiter.cpp
     ../src/cipher/BruteForceLimiter.cpp
-    ../src/common/Utilities.cpp)
+    ../src/common/Timestamp.cpp)
 
 target_include_directories(TestBruteForceLimiter
     PRIVATE
@@ -255,7 +255,8 @@ add_executable(TestSecureSession
     ../src/cipher/Spake2p.cpp
     ../src/cipher/FakeCredentialGenerator.cpp
     ../src/cipher/BruteForceLimiter.cpp
-    ../src/common/Utilities.cpp)
+    ../src/common/Base64.cpp
+    ../src/common/Timestamp.cpp)
 
 target_include_directories(TestSecureSession
     PRIVATE
@@ -266,11 +267,27 @@ target_link_libraries(TestSecureSession
         uuid
         sodium)
 
+add_executable(TestBase64
+    TestBase64.cpp
+    ../src/common/Base64.cpp)
+
+target_include_directories(TestBase64
+    PRIVATE
+        ../src)
+
+add_executable(TestTlv
+    TestTlv.cpp)
+
+target_include_directories(TestTlv
+    PRIVATE
+        ../src)
+
 # Get all .cpp files from ../src except main.cpp
 file(GLOB_RECURSE TEST_SERVICE_SRC_FILES 
     ${CMAKE_CURRENT_SOURCE_DIR}/../src/*.cpp)
 list(REMOVE_ITEM TEST_SERVICE_SRC_FILES 
-    ${CMAKE_CURRENT_SOURCE_DIR}/../src/main.cpp)
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/tui-server.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/tui-register.cpp)
 
 add_executable(TestService
     TestService.cpp

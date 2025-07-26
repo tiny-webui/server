@@ -1,6 +1,6 @@
 #include <format>
 #include "Database.h"
-#include "common/Utilities.h"
+#include "common/Timestamp.h"
 
 using namespace TUI::Common;
 using namespace TUI::Database;
@@ -255,7 +255,7 @@ JS::Promise<Uuid> Database::CreateChatAsync(const Uuid& userId)
     Uuid id{};
     co_await _db->ExecAsync(
         "INSERT INTO chat (timestamp, user_id, id) VALUES(?, ?, ?);",
-        Utilities::GetTimestamp(), 
+        Timestamp::GetWallClock(), 
         static_cast<std::string>(userId),
         static_cast<std::string>(id));
     co_return id;
@@ -404,7 +404,7 @@ JS::Promise<void> Database::SetStringToChatAsync(
     co_await _db->ExecAsync(
         sql,
         std::move(value),
-        Utilities::GetTimestamp(),
+        Timestamp::GetWallClock(),
         static_cast<std::string>(userId),
         static_cast<std::string>(id));
 }

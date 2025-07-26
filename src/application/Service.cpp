@@ -1,7 +1,7 @@
 #include "Service.h"
 #include "apiProvider/Factory.h"
 #include "network/HttpStreamResponseParser.h"
-#include "common/Utilities.h"
+#include "common/Timestamp.h"
 #include "common/StreamBatcher.h"
 
 using namespace TUI;
@@ -449,7 +449,7 @@ JS::AsyncGenerator<nlohmann::json, nlohmann::json> Service::OnChatCompletionAsyn
     auto lock = _resourceVersionManager->GetWriteLock(
         {"chat", static_cast<std::string>(callerId.userId), static_cast<std::string>(chatId)}, callerId);
 
-    int64_t userMessageTimestamp = Common::Utilities::GetTimestamp();
+    int64_t userMessageTimestamp = Common::Timestamp::GetWallClock();
     /** Construct the linear history from the tree history and the new user message */
     Schema::IServer::TreeHistory treeHistory{};
     {
@@ -558,7 +558,7 @@ JS::AsyncGenerator<nlohmann::json, nlohmann::json> Service::OnChatCompletionAsyn
         responseMessage.set_content(std::move(responseContents));
         responseNode.set_message(std::move(responseMessage));
         responseNode.set_parent(static_cast<std::string>(userMessageId));
-        responseNode.set_timestamp(static_cast<double>(Common::Utilities::GetTimestamp()));
+        responseNode.set_timestamp(static_cast<double>(Common::Timestamp::GetWallClock()));
         nodes.emplace(static_cast<std::string>(responseMessageId), std::move(responseNode));
 
         Schema::IServer::MessageNode userNode{};
