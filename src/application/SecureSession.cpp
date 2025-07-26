@@ -5,7 +5,7 @@
 #include "cipher/EcdhePsk.h"
 #include "cipher/HandshakeMessage.h"
 #include "schema/IServer.h"
-#include "common/Utilities.h"
+#include "common/Base64.h"
 #include "common/UniqueTypes.h"
 
 using namespace TUI;
@@ -253,15 +253,15 @@ JS::Promise<void> Server::HandleHandshakeAsync(std::shared_ptr<IConnection<void>
                                     result = _fakeCredentialGenerator.GetFakeCredential(username);
                                     auto pair = std::move(pairOpt.value());
                                     auto userCredential = nlohmann::json::parse(pair.first).get<Schema::IServer::UserCredential>();
-                                    result.salt = Common::Utilities::HexToBytes<sizeof(result.salt)>(userCredential.get_salt());
+                                    result.salt = Common::Base64::Decode<sizeof(result.salt)>(userCredential.get_salt());
                                 }
                                 else
                                 {
                                     auto pair = std::move(pairOpt.value());
                                     auto userCredential = nlohmann::json::parse(pair.first).get<Schema::IServer::UserCredential>();
-                                    result.w0 = Common::Utilities::HexToBytes<sizeof(result.w0)>(userCredential.get_w0());
-                                    result.L = Common::Utilities::HexToBytes<sizeof(result.L)>(userCredential.get_l());
-                                    result.salt = Common::Utilities::HexToBytes<sizeof(result.salt)>(userCredential.get_salt());
+                                    result.w0 = Common::Base64::Decode<sizeof(result.w0)>(userCredential.get_w0());
+                                    result.L = Common::Base64::Decode<sizeof(result.L)>(userCredential.get_l());
+                                    result.salt = Common::Base64::Decode<sizeof(result.salt)>(userCredential.get_salt());
                                     callerId.userId = pair.second;
                                 }
                                 usernameOpt = username;
@@ -326,7 +326,7 @@ JS::Promise<void> Server::HandleHandshakeAsync(std::shared_ptr<IConnection<void>
                 auto resumptionKey = Cipher::EcdhePsk::GeneratePsk();
                 Schema::IServer::ProtocolNegotiationResponse negotiationResponse;
                 negotiationResponse.set_session_resumption_key_index(static_cast<std::string>(resumptionKeyIndex));
-                negotiationResponse.set_session_resumption_key(Common::Utilities::BytesToHex(resumptionKey));
+                negotiationResponse.set_session_resumption_key(Common::Base64::Encode(resumptionKey));
                 negotiationResponse.set_was_under_attack(false);
                 if (usernameOpt.has_value())
                 {

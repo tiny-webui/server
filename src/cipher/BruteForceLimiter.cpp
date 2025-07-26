@@ -1,5 +1,6 @@
-#include "common/Utilities.h"
+#include "common/Timestamp.h"
 #include "BruteForceLimiter.h"
+#include <stdexcept>
 
 using namespace TUI::Cipher;
 
@@ -23,7 +24,7 @@ void BruteForceLimiter::LogInvalidLogin(const std::string& username)
         }
     }
     auto& state = item->second;
-    int64_t currentTimeMs = Common::Utilities::GetMonotonicTimestamp();
+    int64_t currentTimeMs = Common::Timestamp::GetMonotonic();
     if (state.nextValidTimeMs > currentTimeMs)
     {
         /** Still blocked. No need to update the timeout. */
@@ -76,7 +77,7 @@ bool BruteForceLimiter::IsBlocked(const std::string& username) const
     {
         return false;
     }
-    int64_t currentTimeMs = Common::Utilities::GetMonotonicTimestamp();
+    int64_t currentTimeMs = Common::Timestamp::GetMonotonic();
     return currentTimeMs < item->second.nextValidTimeMs;
 }
 

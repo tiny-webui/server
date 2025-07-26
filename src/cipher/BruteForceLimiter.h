@@ -2,7 +2,6 @@
 
 #include <unordered_map>
 #include <string>
-#include "common/Utilities.h"
 
 /**
  * The brute force limiter silently limits the frequency of brute force attacks on valid usernames.

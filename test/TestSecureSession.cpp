@@ -8,7 +8,7 @@
 #include "network/IServer.h"
 #include "cipher/Spake2p.h"
 #include "schema/IServer.h"
-#include "common/Utilities.h"
+#include "common/Base64.h"
 #include "Utility.h"
 
 using namespace TUI;
@@ -124,7 +124,7 @@ public:
                 auto newResumptionKeyIndexStr = negotiationResponse.get_session_resumption_key_index();
                 _newResumptionKeyIndex.emplace(
                     newResumptionKeyIndexStr.begin(), newResumptionKeyIndexStr.end());
-                _newResumptionKey = Common::Utilities::HexToBytes<sizeof(Cipher::EcdhePsk::Psk)>(negotiationResponse.get_session_resumption_key());
+                _newResumptionKey = Common::Base64::Decode<sizeof(Cipher::EcdhePsk::Psk)>(negotiationResponse.get_session_resumption_key());
                 _handshakeComplete = true;
                 _handshakePromise.Resolve();
             }
@@ -366,9 +366,9 @@ JS::Promise<void> TestFlowAsync(Tev& tev)
     Common::Uuid userId{};
     auto registration = Cipher::Spake2p::Register(username, password);
     Schema::IServer::UserCredential userCredential;
-    userCredential.set_w0(Common::Utilities::BytesToHex(registration.w0));
-    userCredential.set_l(Common::Utilities::BytesToHex(registration.L));
-    userCredential.set_salt(Common::Utilities::BytesToHex(registration.salt));
+    userCredential.set_w0(Common::Base64::Encode(registration.w0));
+    userCredential.set_l(Common::Base64::Encode(registration.L));
+    userCredential.set_salt(Common::Base64::Encode(registration.salt));
     auto userCredentialStr = static_cast<nlohmann::json>(userCredential).dump();
     auto testServer = std::make_shared<TestServer>(tev, username, password);
     auto secureSessionServer = SecureSession::Server::Create(

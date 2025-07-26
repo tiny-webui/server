@@ -37,8 +37,7 @@ target_include_directories(TestHttpClient
 
 target_link_libraries(TestHttpClient
     PRIVATE
-        curl
-        tev-cpp)
+        curl)
 
 add_executable(TestWebSocketServer
     TestWebSocketServer.cpp
@@ -51,7 +50,6 @@ target_include_directories(TestWebSocketServer
 
 target_link_libraries(TestWebSocketServer
     PRIVATE
-        tev-cpp
         websockets)
 
 add_executable(TestHttpStreamResponseParser
@@ -83,7 +81,6 @@ target_include_directories(TestApiProvider
 
 target_link_libraries(TestApiProvider
     PRIVATE
-        tev-cpp
         curl)
 
 add_executable(TestTevInjectionQueue
@@ -93,20 +90,12 @@ target_include_directories(TestTevInjectionQueue
     PRIVATE
         ../src)
 
-target_link_libraries(TestTevInjectionQueue
-    PRIVATE
-        tev-cpp)
-
 add_executable(TestWorkerThread
     TestWorkerThread.cpp)
 
 target_include_directories(TestWorkerThread
     PRIVATE
         ../src)
-
-target_link_libraries(TestWorkerThread
-    PRIVATE
-        tev-cpp)
 
 add_executable(TestSqlite
     TestSqlite.cpp
@@ -118,7 +107,6 @@ target_include_directories(TestSqlite
 
 target_link_libraries(TestSqlite
     PRIVATE
-        tev-cpp
         sqlite3)
 
 add_executable(TestUuid
@@ -136,7 +124,7 @@ add_executable(TestDatabase
     TestDatabase.cpp
     ../src/database/Database.cpp
     ../src/database/Sqlite.cpp
-    ../src/common/Utilities.cpp)
+    ../src/common/Timestamp.cpp)
 
 target_include_directories(TestDatabase
     PRIVATE
@@ -144,7 +132,6 @@ target_include_directories(TestDatabase
 
 target_link_libraries(TestDatabase
     PRIVATE
-        tev-cpp
         sqlite3
         uuid)
 
@@ -229,10 +216,6 @@ target_include_directories(TestStreamBatcher
     PRIVATE
         ../src)
 
-target_link_libraries(TestStreamBatcher
-    PRIVATE
-        tev-cpp)
-
 add_executable(TestCache
     TestCache.cpp)
 
@@ -256,7 +239,7 @@ target_link_libraries(TestFakeCredentialGenerator
 add_executable(TestBruteForceLimiter
     TestBruteForceLimiter.cpp
     ../src/cipher/BruteForceLimiter.cpp
-    ../src/common/Utilities.cpp)
+    ../src/common/Timestamp.cpp)
 
 target_include_directories(TestBruteForceLimiter
     PRIVATE
@@ -272,7 +255,8 @@ add_executable(TestSecureSession
     ../src/cipher/Spake2p.cpp
     ../src/cipher/FakeCredentialGenerator.cpp
     ../src/cipher/BruteForceLimiter.cpp
-    ../src/common/Utilities.cpp)
+    ../src/common/Base64.cpp
+    ../src/common/Timestamp.cpp)
 
 target_include_directories(TestSecureSession
     PRIVATE
@@ -280,15 +264,54 @@ target_include_directories(TestSecureSession
 
 target_link_libraries(TestSecureSession
     PRIVATE
-        tev-cpp
         uuid
+        sodium)
+
+add_executable(TestBase64
+    TestBase64.cpp
+    ../src/common/Base64.cpp)
+
+target_include_directories(TestBase64
+    PRIVATE
+        ../src)
+
+add_executable(TestTlv
+    TestTlv.cpp)
+
+target_include_directories(TestTlv
+    PRIVATE
+        ../src)
+
+add_executable(TestUtf8
+    TestUtf8.cpp
+    ../src/common/Utf8.cpp)
+
+target_include_directories(TestUtf8
+    PRIVATE
+        ../src)
+
+add_executable(TestRegister
+    TestRegister.cpp
+    ../src/cipher/ChaCha20Poly1305.cpp
+    ../src/cipher/Ed25519.cpp
+    ../src/cipher/HandshakeMessage.cpp
+    ../src/cipher/Spake2p.cpp
+    ../src/common/Base64.cpp)
+
+target_include_directories(TestRegister
+    PRIVATE
+        ../src)
+
+target_link_libraries(TestRegister
+    PRIVATE
         sodium)
 
 # Get all .cpp files from ../src except main.cpp
 file(GLOB_RECURSE TEST_SERVICE_SRC_FILES 
     ${CMAKE_CURRENT_SOURCE_DIR}/../src/*.cpp)
 list(REMOVE_ITEM TEST_SERVICE_SRC_FILES 
-    ${CMAKE_CURRENT_SOURCE_DIR}/../src/main.cpp)
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/tui-server.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/tui-register.cpp)
 
 add_executable(TestService
     TestService.cpp
@@ -300,7 +323,6 @@ target_include_directories(TestService
 
 target_link_libraries(TestService
     PRIVATE
-        tev-cpp
         curl
         websockets
         sqlite3
