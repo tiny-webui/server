@@ -33,6 +33,9 @@ file(GLOB_RECURSE SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp")
 file(GLOB_RECURSE SCHEMA_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/schema/src/*.cpp")
 list(REMOVE_ITEM SOURCES ${SCHEMA_SOURCES})
 
+# Remove the tui-register.cpp entry
+list(REMOVE_ITEM SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/tui-register.cpp")
+
 add_executable(tui-server ${SOURCES})
 
 target_include_directories(tui-server
