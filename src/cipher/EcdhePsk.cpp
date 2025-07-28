@@ -17,8 +17,8 @@ static_assert(PUBKEY_SIZE == crypto_scalarmult_BYTES, "Public key size mismatch 
 static_assert(HASH_SIZE == crypto_generichash_BYTES, "Hash size mismatch");
 
 static std::array<uint8_t, crypto_generichash_BYTES> GetTranscriptHash(
-    const HandshakeMessage& clientMessage,
-    const HandshakeMessage& serverMessage)
+    const HandshakeMessage::Message& clientMessage,
+    const HandshakeMessage::Message& serverMessage)
 {
     auto clientMessageBytes = clientMessage.Serialize();
     auto serverMessageBytes = serverMessage.Serialize();
@@ -115,7 +115,7 @@ Client::Client(
     }
 }
 
-HandshakeMessage Client::GetClientMessage()
+HandshakeMessage::Message Client::GetClientMessage()
 {
     auto marker = _stepChecker->CheckStep(Step::Init, Step::ClientMessage);
     /** Generate key pair */
@@ -133,11 +133,12 @@ HandshakeMessage Client::GetClientMessage()
     /** Assemble handshake message */
     _firstMessageAdditionalElements.emplace(
         HandshakeMessage::Type::CipherMessage, std::move(clientMessage));
-    _clientMessage = HandshakeMessage(_firstMessageAdditionalElements);
+    _clientMessage = HandshakeMessage::Message(_firstMessageAdditionalElements);
     return _clientMessage.value();
 }
 
-HandshakeMessage Client::TakeServerMessage(const HandshakeMessage& handshakeMessage)
+HandshakeMessage::Message Client::TakeServerMessage(
+    const HandshakeMessage::Message& handshakeMessage)
 {
     auto marker = _stepChecker->CheckStep(Step::ClientMessage, Step::ServerMessage);
     auto serverMessageOpt = handshakeMessage.GetElement(HandshakeMessage::Type::CipherMessage);
@@ -176,12 +177,13 @@ HandshakeMessage Client::TakeServerMessage(const HandshakeMessage& handshakeMess
         clientConfirmMessage = encryptor.Encrypt(_transcriptHash);
     }
     /** Assemble handshake message */
-    HandshakeMessage clientConfirmation{
+    HandshakeMessage::Message clientConfirmation{
         {{HandshakeMessage::Type::CipherMessage, std::move(clientConfirmMessage)}}};
     return clientConfirmation;
 }
 
-void Client::TakeServerConfirmation(const HandshakeMessage& handshakeMessage)
+void Client::TakeServerConfirmation(
+    const HandshakeMessage::Message& handshakeMessage)
 {
     auto marker = _stepChecker->CheckStep(Step::ServerMessage, Step::ServerConfirmation);
     auto serverConfirmOpt = handshakeMessage.GetElement(HandshakeMessage::Type::CipherMessage);
@@ -200,8 +202,8 @@ void Client::TakeServerConfirmation(const HandshakeMessage& handshakeMessage)
     }
 }
 
-std::optional<HandshakeMessage> Client::GetNextMessage(
-    const std::optional<HandshakeMessage>& peerMessage)
+std::optional<HandshakeMessage::Message> Client::GetNextMessage(
+    const std::optional<HandshakeMessage::Message>& peerMessage)
 {
     switch (_numCalls++)
     {
@@ -258,7 +260,8 @@ Server::Server(
     }
 }
 
-HandshakeMessage Server::TakeClientMessage(const HandshakeMessage& handshakeMessage)
+HandshakeMessage::Message Server::TakeClientMessage(
+    const HandshakeMessage::Message& handshakeMessage)
 {
     auto marker = _stepChecker->CheckStep(Step::Init, Step::ClientMessage);
     auto keyIndexOpt = handshakeMessage.GetElement(HandshakeMessage::Type::KeyIndex);
@@ -291,7 +294,7 @@ HandshakeMessage Server::TakeClientMessage(const HandshakeMessage& handshakeMess
         std::copy(nonce.begin(), nonce.end(), cipherMessage.begin() + PUBKEY_SIZE);
     }
     /** Assemble handshake message */
-    HandshakeMessage serverMessage{
+    HandshakeMessage::Message serverMessage{
         {{HandshakeMessage::Type::CipherMessage, std::move(cipherMessage)}}}; 
     /** Calculate Z */
     std::array<uint8_t, PUBKEY_SIZE> Z{};
@@ -315,7 +318,8 @@ HandshakeMessage Server::TakeClientMessage(const HandshakeMessage& handshakeMess
     return serverMessage;
 }
 
-HandshakeMessage Server::TakeClientConfirmation(const HandshakeMessage& handshakeMessage)
+HandshakeMessage::Message Server::TakeClientConfirmation(
+    const HandshakeMessage::Message& handshakeMessage)
 {
     auto marker = _stepChecker->CheckStep(Step::ClientMessage, Step::ClientConfirmation);
     /** validate client confirm */
@@ -342,13 +346,13 @@ HandshakeMessage Server::TakeClientConfirmation(const HandshakeMessage& handshak
         cipherMessage = encryptor.Encrypt(_transcriptHash);
     }
     /** Assemble handshake message */
-    HandshakeMessage serverConfirmation{
+    HandshakeMessage::Message serverConfirmation{
         {{HandshakeMessage::Type::CipherMessage, std::move(cipherMessage)}}};
     return serverConfirmation;
 }
 
-std::optional<HandshakeMessage> Server::GetNextMessage(
-    const std::optional<HandshakeMessage>& peerMessage)
+std::optional<HandshakeMessage::Message> Server::GetNextMessage(
+    const std::optional<HandshakeMessage::Message>& peerMessage)
 {
     switch (_numCalls++)
     {

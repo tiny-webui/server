@@ -66,6 +66,11 @@ namespace TUI::Common
 
         Tlv() = default;
 
+        explicit Tlv(std::map<E, std::vector<uint8_t>> elements)
+            : _elements(std::move(elements))
+        {
+        }
+
         void SetElement(E type, std::vector<uint8_t> value)
         {
             if (value.size() > static_cast<size_t>(std::numeric_limits<LengthType>::max()))
@@ -114,6 +119,7 @@ namespace TUI::Common
             }
             std::vector<uint8_t> serializedData;
             serializedData.reserve(totalSize);
+            /** _elements is an ordered map. Which will keep the results same for the same tlv. */
             for (const auto& item : _elements)
             {
                 EnumValueType typeValue = static_cast<EnumValueType>(item.first);

@@ -167,19 +167,20 @@ Client::Client(
     }
 }
 
-HandshakeMessage Client::RetrieveSalt()
+HandshakeMessage::Message Client::RetrieveSalt()
 {
     auto marker = _stepChecker->CheckStep(Step::Init, Step::RetrieveSalt);
     /** DO NOT include the null termination */
     std::vector<uint8_t> keyIndex(_username.begin(), _username.end());
     _firstMessageAdditionalElements.emplace(
         HandshakeMessage::Type::KeyIndex, std::move(keyIndex));
-    HandshakeMessage message{_firstMessageAdditionalElements};
+    HandshakeMessage::Message message{_firstMessageAdditionalElements};
     _firstMessageAdditionalElements.clear();
     return message;
 }
 
-HandshakeMessage Client::GetShareP(const HandshakeMessage& serverMessage)
+HandshakeMessage::Message Client::GetShareP(
+    const HandshakeMessage::Message& serverMessage)
 {
     auto marker = _stepChecker->CheckStep(Step::RetrieveSalt, Step::ShareP);
     auto cipherMessageOpt = serverMessage.GetElement(HandshakeMessage::Type::CipherMessage);
@@ -207,12 +208,13 @@ HandshakeMessage Client::GetShareP(const HandshakeMessage& serverMessage)
     /** Assemble handshake message */
     std::vector<uint8_t> cipherMessageToSend(shareP.size(), 0);
     std::copy(shareP.begin(), shareP.end(), cipherMessageToSend.begin());
-    HandshakeMessage message{
+    HandshakeMessage::Message message{
         {{HandshakeMessage::Type::CipherMessage, std::move(cipherMessageToSend)}}};
     return message;
 }
 
-HandshakeMessage Client::GetConfirmP(const HandshakeMessage& serverMessage)
+HandshakeMessage::Message Client::GetConfirmP(
+    const HandshakeMessage::Message& serverMessage)
 {
     auto marker = _stepChecker->CheckStep(Step::ShareP, Step::ConfirmP);
     auto cipherMessageOpt = serverMessage.GetElement(HandshakeMessage::Type::CipherMessage);
@@ -263,13 +265,13 @@ HandshakeMessage Client::GetConfirmP(const HandshakeMessage& serverMessage)
     /** Assemble the handshake message */
     std::vector<uint8_t> cipherMessageToSend(confirmP.size(), 0);
     std::copy(confirmP.begin(), confirmP.end(), cipherMessageToSend.begin());
-    HandshakeMessage message{
+    HandshakeMessage::Message message{
         {{HandshakeMessage::Type::CipherMessage, std::move(cipherMessageToSend)}}};
     return message;
 }
 
-std::optional<HandshakeMessage> Client::GetNextMessage(
-    const std::optional<HandshakeMessage>& peerMessage)
+std::optional<HandshakeMessage::Message> Client::GetNextMessage(
+    const std::optional<HandshakeMessage::Message>& peerMessage)
 {
     switch (_stepChecker->GetCurrentStep())
     {
@@ -324,7 +326,8 @@ Server::Server(std::function<RegistrationResult(const std::string&)> getUserRegi
     }
 }
 
-HandshakeMessage Server::RetrieveSalt(const HandshakeMessage& clientMessage)
+HandshakeMessage::Message Server::RetrieveSalt(
+    const HandshakeMessage::Message& clientMessage)
 {
     auto marker = _stepChecker->CheckStep(Step::Init, Step::RetrieveSalt);
     auto keyIndexOpt = clientMessage.GetElement(HandshakeMessage::Type::KeyIndex);
@@ -338,12 +341,13 @@ HandshakeMessage Server::RetrieveSalt(const HandshakeMessage& clientMessage)
     }
     _registrationResult = _getUserRegistration(_username);
     std::vector<uint8_t> salt(_registrationResult->salt.begin(), _registrationResult->salt.end());
-    HandshakeMessage message{
+    HandshakeMessage::Message message{
         {{HandshakeMessage::Type::CipherMessage, salt}}};
     return message;
 }
 
-HandshakeMessage Server::GetShareVConfirmV(const HandshakeMessage& clientMessage)
+HandshakeMessage::Message Server::GetShareVConfirmV(
+    const HandshakeMessage::Message& clientMessage)
 {
     auto marker = _stepChecker->CheckStep(Step::RetrieveSalt, Step::ShareVConfirmV);
     auto cipherMessageOpt = clientMessage.GetElement(HandshakeMessage::Type::CipherMessage);
@@ -388,12 +392,12 @@ HandshakeMessage Server::GetShareVConfirmV(const HandshakeMessage& clientMessage
     std::vector<uint8_t> cipherMessageToSend(shareV.size() + confirmV.size(), 0);
     std::copy(shareV.begin(), shareV.end(), cipherMessageToSend.begin());
     std::copy(confirmV.begin(), confirmV.end(), cipherMessageToSend.begin() + shareV.size());
-    HandshakeMessage message{
+    HandshakeMessage::Message message{
         {{HandshakeMessage::Type::CipherMessage, std::move(cipherMessageToSend)}}};
     return message;
 }
 
-void Server::TakeConfirmP(const HandshakeMessage& clientMessage)
+void Server::TakeConfirmP(const HandshakeMessage::Message& clientMessage)
 {
     auto marker = _stepChecker->CheckStep(Step::ShareVConfirmV, Step::ConfirmP);
     auto cipherMessageOpt = clientMessage.GetElement(HandshakeMessage::Type::CipherMessage);
@@ -417,8 +421,8 @@ void Server::TakeConfirmP(const HandshakeMessage& clientMessage)
     }
 }
 
-std::optional<HandshakeMessage> Server::GetNextMessage(
-    const std::optional<HandshakeMessage>& peerMessage)
+std::optional<HandshakeMessage::Message> Server::GetNextMessage(
+    const std::optional<HandshakeMessage::Message>& peerMessage)
 {
     switch (_stepChecker->GetCurrentStep())
     {

@@ -164,7 +164,6 @@ target_link_libraries(TestChaCha20Poly1305
 add_executable(TestEcdhePsk
     TestEcdhePsk.cpp
     ../src/cipher/EcdhePsk.cpp
-    ../src/cipher/HandshakeMessage.cpp
     ../src/cipher/ChaCha20Poly1305.cpp)
 
 target_include_directories(TestEcdhePsk
@@ -191,8 +190,7 @@ add_executable(TestSpake2p
     TestSpake2p.cpp
     ../src/cipher/Spake2p.cpp
     ../src/cipher/Ed25519.cpp
-    ../src/cipher/ChaCha20Poly1305.cpp
-    ../src/cipher/HandshakeMessage.cpp)
+    ../src/cipher/ChaCha20Poly1305.cpp)
 
 target_include_directories(TestSpake2p
     PRIVATE
@@ -249,7 +247,6 @@ add_executable(TestSecureSession
     TestSecureSession.cpp
     ../src/application/SecureSession.cpp
     ../src/cipher/ChaCha20Poly1305.cpp
-    ../src/cipher/HandshakeMessage.cpp
     ../src/cipher/EcdhePsk.cpp
     ../src/cipher/Ed25519.cpp
     ../src/cipher/Spake2p.cpp
@@ -294,7 +291,6 @@ add_executable(TestRegister
     TestRegister.cpp
     ../src/cipher/ChaCha20Poly1305.cpp
     ../src/cipher/Ed25519.cpp
-    ../src/cipher/HandshakeMessage.cpp
     ../src/cipher/Spake2p.cpp
     ../src/common/Base64.cpp)
 

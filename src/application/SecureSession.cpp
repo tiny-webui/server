@@ -214,7 +214,7 @@ JS::Promise<void> Server::HandleHandshakeAsync(std::shared_ptr<IConnection<void>
             if (auth == nullptr || !auth->IsHandshakeComplete())
             {
                 /** authentication messages */
-                Cipher::HandshakeMessage message{data};
+                auto message = Cipher::HandshakeMessage::Message::Parse(data);
                 if (auth == nullptr)
                 {
                     /** First message, create auth from the ProtocolType */
