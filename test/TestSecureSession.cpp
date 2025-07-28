@@ -90,7 +90,8 @@ public:
             if (!_auth->IsHandshakeComplete())
             {
                 /** Auth message */
-                auto handshakeMessage = Cipher::HandshakeMessage(std::move(message));
+                auto handshakeMessage = Cipher::HandshakeMessage::Message::Parse(
+                    std::move(message));
                 auto replyOpt = _auth->GetNextMessage(handshakeMessage);
                 if (replyOpt.has_value())
                 {

@@ -25,15 +25,16 @@ int main(int argc, char const *argv[])
             return result;
         });
     
-    std::optional<HandshakeMessage> clientMessage{std::nullopt};
-    std::optional<HandshakeMessage> serverMessage{std::nullopt};
+    std::optional<HandshakeMessage::Message> clientMessage{std::nullopt};
+    std::optional<HandshakeMessage::Message> serverMessage{std::nullopt};
     while(!client.IsHandshakeComplete() || !server.IsHandshakeComplete())
     {
         if (!client.IsHandshakeComplete())
         {
             if (serverMessage.has_value())
             {
-                serverMessage = HandshakeMessage(serverMessage->Serialize());
+                serverMessage = HandshakeMessage::Message::Parse(
+                    serverMessage->Serialize());
             }
             clientMessage = client.GetNextMessage(serverMessage);
         }
@@ -41,7 +42,8 @@ int main(int argc, char const *argv[])
         {
             if (clientMessage.has_value())
             {
-                clientMessage = HandshakeMessage(clientMessage->Serialize());
+                clientMessage = HandshakeMessage::Message::Parse(
+                    clientMessage->Serialize());
             }
             serverMessage = server.GetNextMessage(clientMessage);
         }

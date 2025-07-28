@@ -43,8 +43,8 @@ namespace TUI::Cipher::Spake2p
             const std::string& password,
             const std::map<HandshakeMessage::Type, std::vector<uint8_t>>& additionalElements = {});
         
-        std::optional<HandshakeMessage> GetNextMessage(
-            const std::optional<HandshakeMessage>& peerMessage) override;
+        std::optional<HandshakeMessage::Message> GetNextMessage(
+            const std::optional<HandshakeMessage::Message>& peerMessage) override;
         bool IsHandshakeComplete() override;
         std::array<uint8_t, KEY_SIZE> GetClientKey() override;
         std::array<uint8_t, KEY_SIZE> GetServerKey() override;
@@ -76,7 +76,7 @@ namespace TUI::Cipher::Spake2p
          *  username (w/o null terminator)
          *              Any
          */
-        HandshakeMessage RetrieveSalt();
+        HandshakeMessage::Message RetrieveSalt();
         /**
          * @brief Get the Share P object
          * 
@@ -86,7 +86,8 @@ namespace TUI::Cipher::Spake2p
          *   ShareP
          *    32B
          */
-        HandshakeMessage GetShareP(const HandshakeMessage& serverMessage);
+        HandshakeMessage::Message GetShareP(
+            const HandshakeMessage::Message& serverMessage);
         /**
          * @brief Get the Confirm P object
          * 
@@ -96,7 +97,8 @@ namespace TUI::Cipher::Spake2p
          *   MAC(K_confirmP, shareV)
          *    Not VA but don't care
          */
-        HandshakeMessage GetConfirmP(const HandshakeMessage& serverMessage);
+        HandshakeMessage::Message GetConfirmP(
+            const HandshakeMessage::Message& serverMessage);
     };
 
     class Server : public IAuthenticationPeer
@@ -104,8 +106,8 @@ namespace TUI::Cipher::Spake2p
     public:
         Server(std::function<RegistrationResult(const std::string&)> getUserRegistration);
 
-        std::optional<HandshakeMessage> GetNextMessage(
-            const std::optional<HandshakeMessage>& peerMessage) override;
+        std::optional<HandshakeMessage::Message> GetNextMessage(
+            const std::optional<HandshakeMessage::Message>& peerMessage) override;
         bool IsHandshakeComplete() override;
         std::array<uint8_t, KEY_SIZE> GetClientKey() override;
         std::array<uint8_t, KEY_SIZE> GetServerKey() override;
@@ -136,7 +138,8 @@ namespace TUI::Cipher::Spake2p
          *    Salt
          *    16B
          */
-        HandshakeMessage RetrieveSalt(const HandshakeMessage& clientMessage);
+        HandshakeMessage::Message RetrieveSalt(
+            const HandshakeMessage::Message& clientMessage);
         /**
          * @brief Get the Share V Confirm V object
          * 
@@ -146,13 +149,14 @@ namespace TUI::Cipher::Spake2p
          *   ShareV | MAC(K_confirmV, shareP)
          *    32 B  | Not VA but don't care
          */
-        HandshakeMessage GetShareVConfirmV(const HandshakeMessage& clientMessage);
+        HandshakeMessage::Message GetShareVConfirmV(
+            const HandshakeMessage::Message& clientMessage);
         /**
          * @brief Take the Confirm P message from the client.
          * 
          * @param clientMessage 
          */
-        void TakeConfirmP(const HandshakeMessage& clientMessage);
+        void TakeConfirmP(const HandshakeMessage::Message& clientMessage);
     };
 }
 

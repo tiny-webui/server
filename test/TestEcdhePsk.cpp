@@ -30,8 +30,8 @@ int main(int argc, char const *argv[])
     Server server(getPsk);
 
     {
-        std::optional<HandshakeMessage> clientMessageOpt{std::nullopt};
-        std::optional<HandshakeMessage> serverMessageOpt{std::nullopt};
+        std::optional<HandshakeMessage::Message> clientMessageOpt{std::nullopt};
+        std::optional<HandshakeMessage::Message> serverMessageOpt{std::nullopt};
         while(!client.IsHandshakeComplete() || !server.IsHandshakeComplete())
         {
             if (!client.IsHandshakeComplete())
@@ -39,7 +39,8 @@ int main(int argc, char const *argv[])
                 /** Mimic transmission */
                 if (serverMessageOpt.has_value())
                 {
-                    serverMessageOpt = HandshakeMessage(serverMessageOpt->Serialize());
+                    serverMessageOpt = HandshakeMessage::Message::Parse(
+                        serverMessageOpt->Serialize());
                 }
                 clientMessageOpt = client.GetNextMessage(serverMessageOpt);
             }
@@ -47,7 +48,8 @@ int main(int argc, char const *argv[])
             {
                 if (clientMessageOpt.has_value())
                 {
-                    clientMessageOpt = HandshakeMessage(clientMessageOpt->Serialize());
+                    clientMessageOpt = HandshakeMessage::Message::Parse(
+                        clientMessageOpt->Serialize());
                 }
                 serverMessageOpt = server.GetNextMessage(clientMessageOpt);
             }

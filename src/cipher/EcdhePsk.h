@@ -53,8 +53,8 @@ namespace TUI::Cipher::EcdhePsk
             const std::vector<uint8_t>& keyIndex,
             const std::map<HandshakeMessage::Type, std::vector<uint8_t>>& additionalElements = {});
 
-        std::optional<HandshakeMessage> GetNextMessage(
-            const std::optional<HandshakeMessage>& peerMessage) override;
+        std::optional<HandshakeMessage::Message> GetNextMessage(
+            const std::optional<HandshakeMessage::Message>& peerMessage) override;
         bool IsHandshakeComplete() override;
         std::array<uint8_t, KEY_SIZE> GetClientKey() override;
         std::array<uint8_t, KEY_SIZE> GetServerKey() override;
@@ -70,7 +70,7 @@ namespace TUI::Cipher::EcdhePsk
         Psk _psk;
         std::map<HandshakeMessage::Type, std::vector<uint8_t>> _firstMessageAdditionalElements{};
         std::array<uint8_t, PRIKEY_SIZE> _priKey{};
-        std::optional<HandshakeMessage> _clientMessage{std::nullopt};
+        std::optional<HandshakeMessage::Message> _clientMessage{std::nullopt};
         std::array<uint8_t, KEY_SIZE> _serverConfirmKey{};
         std::array<uint8_t, KEY_SIZE> _clientKey{};
         std::array<uint8_t, KEY_SIZE> _serverKey{};
@@ -90,7 +90,7 @@ namespace TUI::Cipher::EcdhePsk
          *     Any
          * [additional elements from constructor]
          */
-        HandshakeMessage GetClientMessage();
+        HandshakeMessage::Message GetClientMessage();
         /**
          * @brief Step 3
          * 
@@ -101,15 +101,15 @@ namespace TUI::Cipher::EcdhePsk
          * AES-GCM(client_confirm_key, transcript_hash)
          *                  Any
          */
-        HandshakeMessage TakeServerMessage(
-            const HandshakeMessage& serverMessage);
+        HandshakeMessage::Message TakeServerMessage(
+            const HandshakeMessage::Message& serverMessage);
 
         /**
          * @brief Step 5
          * 
          * @param serverMessage
          */
-        void TakeServerConfirmation(const HandshakeMessage& serverMessage);
+        void TakeServerConfirmation(const HandshakeMessage::Message& serverMessage);
     };
 
     class Server : public IAuthenticationPeer
@@ -119,8 +119,8 @@ namespace TUI::Cipher::EcdhePsk
         Server(
             std::function<Psk(const std::vector<uint8_t>&)> getPsk);
 
-        std::optional<HandshakeMessage> GetNextMessage(
-            const std::optional<HandshakeMessage>& peerMessage) override;
+        std::optional<HandshakeMessage::Message> GetNextMessage(
+            const std::optional<HandshakeMessage::Message>& peerMessage) override;
         bool IsHandshakeComplete() override;
         std::array<uint8_t, KEY_SIZE> GetClientKey() override;
         std::array<uint8_t, KEY_SIZE> GetServerKey() override;
@@ -150,7 +150,8 @@ namespace TUI::Cipher::EcdhePsk
          *   pubKey | nonce
          *    32B   |  32B
          */
-        HandshakeMessage TakeClientMessage(const HandshakeMessage& clientMessage);
+        HandshakeMessage::Message TakeClientMessage(
+            const HandshakeMessage::Message& clientMessage);
 
         /**
          * @brief Step 4
@@ -161,6 +162,7 @@ namespace TUI::Cipher::EcdhePsk
          * AES-GCM(server_confirm_key, transcript_hash)
          *                 Any
          */
-        HandshakeMessage TakeClientConfirmation(const HandshakeMessage& clientConfirmation);
+        HandshakeMessage::Message TakeClientConfirmation(
+            const HandshakeMessage::Message& clientConfirmation);
     };
 }

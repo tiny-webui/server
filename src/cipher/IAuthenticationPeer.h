@@ -14,8 +14,8 @@ namespace TUI::Cipher
 
         virtual ~IAuthenticationPeer() = default;
 
-        virtual std::optional<HandshakeMessage> GetNextMessage(
-            const std::optional<HandshakeMessage>& peerMessage) = 0;
+        virtual std::optional<HandshakeMessage::Message> GetNextMessage(
+            const std::optional<HandshakeMessage::Message>& peerMessage) = 0;
         virtual bool IsHandshakeComplete() = 0;
         virtual std::array<uint8_t, KEY_SIZE> GetClientKey() = 0;
         virtual std::array<uint8_t, KEY_SIZE> GetServerKey() = 0;
