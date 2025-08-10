@@ -80,10 +80,6 @@ std::vector<std::uint8_t> Base64::Decode(const std::string& base64String)
     {
         if (c == '=')
         {
-            if (bitsLeft != 0)
-            {
-                throw std::invalid_argument("Invalid Base64 padding");
-            }
             break;
         }
         uint8_t value = Base64CharToValue(c);
