@@ -76,7 +76,6 @@ namespace TUI::Cipher::EcdhePsk
         std::array<uint8_t, KEY_SIZE> _serverKey{};
         std::array<uint8_t, HASH_SIZE> _transcriptHash{};
         std::shared_ptr<StepChecker<Step>> _stepChecker{StepChecker<Step>::Create(Step::Init)};
-        int64_t _numCalls{0};
 
         /**
          * @brief Step 1
@@ -139,7 +138,6 @@ namespace TUI::Cipher::EcdhePsk
         std::array<uint8_t, KEY_SIZE> _serverKey{};
         std::array<uint8_t, HASH_SIZE> _transcriptHash{};
         std::shared_ptr<StepChecker<Step>> _stepChecker{StepChecker<Step>::Create(Step::Init)};
-        int64_t _numCalls{0};
 
         /**
          * @brief Step 2
