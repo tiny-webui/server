@@ -161,6 +161,26 @@ target_link_libraries(TestChaCha20Poly1305
     PRIVATE
         sodium)
 
+add_executable(TestChaCha20Poly1305Interactive
+    TestChaCha20Poly1305Interactive.cpp
+    ../src/cipher/ChaCha20Poly1305.cpp
+    ../src/common/Base64.cpp)
+
+target_include_directories(TestChaCha20Poly1305Interactive
+    PRIVATE
+        ../src)
+
+target_link_libraries(TestChaCha20Poly1305Interactive
+    PRIVATE
+        sodium)
+
+add_executable(TestCryptoKdfHkdfSha256
+    TestCryptoKdfHkdfSha256.cpp)
+
+target_link_libraries(TestCryptoKdfHkdfSha256
+    PRIVATE
+        sodium)
+
 add_executable(TestEcdhePsk
     TestEcdhePsk.cpp
     ../src/cipher/EcdhePsk.cpp
@@ -171,6 +191,20 @@ target_include_directories(TestEcdhePsk
         ../src)
 
 target_link_libraries(TestEcdhePsk
+    PRIVATE
+        sodium)
+
+add_executable(TestEcdhePskInteractive
+    TestEcdhePskInteractive.cpp
+    ../src/cipher/EcdhePsk.cpp
+    ../src/cipher/ChaCha20Poly1305.cpp
+    ../src/common/Base64.cpp)
+
+target_include_directories(TestEcdhePskInteractive
+    PRIVATE
+        ../src)
+
+target_link_libraries(TestEcdhePskInteractive
     PRIVATE
         sodium)
 
@@ -197,6 +231,21 @@ target_include_directories(TestSpake2p
         ../src)
 
 target_link_libraries(TestSpake2p
+    PRIVATE
+        sodium)
+
+add_executable(TestSpake2pInteractive
+    TestSpake2pInteractive.cpp
+    ../src/cipher/Spake2p.cpp
+    ../src/cipher/Ed25519.cpp
+    ../src/cipher/ChaCha20Poly1305.cpp
+    ../src/common/Base64.cpp)
+
+target_include_directories(TestSpake2pInteractive
+    PRIVATE
+        ../src)
+
+target_link_libraries(TestSpake2pInteractive
     PRIVATE
         sodium)
 
