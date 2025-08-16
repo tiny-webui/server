@@ -119,7 +119,10 @@ namespace TUI::Common
             }
             std::vector<uint8_t> serializedData;
             serializedData.reserve(totalSize);
-            /** _elements is an ordered map. Which will keep the results same for the same tlv. */
+            /** 
+             * _elements is an ordered map. Which will keep the results same for the same tlv.
+             * The elements are in ascending order.
+             */
             for (const auto& item : _elements)
             {
                 EnumValueType typeValue = static_cast<EnumValueType>(item.first);

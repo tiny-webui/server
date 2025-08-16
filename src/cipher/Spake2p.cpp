@@ -18,13 +18,16 @@ static_assert(sizeof(RegistrationResult::L) == Ed25519::Point::size, "L size mis
 static_assert(crypto_generichash_BYTES == crypto_kdf_hkdf_sha256_KEYBYTES,
               "Hash size mismatch for HKDF expansion");
 
+static constexpr std::string_view HASH_CONTEXT = "TUI";
+static constexpr std::string_view ID_VERIFIER = "tui-server";
+
 static std::pair<std::array<uint8_t, sizeof(RegistrationResult::w0)>, std::array<uint8_t, sizeof(RegistrationResult::w0)>>
 DeriveW0W1(
     const std::string& username, const std::string& password,
     const std::array<uint8_t, sizeof(RegistrationResult::salt)>& salt)
 {
     int rc = 0;
-    /** len(password) | password | len(username) | username | len("tui") | "tui" */
+    /** len(password) | password | len(username) | username | len(ID_VERIFIER) | ID_VERIFIER */
     std::vector<uint8_t> keyMaterial{};
     {
         uint16_t passwordLen = static_cast<uint16_t>(password.size());
@@ -39,13 +42,12 @@ DeriveW0W1(
             reinterpret_cast<uint8_t*>(&usernameLen),
             reinterpret_cast<uint8_t*>(&usernameLen) + sizeof(usernameLen));
         keyMaterial.insert(keyMaterial.end(), username.begin(), username.end());
-        std::string idVerifier = "tui";
-        uint16_t idVerifierLen = static_cast<uint16_t>(idVerifier.size());
+        uint16_t idVerifierLen = static_cast<uint16_t>(ID_VERIFIER.size());
         keyMaterial.insert(
             keyMaterial.end(),
             reinterpret_cast<uint8_t*>(&idVerifierLen),
             reinterpret_cast<uint8_t*>(&idVerifierLen) + sizeof(idVerifierLen));
-        keyMaterial.insert(keyMaterial.end(), idVerifier.begin(), idVerifier.end());
+        keyMaterial.insert(keyMaterial.end(), ID_VERIFIER.begin(), ID_VERIFIER.end());
     }
     std::array<uint8_t, Ed25519::Scalar::keyMaterialSize> w0s{};
     std::array<uint8_t, Ed25519::Scalar::keyMaterialSize> w1s{};
@@ -174,7 +176,7 @@ HandshakeMessage::Message Client::RetrieveSalt()
     std::vector<uint8_t> keyIndex(_username.begin(), _username.end());
     _firstMessageAdditionalElements.emplace(
         HandshakeMessage::Type::KeyIndex, std::move(keyIndex));
-    HandshakeMessage::Message message{_firstMessageAdditionalElements};
+    HandshakeMessage::Message message{std::move(_firstMessageAdditionalElements)};
     _firstMessageAdditionalElements.clear();
     return message;
 }
@@ -233,12 +235,12 @@ HandshakeMessage::Message Client::GetConfirmP(
     /** Calculate Z and V */
     auto h = Ed25519::GetCofactor();
     Ed25519::Point N(N_BYTES);
-    auto Z = h * _x.value() * (Y - _w0.value() * N);
-    auto V = h * _w1.value() * (Y - _w0.value() * N);
+    auto Z = h * (_x.value() * (Y - _w0.value() * N));
+    auto V = h * (_w1.value() * (Y - _w0.value() * N));
     /** Calculate prk = Hash(TT) */
     auto prk = GetTranscriptHash(
-        "TUI",
-        _username, "tui-server",
+        std::string(HASH_CONTEXT),
+        _username, std::string(ID_VERIFIER),
         _X.value(), Y, Z, V, _w0.value());
     /** Expand keys */
     _clientKey = HkdfExpendKey(prk, "client key");
@@ -372,12 +374,13 @@ HandshakeMessage::Message Server::GetShareVConfirmV(
     auto h = Ed25519::GetCofactor();
     Ed25519::Point M(M_BYTES);
     Ed25519::Point L(_registrationResult->L);
-    auto Z = h * y * (X - w0 * M);
-    auto V = h * y * L;
+    auto Z = h * (y * (X - w0 * M));
+    auto V = h * (y * L);
+
     /** Calculate prk = Hash(TT) */
     auto prk = GetTranscriptHash(
-        "TUI",
-        _username, "tui-server",
+        std::string(HASH_CONTEXT),
+        _username, std::string(ID_VERIFIER),
         X, _Y.value(), Z, V, w0);
     /** Expand keys */
     _clientKey = HkdfExpendKey(prk, "client key");
@@ -417,7 +420,7 @@ void Server::TakeConfirmP(const HandshakeMessage::Message& clientMessage)
     Ed25519::Point Y(YBytes);
     if (Y != _Y.value())
     {
-        throw std::runtime_error("Invalid confirm V from client");
+        throw std::runtime_error("Invalid confirm P from client");
     }
 }
 

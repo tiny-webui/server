@@ -205,21 +205,21 @@ void Client::TakeServerConfirmation(
 std::optional<HandshakeMessage::Message> Client::GetNextMessage(
     const std::optional<HandshakeMessage::Message>& peerMessage)
 {
-    switch (_numCalls++)
+    switch (this->_stepChecker->GetCurrentStep())
     {
-        case 0:
+        case Step::Init:
             if (peerMessage.has_value())
             {
                 throw std::runtime_error("Peer message is unexpected");
             }
             return GetClientMessage();
-        case 1:
+        case Step::ClientMessage:
             if (!peerMessage.has_value())
             {
                 throw std::runtime_error("Peer message is required");
             }
             return TakeServerMessage(peerMessage.value());
-        case 2:
+        case Step::ServerMessage:
             if (!peerMessage.has_value())
             {
                 throw std::runtime_error("Peer message is required");
@@ -354,15 +354,15 @@ HandshakeMessage::Message Server::TakeClientConfirmation(
 std::optional<HandshakeMessage::Message> Server::GetNextMessage(
     const std::optional<HandshakeMessage::Message>& peerMessage)
 {
-    switch (_numCalls++)
+    switch (this->_stepChecker->GetCurrentStep())
     {
-        case 0:
+        case Step::Init:
             if (!peerMessage.has_value())
             {
                 throw std::runtime_error("Peer message is required");
             }
             return TakeClientMessage(peerMessage.value());
-        case 1:
+        case Step::ClientMessage:
             if (!peerMessage.has_value())
             {
                 throw std::runtime_error("Peer message is required");
