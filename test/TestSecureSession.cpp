@@ -318,6 +318,7 @@ private:
             catch(...)
             {
             }
+            std::cout << "All tests passed." << std::endl;
 
             co_await DelayAsync(_tev, 100);
             Close();
