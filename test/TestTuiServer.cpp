@@ -12,6 +12,7 @@
 #include "application/SecureSession.h"
 #include "application/Service.h"
 #include "common/TevInjectionQueue.h"
+#include "common/Base64.h"
 #include "database/Database.h"
 #include "network/IServer.h"
 #include "network/WebSocketServer.h"
@@ -21,9 +22,6 @@ using namespace TUI;
 struct AppParams
 {
     std::optional<std::filesystem::path> dbPath{std::nullopt};
-    std::optional<std::string> unixSocketPath{std::nullopt};
-    std::optional<std::string> address{std::nullopt};
-    std::optional<uint16_t> port{std::nullopt};
 
     static AppParams Parse(int argc, char const *argv[])
     {
@@ -35,15 +33,6 @@ struct AppParams
             {
             case 'd':
                 params.dbPath = std::filesystem::path(optarg);
-                break;
-            case 'u':
-                params.unixSocketPath = std::string(optarg);
-                break;
-            case 'a':
-                params.address = std::string(optarg);
-                break;
-            case 'p':
-                params.port = static_cast<uint16_t>(std::stoi(optarg));
                 break;
             default:
                 break;
@@ -58,10 +47,6 @@ struct AppParams
         {
             throw std::invalid_argument("Database path is required");
         }
-        if (!unixSocketPath.has_value() && (!address.has_value() || !port.has_value()))
-        {
-            throw std::invalid_argument("Either unix socket path or address and port must be provided");
-        }
     }
 
     std::string getHelp(const std::string& programName) const
@@ -69,8 +54,7 @@ struct AppParams
         std::ostringstream oss;
         oss << "Usage: " << std::endl 
             << programName << std::endl
-            << "    -d <database_path>" << std::endl
-            << "    -u <unix_socket_path> | -a <address> -p <port>" << std::endl;
+            << "    -d <database_path>" << std::endl;
         return oss.str();
     }
 };
@@ -83,9 +67,14 @@ struct App
 };
 
 static JS::Promise<void> MainNoexceptAsync(AppParams params);
+static JS::Promise<void> PrepareTestDatabaseAsync(AppParams params);
 static JS::Promise<void> MainAsync(AppParams params);
 static void SignalHandler(int sig);
 
+static constexpr std::string_view serverAddress = "127.0.0.1";
+static constexpr uint16_t serverPort = 12345;
+static constexpr std::string_view testUsername = "username";
+static constexpr std::string_view testPassword = "password";
 static App gApp{};
 
 int main(int argc, char const *argv[])
@@ -112,6 +101,7 @@ static JS::Promise<void> MainNoexceptAsync(AppParams params)
 {
     try
     {
+        co_await PrepareTestDatabaseAsync(params);
         co_await MainAsync(std::move(params));
     }
     catch (const std::exception& e)
@@ -126,20 +116,43 @@ static JS::Promise<void> MainNoexceptAsync(AppParams params)
     }
 }
 
+static JS::Promise<void> PrepareTestDatabaseAsync(AppParams params)
+{
+    if (std::filesystem::exists(params.dbPath.value()))
+    {
+        std::filesystem::remove(params.dbPath.value());
+    }
+    if (std::filesystem::exists(params.dbPath->string() + "-wal"))
+    {
+        std::filesystem::remove(params.dbPath->string() + "-wal");
+    }
+    if (std::filesystem::exists(params.dbPath->string() + "-shm"))
+    {
+        std::filesystem::remove(params.dbPath->string() + "-shm");
+    }
+
+    auto database = co_await Database::Database::CreateAsync(gApp.tev, params.dbPath.value());
+    /** Register a test user */
+    auto registration = Cipher::Spake2p::Register(std::string(testUsername), std::string(testPassword));
+    Schema::IServer::UserCredential userCredential;
+    userCredential.set_w0(Common::Base64::Encode(registration.w0));
+    userCredential.set_l(Common::Base64::Encode(registration.L));
+    userCredential.set_salt(Common::Base64::Encode(registration.salt));
+    Schema::IServer::UserAdminSettings adminSettings;
+    using RoleType = std::remove_reference_t<decltype(adminSettings.get_mutable_role())>;
+    adminSettings.set_role(RoleType::ADMIN);
+    co_await database->CreateUserAsync(
+        std::string(testUsername),
+        static_cast<nlohmann::json>(adminSettings).dump(),
+        static_cast<nlohmann::json>(userCredential).dump());
+}
+
 static JS::Promise<void> MainAsync(AppParams params)
 {
     auto database = co_await Database::Database::CreateAsync(gApp.tev, params.dbPath.value());
     std::shared_ptr<Network::IServer<void>> webSocketServer{nullptr};
-    if (params.unixSocketPath.has_value())
-    {
-        webSocketServer = Network::WebSocket::Server::Create(
-            gApp.tev, params.unixSocketPath.value());
-    }
-    else
-    {
-        webSocketServer = Network::WebSocket::Server::Create(
-            gApp.tev, params.address.value(), params.port.value());
-    }
+    webSocketServer = Network::WebSocket::Server::Create(
+        gApp.tev, std::string(serverAddress), serverPort);
     auto secureSessionServer = Application::SecureSession::Server::Create(
         gApp.tev, std::move(webSocketServer), 
         [=](const std::string& username) -> std::optional<std::pair<std::string, Common::Uuid>> {

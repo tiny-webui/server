@@ -208,8 +208,8 @@ namespace TUI::Common
         std::thread _workerThread{};
         bool _closed{false};
         uint64_t _taskIdSeed{0};
-        std::shared_ptr<TevInjectionQueue<std::pair<uint64_t, std::function<std::any()>>>> _taskQueue{nullptr};
         std::shared_ptr<TevInjectionQueue<TaskResult>> _resultQueue{nullptr};
+        std::shared_ptr<TevInjectionQueue<std::pair<uint64_t, std::function<std::any()>>>> _taskQueue{nullptr};
         std::shared_ptr<TevInjectionQueue<bool>> _closeQueue{nullptr};
         std::unordered_map<uint64_t, std::function<void(TaskResult&&)>> _resultCallbacks{};
     };

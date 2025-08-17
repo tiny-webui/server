@@ -373,3 +373,19 @@ target_link_libraries(TestService
         sqlite3
         uuid
         sodium)
+
+add_executable(TestTuiServer
+    TestTuiServer.cpp
+    ${TEST_SERVICE_SRC_FILES})
+
+target_include_directories(TestTuiServer
+    PRIVATE
+        ../src)
+
+target_link_libraries(TestTuiServer
+    PRIVATE
+        curl
+        websockets
+        sqlite3
+        uuid
+        sodium)
