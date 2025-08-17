@@ -70,7 +70,7 @@ namespace TUI::Application
         ResourceVersionManager& operator=(ResourceVersionManager&&) = delete;
         ~ResourceVersionManager() = default;
         
-        Lock GetReadLock(const std::vector<std::string>& resourcePath, const ID& id)
+        Lock GetReadLock(const std::vector<std::string>& resourcePath, const ID& id, bool checkVersion = true)
         {
             /** Lock first, then check. */
             LockReadLock(resourcePath, id);
@@ -93,7 +93,10 @@ namespace TUI::Application
                     }
                 }
             };
-            CheckReaderVersion(resourcePath, id);
+            if (checkVersion) 
+            {
+                CheckReaderVersion(resourcePath, id);
+            }
             return std::move(lock);
         }
 
