@@ -330,8 +330,12 @@ JS::Promise<nlohmann::json> Service::OnDeleteMetadataAsync(CallerId callerId, nl
 JS::Promise<nlohmann::json> Service::OnGetChatListAsync(CallerId callerId, nlohmann::json paramsJson)
 {
     auto params = ParseParams<Schema::IServer::GetChatListParams>(paramsJson);
+    /** 
+     * The lock should not prevent the reader from continue reading.
+     * Only checking the version when start is 0 (the first page).
+     */
     auto lock = _resourceVersionManager->GetReadLock(
-        {"chatList", static_cast<std::string>(callerId.userId)}, callerId);
+        {"chatList", static_cast<std::string>(callerId.userId)}, callerId, params.get_start() == 0);
     auto start = params.get_start();
     auto quantity = params.get_quantity();
     if (start < 0 || quantity < 0)
