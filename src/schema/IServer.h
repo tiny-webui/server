@@ -300,10 +300,10 @@ namespace IServer {
         void set_start(const double & value) { this->start = value; }
     };
 
-    class List {
+    class GetChatListResultElement {
         public:
-        List() = default;
-        virtual ~List() = default;
+        GetChatListResultElement() = default;
+        virtual ~GetChatListResultElement() = default;
 
         private:
         std::string id;
@@ -316,23 +316,6 @@ namespace IServer {
 
         std::optional<std::map<std::string, nlohmann::json>> get_metadata() const { return metadata; }
         void set_metadata(std::optional<std::map<std::string, nlohmann::json>> value) { this->metadata = value; }
-    };
-
-    class GetChatListResult {
-        public:
-        GetChatListResult() = default;
-        virtual ~GetChatListResult() = default;
-
-        private:
-        std::vector<List> list;
-
-        public:
-        /**
-         * This list will be in the reverse order of creation
-         */
-        const std::vector<List> & get_list() const { return list; }
-        std::vector<List> & get_mutable_list() { return list; }
-        void set_list(const std::vector<List> & value) { this->list = value; }
     };
 
     class ChatCompletionParams {
@@ -666,6 +649,7 @@ namespace IServer {
 
     using GetMetadataResult = std::map<std::string, nlohmann::json>;
     using LinearHistory = std::vector<Message>;
+    using GetChatListResult = std::vector<GetChatListResultElement>;
     using GetModelListResult = std::vector<GetModelListResultElement>;
     using GetUserListResult = std::vector<GetUserListResultElement>;
 }
@@ -699,11 +683,8 @@ namespace IServer {
     void from_json(const json & j, GetChatListParams & x);
     void to_json(json & j, const GetChatListParams & x);
 
-    void from_json(const json & j, List & x);
-    void to_json(json & j, const List & x);
-
-    void from_json(const json & j, GetChatListResult & x);
-    void to_json(json & j, const GetChatListResult & x);
+    void from_json(const json & j, GetChatListResultElement & x);
+    void to_json(json & j, const GetChatListResultElement & x);
 
     void from_json(const json & j, ChatCompletionParams & x);
     void to_json(json & j, const ChatCompletionParams & x);
@@ -860,26 +841,17 @@ namespace IServer {
         j["start"] = x.get_start();
     }
 
-    inline void from_json(const json & j, List& x) {
+    inline void from_json(const json & j, GetChatListResultElement& x) {
         x.set_id(j.at("id").get<std::string>());
         x.set_metadata(get_stack_optional<std::map<std::string, nlohmann::json>>(j, "metadata"));
     }
 
-    inline void to_json(json & j, const List & x) {
+    inline void to_json(json & j, const GetChatListResultElement & x) {
         j = json::object();
         j["id"] = x.get_id();
         if (x.get_metadata()) {
             j["metadata"] = x.get_metadata();
         }
-    }
-
-    inline void from_json(const json & j, GetChatListResult& x) {
-        x.set_list(j.at("list").get<std::vector<List>>());
-    }
-
-    inline void to_json(json & j, const GetChatListResult & x) {
-        j = json::object();
-        j["list"] = x.get_list();
     }
 
     inline void from_json(const json & j, ChatCompletionParams& x) {
