@@ -335,7 +335,7 @@ JS::Promise<nlohmann::json> Service::OnGetChatListAsync(CallerId callerId, nlohm
      * Only checking the version when start is 0 (the first page).
      */
     auto lock = _resourceVersionManager->GetReadLock(
-        {"chatList", static_cast<std::string>(callerId.userId)}, callerId, params.get_start() == 0);
+        {"chatList", static_cast<std::string>(callerId.userId)}, callerId, params.get_start() != 0);
     auto start = params.get_start();
     auto quantity = params.get_quantity();
     if (start < 0 || quantity < 0)
@@ -796,6 +796,10 @@ JS::Promise<nlohmann::json> Service::OnGetUserListAsync(CallerId callerId, nlohm
             using MetadataType = std::remove_reference<decltype(entry.get_public_metadata())>::type;
             MetadataType metadata{TryGetMetadata(params.get_metadata_keys().value(), item.publicMetadata)};
             entry.set_public_metadata(std::move(metadata));
+        }
+        if (callerId.userId == item.id)
+        {
+            entry.set_is_self(true);
         }
         result.push_back(std::move(entry));
     }

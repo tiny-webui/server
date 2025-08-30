@@ -25,7 +25,6 @@
 //     UserCredential data = nlohmann::json::parse(jsonString);
 //     GetUserListParams data = nlohmann::json::parse(jsonString);
 //     GetUserListResult data = nlohmann::json::parse(jsonString);
-//     GetUserAnyParams data = nlohmann::json::parse(jsonString);
 //     NewUserParams data = nlohmann::json::parse(jsonString);
 //     SetUserAdminSettingsParams data = nlohmann::json::parse(jsonString);
 //     ProtocolNegotiationRequest data = nlohmann::json::parse(jsonString);
@@ -526,6 +525,7 @@ namespace IServer {
         private:
         UserAdminSettings admin_settings;
         std::string id;
+        std::optional<bool> is_self;
         std::optional<std::map<std::string, nlohmann::json>> public_metadata;
         std::string user_name;
 
@@ -538,29 +538,15 @@ namespace IServer {
         std::string & get_mutable_id() { return id; }
         void set_id(const std::string & value) { this->id = value; }
 
+        std::optional<bool> get_is_self() const { return is_self; }
+        void set_is_self(std::optional<bool> value) { this->is_self = value; }
+
         std::optional<std::map<std::string, nlohmann::json>> get_public_metadata() const { return public_metadata; }
         void set_public_metadata(std::optional<std::map<std::string, nlohmann::json>> value) { this->public_metadata = value; }
 
         const std::string & get_user_name() const { return user_name; }
         std::string & get_mutable_user_name() { return user_name; }
         void set_user_name(const std::string & value) { this->user_name = value; }
-    };
-
-    class GetUserAnyParams {
-        public:
-        GetUserAnyParams() = default;
-        virtual ~GetUserAnyParams() = default;
-
-        private:
-        std::optional<std::string> id;
-
-        public:
-        /**
-         * For admin, the user id.
-         * The current user has no knowledge of their id. It's provided by the authentication system.
-         */
-        std::optional<std::string> get_id() const { return id; }
-        void set_id(std::optional<std::string> value) { this->id = value; }
     };
 
     class NewUserParams {
@@ -718,9 +704,6 @@ namespace IServer {
 
     void from_json(const json & j, GetUserListResultElement & x);
     void to_json(json & j, const GetUserListResultElement & x);
-
-    void from_json(const json & j, GetUserAnyParams & x);
-    void to_json(json & j, const GetUserAnyParams & x);
 
     void from_json(const json & j, NewUserParams & x);
     void to_json(json & j, const NewUserParams & x);
@@ -975,6 +958,7 @@ namespace IServer {
     inline void from_json(const json & j, GetUserListResultElement& x) {
         x.set_admin_settings(j.at("adminSettings").get<UserAdminSettings>());
         x.set_id(j.at("id").get<std::string>());
+        x.set_is_self(get_stack_optional<bool>(j, "isSelf"));
         x.set_public_metadata(get_stack_optional<std::map<std::string, nlohmann::json>>(j, "publicMetadata"));
         x.set_user_name(j.at("userName").get<std::string>());
     }
@@ -983,21 +967,13 @@ namespace IServer {
         j = json::object();
         j["adminSettings"] = x.get_admin_settings();
         j["id"] = x.get_id();
+        if (x.get_is_self()) {
+            j["isSelf"] = x.get_is_self();
+        }
         if (x.get_public_metadata()) {
             j["publicMetadata"] = x.get_public_metadata();
         }
         j["userName"] = x.get_user_name();
-    }
-
-    inline void from_json(const json & j, GetUserAnyParams& x) {
-        x.set_id(get_stack_optional<std::string>(j, "id"));
-    }
-
-    inline void to_json(json & j, const GetUserAnyParams & x) {
-        j = json::object();
-        if (x.get_id()) {
-            j["id"] = x.get_id();
-        }
     }
 
     inline void from_json(const json & j, NewUserParams& x) {
