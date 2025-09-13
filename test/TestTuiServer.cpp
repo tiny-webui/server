@@ -73,7 +73,7 @@ static void SignalHandler(int sig);
 
 static constexpr std::string_view serverAddress = "127.0.0.1";
 static constexpr uint16_t serverPort = 12345;
-static constexpr std::string_view testUsername = "username";
+static constexpr std::string_view testUsername = "test@example.com";
 static constexpr std::string_view testPassword = "password";
 static App gApp{};
 
