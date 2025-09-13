@@ -10,5 +10,7 @@ namespace TUI::Application
         Salt = 1,
         w0 = 2,
         L = 3,
+        PublicMetadata = 4,
+        AdminSettings = 5,
     };
 }

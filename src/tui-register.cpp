@@ -159,17 +159,38 @@ static JS::Promise<void> MainAsync(Tev& tev, AppParams params)
     {
         throw std::invalid_argument("Invalid L size");
     }
+    std::string publicMetadata{};
+    auto publicMetadataOpt = tlv.GetElement(Application::RegisterTlvType::PublicMetadata);
+    if (publicMetadataOpt.has_value())
+    {
+        publicMetadata = std::string(publicMetadataOpt.value().begin(), publicMetadataOpt.value().end());
+        if (!Common::Utf8::IsValid(publicMetadata))
+        {
+            throw std::invalid_argument("Public metadata must be a valid UTF-8 string");
+        }
+        auto publicMetadataObj = nlohmann::json::parse(publicMetadata);
+        if (!publicMetadataObj.is_object())
+        {
+            throw std::invalid_argument("Public metadata must be a JSON object");
+        }
+        /** condense the json string */
+        publicMetadata = publicMetadataObj.dump();
+    }
+    /** The first user will always be admin. So the admin settings part is ignored. */
     Schema::IServer::UserCredential credential;
     credential.set_salt(Common::Base64::Encode(saltOpt.value()));
     credential.set_w0(Common::Base64::Encode(w0Opt.value()));
     credential.set_l(Common::Base64::Encode(LOpt.value()));
     Schema::IServer::UserAdminSettings adminSettings;
     using RoleType = std::remove_reference_t<decltype(adminSettings.get_mutable_role())>;
-    /** The first user should always be an admin */
     adminSettings.set_role(RoleType::ADMIN);
-    co_await database->CreateUserAsync(
+    auto userId = co_await database->CreateUserAsync(
         username,
         static_cast<nlohmann::json>(adminSettings).dump(),
         static_cast<nlohmann::json>(credential).dump());
+    if (!publicMetadata.empty())
+    {
+        co_await database->SetUserPublicMetadataAsync(userId, publicMetadata);
+    }
     std::cout << "First admin registered successfully: " << username << std::endl;
 }

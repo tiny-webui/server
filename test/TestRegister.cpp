@@ -16,13 +16,18 @@ int main(int argc, char const *argv[])
 {
     if (argc < 3)
     {
-        std::cerr << "Usage: " << argv[0] << " <username> <password>" << std::endl;
+        std::cerr << "Usage: " << argv[0] << " <username> <password> [meatdata json]" << std::endl;
         std::cerr << "Please DO NOT use a real username and password in this test." << std::endl;
         return 1;
     }
 
     std::string username = argv[1];
     std::string password = argv[2];
+    std::string publicMetadata{};
+    if (argc >= 4)
+    {
+        publicMetadata = argv[3];
+    }
 
     auto result = Cipher::Spake2p::Register(username, password);
     Common::Tlv<Application::RegisterTlvType> tlv;
@@ -30,6 +35,10 @@ int main(int argc, char const *argv[])
     tlv.SetElement(Application::RegisterTlvType::Salt, result.salt);
     tlv.SetElement(Application::RegisterTlvType::w0, result.w0);
     tlv.SetElement(Application::RegisterTlvType::L, result.L);
+    if (!publicMetadata.empty())
+    {
+        tlv.SetElement(Application::RegisterTlvType::PublicMetadata, publicMetadata);
+    }
     auto serializedData = tlv.Serialize();
     auto encodedData = Common::Base64::Encode(serializedData);
 
