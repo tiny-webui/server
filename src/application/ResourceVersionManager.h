@@ -70,7 +70,7 @@ namespace TUI::Application
         ResourceVersionManager& operator=(ResourceVersionManager&&) = delete;
         ~ResourceVersionManager() = default;
         
-        Lock GetReadLock(const std::vector<std::string>& resourcePath, const ID& id, bool checkVersion = true)
+        Lock GetReadLock(const std::vector<std::string>& resourcePath, const ID& id, bool consecutiveRead = false)
         {
             /** Lock first, then check. */
             LockReadLock(resourcePath, id);
@@ -93,9 +93,22 @@ namespace TUI::Application
                     }
                 }
             };
-            if (checkVersion) 
+            if (!consecutiveRead) 
             {
+                /** 
+                 * This resource is not paged or is the first page
+                 * When the resource is paged. This labels if the page head is synced.
+                 */
                 CheckReaderVersion(resourcePath, id);
+            }
+            else
+            {
+                /**
+                 * This may seem confusing.
+                 * But the consecutive reader must sync the resource head before reading more.
+                 * Which is the same requirement as the writer.
+                 */
+                CheckWriterVersion(resourcePath, id);
             }
             return std::move(lock);
         }

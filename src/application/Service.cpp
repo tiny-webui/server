@@ -335,7 +335,7 @@ JS::Promise<nlohmann::json> Service::OnGetChatListAsync(CallerId callerId, nlohm
      * Only checking the version when start is 0 (the first page).
      */
     auto lock = _resourceVersionManager->GetReadLock(
-        {"chatList", static_cast<std::string>(callerId.userId)}, callerId, params.get_start() == 0);
+        {"chatList", static_cast<std::string>(callerId.userId)}, callerId, params.get_start() != 0);
     auto start = params.get_start();
     auto quantity = params.get_quantity();
     if (start < 0 || quantity < 0)
@@ -345,12 +345,11 @@ JS::Promise<nlohmann::json> Service::OnGetChatListAsync(CallerId callerId, nlohm
 
     auto list = _database->ListChat(callerId.userId, static_cast<size_t>(start), static_cast<size_t>(quantity));
     Schema::IServer::GetChatListResult result{};
-    auto& resultList = result.get_mutable_list();
-    resultList.reserve(list.size());
+    result.reserve(list.size());
     auto metadataKeys = params.get_meta_data_keys();
     for (const auto& item : list)
     {
-        using EntryType = std::remove_reference<decltype(resultList)>::type::value_type;
+        using EntryType = std::remove_reference<decltype(result)>::type::value_type;
         EntryType entry;
         entry.set_id(static_cast<std::string>(item.id));
         if (metadataKeys.has_value())
@@ -359,9 +358,9 @@ JS::Promise<nlohmann::json> Service::OnGetChatListAsync(CallerId callerId, nlohm
             MetadataType metadata{TryGetMetadata(metadataKeys.value(), item.metadata)};
             entry.set_metadata(std::move(metadata));
         }
-        resultList.push_back(std::move(entry));
+        result.push_back(std::move(entry));
     }
-    resultList.shrink_to_fit();
+    result.shrink_to_fit();
     co_return static_cast<nlohmann::json>(result);
 }
 
@@ -797,6 +796,10 @@ JS::Promise<nlohmann::json> Service::OnGetUserListAsync(CallerId callerId, nlohm
             using MetadataType = std::remove_reference<decltype(entry.get_public_metadata())>::type;
             MetadataType metadata{TryGetMetadata(params.get_metadata_keys().value(), item.publicMetadata)};
             entry.set_public_metadata(std::move(metadata));
+        }
+        if (callerId.userId == item.id)
+        {
+            entry.set_is_self(true);
         }
         result.push_back(std::move(entry));
     }
