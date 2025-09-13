@@ -176,13 +176,13 @@ static JS::Promise<void> MainAsync(Tev& tev, AppParams params)
         /** condense the json string */
         publicMetadata = publicMetadataObj.dump();
     }
-    /** The first user will always be admin. So the admin settings part is ignored. */
     Schema::IServer::UserCredential credential;
     credential.set_salt(Common::Base64::Encode(saltOpt.value()));
     credential.set_w0(Common::Base64::Encode(w0Opt.value()));
     credential.set_l(Common::Base64::Encode(LOpt.value()));
     Schema::IServer::UserAdminSettings adminSettings;
     using RoleType = std::remove_reference_t<decltype(adminSettings.get_mutable_role())>;
+    /** The first user will always be admin */
     adminSettings.set_role(RoleType::ADMIN);
     auto userId = co_await database->CreateUserAsync(
         username,

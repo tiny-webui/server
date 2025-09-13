@@ -11,6 +11,5 @@ namespace TUI::Application
         w0 = 2,
         L = 3,
         PublicMetadata = 4,
-        AdminSettings = 5,
     };
 }
