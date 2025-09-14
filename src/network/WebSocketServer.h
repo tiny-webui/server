@@ -88,8 +88,8 @@ namespace TUI::Network::WebSocket
 
         struct ITCDataMessage : public IITCData
         {
-            explicit ITCDataMessage(std::uint64_t id, const std::vector<std::uint8_t>& message)
-                : id(id), message(message)
+            explicit ITCDataMessage(std::uint64_t id, std::vector<std::uint8_t> message)
+                : id(id), message(std::move(message))
             {
             }
             uint64_t id;
@@ -104,8 +104,8 @@ namespace TUI::Network::WebSocket
 
         struct ITCDataConnectionDisconnected : public IITCData
         {
-            explicit ITCDataConnectionDisconnected(std::uint64_t id, const std::string& reason) 
-                : id(id), reason(reason)
+            explicit ITCDataConnectionDisconnected(std::uint64_t id, std::string reason) 
+                : id(id), reason(std::move(reason))
             {
             }
             uint64_t id;

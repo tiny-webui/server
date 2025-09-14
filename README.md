@@ -90,7 +90,7 @@ npm i
 node ChatBot.js ../config/AzureOpenAI.json
 ```
 
-## API reference
-API design is not finalized. If anything feels wrong, let's discuss it.
-
-For now, some references are [IServer.ts](./src/schema/src/types/IServer.ts), [ChatBot.js](./test/ServiceClient/ChatBot.js), [TestUser.js](./test/ServiceClient/TestUser.js), [TestMetadata.js](./test/ServiceClient/TestMetadata.js) and [Service.cpp](./src/application/Service.cpp). 
+## Test with webapp
+1. Build the test `TestTuiServer`
+2. Start the test server with `./TestTuiServer -d <test database location>`
+This will create a test database with a test admin user (username: test@example.com, password: password). The server will listen on localhost:12345. Notice that the test database will be cleared each time this starts.
