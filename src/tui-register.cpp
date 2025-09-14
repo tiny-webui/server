@@ -296,7 +296,5 @@ static JS::Promise<std::string> ReadLineAsync(Tev& tev)
         }
     });
     co_await promise;
-    /** Call this explicitly since co_return may set the next read handler before this one is released */
-    readHandler.Clear();
     co_return buffer;
 }
