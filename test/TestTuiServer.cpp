@@ -2,6 +2,7 @@
 #include <iostream>
 #include <sstream>
 #include <memory>
+#include <fstream>
 
 #include <signal.h>
 #include <unistd.h>
@@ -22,17 +23,21 @@ using namespace TUI;
 struct AppParams
 {
     std::optional<std::filesystem::path> dbPath{std::nullopt};
+    std::optional<std::filesystem::path> configPath{std::nullopt};
 
     static AppParams Parse(int argc, char const *argv[])
     {
         int opt = -1;
         AppParams params{};
-        while ((opt = getopt(argc, const_cast<char**>(argv), "d:u:a:p:")) != -1)
+        while ((opt = getopt(argc, const_cast<char**>(argv), "d:c:")) != -1)
         {
             switch (opt)
             {
             case 'd':
                 params.dbPath = std::filesystem::path(optarg);
+                break;
+            case 'c':
+                params.configPath = std::filesystem::path(optarg);
                 break;
             default:
                 break;
@@ -54,7 +59,8 @@ struct AppParams
         std::ostringstream oss;
         oss << "Usage: " << std::endl 
             << programName << std::endl
-            << "    -d <database_path>" << std::endl;
+            << "    -d <database_path>" << std::endl
+            << "    [-c <config_path>]" << std::endl;
         return oss.str();
     }
 };
@@ -145,6 +151,24 @@ static JS::Promise<void> PrepareTestDatabaseAsync(AppParams params)
         std::string(testUsername),
         static_cast<nlohmann::json>(adminSettings).dump(),
         static_cast<nlohmann::json>(userCredential).dump());
+    /** Create a new model if config path is provided */
+    if (params.configPath.has_value())
+    {
+        if (!std::filesystem::exists(params.configPath.value()))
+        {
+            throw std::invalid_argument("Config path does not exist");
+        }
+        std::ifstream configFile(params.configPath->string());
+        if (!configFile.is_open())
+        {
+            throw std::runtime_error("Failed to open config file");
+        }
+        std::stringstream buffer;
+        buffer << configFile.rdbuf();
+        configFile.close();
+        std::string configContent = buffer.str();
+        co_await database->CreateModelAsync(configContent);
+    }
 }
 
 static JS::Promise<void> MainAsync(AppParams params)

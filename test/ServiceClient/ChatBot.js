@@ -17,10 +17,7 @@ const client = new TUIClient('127.0.0.1', 12345, (error) => {
 await client.connectAsync();
 
 const models = await client.makeRequestAsync('getModelList', {});
-const modelId = models[0]?.id ?? await client.makeRequestAsync('newModel', {
-    providerName: 'AzureOpenAI',
-    providerParams: config
-});
+const modelId = models[0]?.id ?? await client.makeRequestAsync('newModel', config);
 
 await client.makeRequestAsync('getChatList', {
     start: 0,
