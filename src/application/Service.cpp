@@ -866,14 +866,16 @@ JS::Promise<nlohmann::json> Service::OnDeleteUserAsync(CallerId callerId, nlohma
 JS::Promise<nlohmann::json> Service::OnGetUserAdminSettingsAsync(CallerId callerId, nlohmann::json paramsJson)
 {
     auto params = ParseParams<std::string>(paramsJson);
-    Common::Uuid userId{params};
-    if (callerId.userId != userId)
-    {
+    Common::Uuid userId{};
+    if (params.empty()) {
+        userId = callerId.userId;
+    } else {
         CheckAdmin(callerId.userId);
+        userId = Common::Uuid{params};
     }
     auto lock = _resourceVersionManager->GetReadLock(
         {"user", static_cast<std::string>(userId), "adminSettings"}, callerId);
-    
+
     auto settingsString = _database->GetUserAdminSettings(userId);
     auto settings = nlohmann::json::parse(settingsString).get<Schema::IServer::UserAdminSettings>();
 
