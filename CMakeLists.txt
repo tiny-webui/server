@@ -66,3 +66,6 @@ target_link_libraries(tui-register
     PRIVATE
         sqlite3
         uuid)
+
+install(TARGETS tui-server RUNTIME DESTINATION bin)
+install(TARGETS tui-register RUNTIME DESTINATION bin)
