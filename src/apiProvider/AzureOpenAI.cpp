@@ -20,13 +20,6 @@ OptionList<AzureOpenAI::Params> AzureOpenAI::ParamsDefinition = {
         [](AzureOpenAI::Params& params, std::string value){
             params.apiKey = std::move(value);
         }),
-    CreateOption<AzureOpenAI::Params, StringOption<AzureOpenAI::Params>>(
-        "model",
-        true,
-        [](AzureOpenAI::Params& params, std::string value){
-            params.model = std::move(value);
-        },
-        ""),
     CreateOption<AzureOpenAI::Params, NumberFromRangeOption<AzureOpenAI::Params>>(
         "temperature",
         true,
@@ -61,10 +54,6 @@ RequestData AzureOpenAI::FormatRequest(const Schema::IServer::LinearHistory& his
         {"temperature", _params.temperature},
         {"stream", stream}
     };
-    if (!_params.model.empty())
-    {
-        body["model"] = _params.model;
-    }
     for (const auto& message : history)
     {
         auto messageJson = nlohmann::json::object();

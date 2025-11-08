@@ -21,7 +21,6 @@ namespace TUI::ApiProvider
             /** The full url. This contains the deployment name and api version. */
             std::string url;
             std::string apiKey;
-            std::string model{""};
             double temperature{0.5};
         };
 
