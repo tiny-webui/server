@@ -401,6 +401,11 @@ JS::Promise<nlohmann::json> Service::OnGetChatAsync(CallerId callerId, nlohmann:
     auto lock = _resourceVersionManager->GetReadLock(
         {"chat", static_cast<std::string>(callerId.userId), static_cast<std::string>(chatId)}, callerId);
     auto contentStr = _database->GetChatContent(callerId.userId, chatId);
+    if (contentStr.empty())
+    {
+        Schema::IServer::TreeHistory emptyHistory{};
+        co_return static_cast<nlohmann::json>(emptyHistory);
+    }
     auto content = nlohmann::json::parse(contentStr).get<Schema::IServer::TreeHistory>();
     co_return static_cast<nlohmann::json>(content);
 }
