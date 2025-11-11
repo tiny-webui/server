@@ -400,9 +400,8 @@ JS::Promise<nlohmann::json> Service::OnGetChatAsync(CallerId callerId, nlohmann:
     Common::Uuid chatId{params};
     auto lock = _resourceVersionManager->GetReadLock(
         {"chat", static_cast<std::string>(callerId.userId), static_cast<std::string>(chatId)}, callerId);
-    auto contentStr = _database->GetChatContent(callerId.userId, chatId);
-    auto content = nlohmann::json::parse(contentStr).get<Schema::IServer::TreeHistory>();
-    co_return static_cast<nlohmann::json>(content);
+    auto history = _database->GetChatHistory(callerId.userId, chatId);
+    co_return static_cast<nlohmann::json>(history);
 }
 
 /**
@@ -453,20 +452,19 @@ JS::AsyncGenerator<nlohmann::json, nlohmann::json> Service::OnChatCompletionAsyn
         {"chat", static_cast<std::string>(callerId.userId), static_cast<std::string>(chatId)}, callerId);
 
     int64_t userMessageTimestamp = Common::Timestamp::GetWallClock();
+
     /** Construct the linear history from the tree history and the new user message */
-    Schema::IServer::TreeHistory treeHistory{};
-    {
-        auto contentStr = _database->GetChatContent(callerId.userId, chatId);
-        if (!contentStr.empty())
-        {
-            treeHistory = nlohmann::json::parse(contentStr).get<Schema::IServer::TreeHistory>();
-        }
-    }
-    auto& nodes = treeHistory.get_mutable_nodes();
+    Common::Uuid parentId{nullptr};
     Schema::IServer::LinearHistory history{};
     {
+        auto treeHistory = _database->GetChatHistory(callerId.userId, chatId);
+        auto& nodes = treeHistory.get_nodes();
         std::list<Schema::IServer::Message> historyList{};
         auto parentIdStr = params.get_parent();
+        if (parentIdStr.has_value())
+        {
+            parentId = Common::Uuid{parentIdStr.value()};
+        }
         while (parentIdStr.has_value())
         {
             auto item = nodes.find(parentIdStr.value());
@@ -543,9 +541,23 @@ JS::AsyncGenerator<nlohmann::json, nlohmann::json> Service::OnChatCompletionAsyn
         }
     }
 
-    /** Save changes to the tree history */
+    /** Save changes to the database */
     Common::Uuid userMessageId{};
     Common::Uuid responseMessageId{};
+    {
+        Schema::IServer::MessageNode userNode{};
+        userNode.set_id(static_cast<std::string>(userMessageId));
+        userNode.set_message(std::move(params.get_mutable_user_message()));
+        if (parentId != nullptr)
+        {
+            userNode.set_parent(static_cast<std::string>(parentId));
+        }
+        userNode.set_children({static_cast<std::string>(responseMessageId)});
+        userNode.set_timestamp(static_cast<double>(userMessageTimestamp));
+        co_await _database->AppendChatHistoryAsync(
+            callerId.userId, chatId,
+            std::move(userNode));
+    }
     {
         Schema::IServer::MessageNode responseNode{};   
         responseNode.set_id(static_cast<std::string>(responseMessageId));
@@ -562,30 +574,11 @@ JS::AsyncGenerator<nlohmann::json, nlohmann::json> Service::OnChatCompletionAsyn
         responseNode.set_message(std::move(responseMessage));
         responseNode.set_parent(static_cast<std::string>(userMessageId));
         responseNode.set_timestamp(static_cast<double>(Common::Timestamp::GetWallClock()));
-        nodes.emplace(static_cast<std::string>(responseMessageId), std::move(responseNode));
-
-        Schema::IServer::MessageNode userNode{};
-        userNode.set_id(static_cast<std::string>(userMessageId));
-        userNode.set_message(std::move(params.get_mutable_user_message()));
-        userNode.set_children({static_cast<std::string>(responseMessageId)});
-        if (params.get_parent().has_value())
-        {
-            userNode.set_parent(params.get_parent());
-            auto item = nodes.find(params.get_parent().value());
-            if (item == nodes.end())
-            {
-                throw Schema::Rpc::Exception(Schema::Rpc::ErrorCode::NOT_FOUND, "Parent message not found");
-            } 
-            auto& parentNode = item->second;
-            parentNode.get_mutable_children().push_back(static_cast<std::string>(userMessageId));
-        }
-        userNode.set_timestamp(static_cast<double>(userMessageTimestamp));
-        nodes.emplace(static_cast<std::string>(userMessageId), std::move(userNode));
-    }
-    /** Save the tree history back */
-    {
-        auto contentStr = static_cast<nlohmann::json>(treeHistory).dump();
-        co_await _database->SetChatContentAsync(callerId.userId, chatId, std::move(contentStr));
+        co_await _database->AppendChatHistoryAsync(
+            callerId.userId, chatId,
+            std::move(responseNode),
+            /** Skip parent update. As the user node is already written */
+            false);
     }
 
     /** Return completion info */

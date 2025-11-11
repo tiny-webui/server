@@ -3,10 +3,12 @@
 #include <tev-cpp/Tev.h>
 #include <js-style-co-routine/Promise.h>
 #include "database/Database.h"
+#include "schema/IServer.h"
 #include "Utility.h"
 
 using namespace TUI::Database;
 using namespace TUI::Common;
+using namespace TUI::Schema;
 
 Tev tev{};
 std::string dbPath{};
@@ -163,9 +165,59 @@ JS::Promise<void> TestChatAsync()
     co_await db->SetChatMetadataAsync(userId, chatId, "test-chat-metadata");
     auto metadata = db->GetChatMetadata(userId, chatId);
     AssertWithMessage(metadata == "test-chat-metadata", "Chat metadata should match");
-    co_await db->SetChatContentAsync(userId, chatId, "test-chat-content");
-    auto content = db->GetChatContent(userId, chatId);
-    AssertWithMessage(content == "test-chat-content", "Chat content should match");
+    {
+        IServer::Message message0{};
+        using MessageRoleType = std::remove_reference<decltype(message0.get_mutable_role())>::type;
+        message0.set_role(MessageRoleType::USER);
+        using MessageContentType = std::remove_reference<decltype(message0.get_mutable_content())>::type::value_type;
+        MessageContentType content0{};
+        using MessageContentTypeType = std::remove_reference<decltype(content0.get_mutable_type())>::type;
+        content0.set_type(MessageContentTypeType::TEXT);
+        content0.set_data("Hello, this is a test message.");
+        message0.get_mutable_content().push_back(std::move(content0));
+        IServer::MessageNode node0{};
+        node0.set_id("node0");
+        node0.set_timestamp(1.0);
+        node0.set_message(std::move(message0));
+        co_await db->AppendChatHistoryAsync(userId, chatId, node0);
+
+        IServer::MessageNode node1{};
+        node1.set_id("node1");
+        node1.set_parent("node0");
+        node1.set_timestamp(2.0);
+        IServer::Message message1{};
+        message1.set_role(MessageRoleType::ASSISTANT);
+        MessageContentType content1{};
+        content1.set_type(MessageContentTypeType::TEXT);
+        content1.set_data("This is a response message.");
+        message1.get_mutable_content().push_back(std::move(content1));
+        node1.set_message(std::move(message1));
+        co_await db->AppendChatHistoryAsync(userId, chatId, node1);
+        
+        auto history = db->GetChatHistory(userId, chatId);
+        auto& nodes = history.get_nodes();
+        AssertWithMessage(nodes.size() == 2, "Chat history should have 2 messages");
+        auto retrievedNode0It = nodes.find("node0");
+        AssertWithMessage(retrievedNode0It != nodes.end(), "Node0 should be found");
+        auto& retrievedNode0 = retrievedNode0It->second;
+        AssertWithMessage(retrievedNode0.get_timestamp() == 1.0, "Node0 timestamp should match");
+        AssertWithMessage(retrievedNode0.get_message().get_role() == MessageRoleType::USER, "Node0 role should match");
+        AssertWithMessage(retrievedNode0.get_message().get_content().size() == 1, "Node0 content size should match");
+        AssertWithMessage(retrievedNode0.get_message().get_content().front().get_data() == "Hello, this is a test message.", "Node0 content data should match");
+        AssertWithMessage(retrievedNode0.get_parent().has_value() == false, "Node0 parent should be null");
+        AssertWithMessage(retrievedNode0.get_children().size() == 1, "Node0 should have 1 child");
+        AssertWithMessage(retrievedNode0.get_children().front() == "node1", "Node0 child ID should match");
+        auto retrievedNode1It = nodes.find("node1");
+        AssertWithMessage(retrievedNode1It != nodes.end(), "Node1 should be found");
+        auto& retrievedNode1 = retrievedNode1It->second;
+        AssertWithMessage(retrievedNode1.get_timestamp() == 2.0, "Node1 timestamp should match");
+        AssertWithMessage(retrievedNode1.get_message().get_role() == MessageRoleType::ASSISTANT, "Node1 role should match");
+        AssertWithMessage(retrievedNode1.get_message().get_content().size() == 1, "Node1 content size should match");
+        AssertWithMessage(retrievedNode1.get_message().get_content().front().get_data() == "This is a response message.", "Node1 content data should match");
+        AssertWithMessage(retrievedNode1.get_parent().has_value() == true, "Node1 parent should not be null");
+        AssertWithMessage(retrievedNode1.get_parent().value() == "node0", "Node1 parent ID should match");
+        AssertWithMessage(retrievedNode1.get_children().empty(), "Node1 should have no children");
+    }
     size_t count = db->GetChatCount(userId);
     AssertWithMessage(count == 1, "Chat count should be 1");
     co_await db->DeleteChatAsync(userId, chatId);

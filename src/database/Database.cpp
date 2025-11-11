@@ -1,9 +1,11 @@
 #include <format>
+#include <nlohmann/json.hpp>
 #include "Database.h"
 #include "common/Timestamp.h"
 
 using namespace TUI::Common;
 using namespace TUI::Database;
+using namespace TUI::Schema;
 
 JS::Promise<std::shared_ptr<Database>> Database::CreateAsync(Tev& tev, const std::filesystem::path& dbPath)
 {
@@ -33,8 +35,17 @@ JS::Promise<std::shared_ptr<Database>> Database::CreateAsync(Tev& tev, const std
         "user_id TEXT, "
         "id TEXT, "
         "metadata TEXT, "
-        "content TEXT, "
         "PRIMARY KEY (user_id, id));");
+    co_await db->_db->ExecAsync(
+        "CREATE TABLE IF NOT EXISTS chat_content ("
+        "user_id TEXT, "
+        "chat_id TEXT, "
+        "id TEXT, "
+        "parent TEXT, "
+        "children TEXT, "
+        "message TEXT, "
+        "timestamp INTEGER, "
+        "PRIMARY KEY (user_id, chat_id, id));");
     co_return db;
 }
 
@@ -132,6 +143,9 @@ JS::Promise<void> Database::DeleteUserAsync(const Uuid& id)
         static_cast<std::string>(id));
     co_await _db->ExecAsync(
         "DELETE FROM chat WHERE user_id = ?;",
+        static_cast<std::string>(id));
+    co_await _db->ExecAsync(
+        "DELETE FROM chat_content WHERE user_id = ?;",
         static_cast<std::string>(id));
 }
 
@@ -266,6 +280,9 @@ JS::Promise<void> Database::DeleteChatAsync(const Uuid& userId, const Uuid& id)
     co_await _db->ExecAsync(
         "DELETE FROM chat WHERE user_id = ? AND id = ?;",
         static_cast<std::string>(userId), static_cast<std::string>(id));
+    co_await _db->ExecAsync(
+        "DELETE FROM chat_content WHERE user_id = ? AND chat_id = ?;",
+        static_cast<std::string>(userId), static_cast<std::string>(id));
 }
 
 size_t Database::GetChatCount(const Uuid& userId)
@@ -306,14 +323,135 @@ std::string Database::GetChatMetadata(const Uuid& userId, const Uuid& id)
     return GetStringFromChat(userId, id, "metadata");
 }
 
-JS::Promise<void> Database::SetChatContentAsync(const Uuid& userId, const Uuid& id, std::string content)
+JS::Promise<void> Database::AppendChatHistoryAsync(
+    const Uuid& userId,
+    const Uuid& chatId,
+    IServer::MessageNode node,
+    bool updateParent)
 {
-    return SetStringToChatAsync(userId, id, "content", content);
+    if (node.get_parent().has_value() && updateParent)
+    {
+        auto result = _db->Exec(
+            "SELECT children FROM chat_content WHERE user_id = ? AND chat_id = ? AND id = ?;",
+            static_cast<std::string>(userId),
+            static_cast<std::string>(chatId),
+            node.get_parent().value());
+        if (result.empty())
+        {
+            throw std::runtime_error("Parent message not found");
+        }
+        auto& row = result.front();
+        auto it = row.find("children");
+        if (it == row.end())
+        {
+            throw std::runtime_error("Children field not found");
+        }
+        std::string childrenStr;
+        if (std::holds_alternative<std::string>(it->second))
+        {
+            childrenStr = std::get<std::string>(it->second);
+        }
+        else if (std::holds_alternative<std::nullptr_t>(it->second))
+        {
+            childrenStr = "[]";
+        }
+        else
+        {
+            throw std::runtime_error("Invalid children field type");
+        }
+        nlohmann::json children = nlohmann::json::parse(childrenStr);
+        children.push_back(node.get_id());
+        co_await _db->ExecAsync(
+            "UPDATE chat_content SET children = ? WHERE user_id = ? AND chat_id = ? AND id = ?;",
+            children.dump(),
+            static_cast<std::string>(userId),
+            static_cast<std::string>(chatId),
+            node.get_parent().value());
+    }
+
+    co_await _db->ExecAsync(
+        "INSERT INTO chat_content (user_id, chat_id, id, parent, children, message, timestamp) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?);",
+        static_cast<std::string>(userId),
+        static_cast<std::string>(chatId),
+        node.get_id(),
+        node.get_parent().value_or(""),
+        (static_cast<nlohmann::json>(node.get_children())).dump(),
+        (static_cast<nlohmann::json>(node.get_message())).dump(),
+        static_cast<int64_t>(node.get_timestamp()));
 }
 
-std::string Database::GetChatContent(const Uuid& userId, const Uuid& id)
+IServer::TreeHistory Database::GetChatHistory(const Uuid& userId, const Uuid& id)
 {
-    return GetStringFromChat(userId, id, "content");
+    auto result = _db->Exec(
+        "SELECT id, parent, children, message, timestamp FROM chat_content "
+        "WHERE user_id = ? AND chat_id = ?;",
+        static_cast<std::string>(userId),
+        static_cast<std::string>(id));
+    IServer::TreeHistory history{};
+    auto& nodes = history.get_mutable_nodes();
+    for (auto& row : result)
+    {
+        try
+        {
+            IServer::MessageNode node{};
+
+            auto messageIdItem = row.find("id");
+            if (messageIdItem == row.end())
+            {
+                continue;
+            }
+            node.set_id(std::get<std::string>(messageIdItem->second));
+
+            auto parentItem = row.find("parent");
+            if (parentItem != row.end() && !std::holds_alternative<std::nullptr_t>(parentItem->second))
+            {
+                auto parentStr = std::get<std::string>(parentItem->second);
+                if (!parentStr.empty())
+                {
+                    node.set_parent(parentStr);
+                }
+            }
+
+            auto childrenItem = row.find("children");
+            if (childrenItem != row.end() && std::holds_alternative<std::string>(childrenItem->second))
+            {
+                auto childrenStr = std::get<std::string>(childrenItem->second);
+                nlohmann::json childrenJson = nlohmann::json::parse(childrenStr);
+                std::vector<std::string> children{};
+                for (const auto& child : childrenJson)
+                {
+                    children.emplace_back(child.get<std::string>());
+                }
+                node.set_children(children);
+            }
+
+            auto messageItem = row.find("message");
+            if (messageItem == row.end())
+            {
+                continue;
+            }
+            std::string messageStr = std::get<std::string>(messageItem->second);
+            auto message = nlohmann::json::parse(messageStr).get<IServer::Message>();
+            node.set_message(std::move(message));
+
+            auto timestampItem = row.find("timestamp");
+            if (timestampItem == row.end())
+            {
+                continue;
+            }
+            int64_t timestamp = std::get<int64_t>(timestampItem->second);
+            node.set_timestamp(static_cast<double>(timestamp));
+
+            nodes.emplace(node.get_id(), std::move(node));
+        }
+        catch(...)
+        {
+            /** @todo log */
+            /** Ignored */
+        }
+    }
+    return history;
 }
 
 std::list<Database::IdMetadataPair> Database::ParseListTableIdWithMetadataResult(

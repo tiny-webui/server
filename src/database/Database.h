@@ -7,6 +7,7 @@
 #include <tev-cpp/Tev.h>
 #include <js-style-co-routine/Promise.h>
 #include "common/Uuid.h"
+#include "schema/IServer.h"
 #include "Sqlite.h"
 
 namespace TUI::Database
@@ -77,9 +78,12 @@ namespace TUI::Database
         JS::Promise<void> SetChatMetadataAsync(
             const Common::Uuid& userId, const Common::Uuid& chatId, std::string metadata);
         std::string GetChatMetadata(const Common::Uuid& userId, const Common::Uuid& chatId);
-        JS::Promise<void> SetChatContentAsync(
-            const Common::Uuid& userId, const Common::Uuid& chatId, std::string content);
-        std::string GetChatContent(const Common::Uuid& userId, const Common::Uuid& chatId);
+        JS::Promise<void> AppendChatHistoryAsync(
+            const Common::Uuid& userId,
+            const Common::Uuid& chatId,
+            Schema::IServer::MessageNode node,
+            bool updateParent = true);
+        Schema::IServer::TreeHistory GetChatHistory(const Common::Uuid& userId, const Common::Uuid& chatId);
 
     private:
         Database() = default;
