@@ -22,6 +22,7 @@ namespace TUI::ApiProvider
             std::string url;
             std::string apiKey;
             double temperature{0.5};
+            std::string model{""};
         };
 
         static Option::OptionList<Params> ParamsDefinition;

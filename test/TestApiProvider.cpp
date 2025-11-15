@@ -39,7 +39,9 @@ JS::Promise<void> TestBulkChatAsync()
 {
     auto client = Http::Client::Create(tev);
     auto params = LoadJsonFile(configFilePath);
-    auto provider = ApiProvider::Factory::CreateProvider("AzureOpenAI", params);;
+    auto provider = ApiProvider::Factory::CreateProvider(
+        params["providerName"].get<std::string>(),
+        params["providerParams"]);
     auto history = LoadChatHistory(historyFilePath);
     auto requestData = provider->FormatRequest(history, false);
     auto response = co_await client->MakeRequest(Http::Method::POST, requestData).GetResponseAsync();
@@ -51,7 +53,9 @@ JS::Promise<void> TestStreamChatAsync()
 {
     auto client = Http::Client::Create(tev);
     auto params = LoadJsonFile(configFilePath);
-    auto provider = ApiProvider::Factory::CreateProvider("AzureOpenAI", params);
+    auto provider = ApiProvider::Factory::CreateProvider(
+        params["providerName"].get<std::string>(),
+        params["providerParams"]);
     auto history = LoadChatHistory(historyFilePath);
     auto requestData = provider->FormatRequest(history, true);
     auto streamEventParser = Http::StreamResponse::Parser{};
