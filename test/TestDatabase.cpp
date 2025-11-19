@@ -86,9 +86,8 @@ JS::Promise<void> TestUserAsync()
     std::string credentialInput = "test-credential";
     std::string credentialInput2 = "test-credential2";
     std::string publicMetadataInput = "test-public-metadata";
-    std::string publicMetadataInput2 = "test-public-metadata2";
+    std::string adminMetadataInput = "test-admin-metadata";
     std::string metadataInput = "test-metadata";
-    std::string metadataInput2 = "test-metadata2";
 
     auto userId = co_await db->CreateUserAsync(
         usernameInput, adminSettingsInput, credentialInput);
@@ -102,6 +101,7 @@ JS::Promise<void> TestUserAsync()
             AssertWithMessage(user.userName == usernameInput, "Username should match");
             AssertWithMessage(user.adminSettings == adminSettingsInput, "Admin settings should match");
             AssertWithMessage(user.publicMetadata.empty(), "Public metadata should be empty");
+            AssertWithMessage(user.adminMetadata.empty(), "Admin metadata should be empty");
             break;
         }
     }
@@ -109,12 +109,15 @@ JS::Promise<void> TestUserAsync()
     auto credential = db->GetUserCredential(userId);
     AssertWithMessage(credential == credentialInput, "Credential should match");
 
-    co_await db->SetUserMetadataAsync(userId, metadataInput2);
+    co_await db->SetUserMetadataAsync(userId, metadataInput);
     auto metadata = db->GetUserMetadata(userId);
-    AssertWithMessage(metadata == metadataInput2, "User metadata should match");
-    co_await db->SetUserPublicMetadataAsync(userId, publicMetadataInput2);
+    AssertWithMessage(metadata == metadataInput, "User metadata should match");
+    co_await db->SetUserPublicMetadataAsync(userId, publicMetadataInput);
     auto publicMetadata = db->GetUserPublicMetadata(userId);
-    AssertWithMessage(publicMetadata == publicMetadataInput2, "User public metadata should match");
+    AssertWithMessage(publicMetadata == publicMetadataInput, "User public metadata should match");
+    co_await db->SetUserAdminMetadataAsync(userId, adminMetadataInput);
+    auto adminMetadata = db->GetUserAdminMetadata(userId);
+    AssertWithMessage(adminMetadataInput == adminMetadata, "User admin metadata should match");
     co_await db->SetUserAdminSettingsAsync(userId, adminSettingsInput2);
     auto adminSettings = db->GetUserAdminSettings(userId);
     AssertWithMessage(adminSettings == adminSettingsInput2, "User admin settings should match");

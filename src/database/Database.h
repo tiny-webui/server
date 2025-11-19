@@ -57,10 +57,13 @@ namespace TUI::Database
             std::string userName;
             std::string adminSettings;
             std::string publicMetadata;
+            std::string adminMetadata;
         };
         std::list<UserListItem> ListUser();
         JS::Promise<void> SetUserPublicMetadataAsync(const Common::Uuid& id, std::string metadata);
         std::string GetUserPublicMetadata(const Common::Uuid& id);
+        JS::Promise<void> SetUserAdminMetadataAsync(const Common::Uuid& id, std::string metadata);
+        std::string GetUserAdminMetadata(const Common::Uuid& id);
         JS::Promise<void> SetUserMetadataAsync(const Common::Uuid& id, std::string metadata);
         std::string GetUserMetadata(const Common::Uuid& id);
         JS::Promise<void> SetUserAdminSettingsAsync(const Common::Uuid& id, std::string settings);
