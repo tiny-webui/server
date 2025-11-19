@@ -135,6 +135,21 @@ JS::Promise<nlohmann::json> Service::OnSetMetadataAsync(CallerId callerId, nlohm
             callerId.userId,
             std::move(newMetadataString));
     }
+    else if (path[0] == "userAdmin")
+    {
+        /** Admin */
+        CheckAdmin(callerId.userId);
+        if (path.size() != 2)
+        {
+            throw Schema::Rpc::Exception(Schema::Rpc::ErrorCode::BAD_REQUEST, "Invalid user admin path");
+        }
+        Common::Uuid targetUserId{path[1]};
+        auto metadataString = _database->GetUserAdminMetadata(targetUserId);
+        auto newMetadataString = TryMergeMetadata(metadataString, params.get_mutable_entries());
+        co_await _database->SetUserAdminMetadataAsync(
+            targetUserId,
+            std::move(newMetadataString));
+    }
     else if (path[0] == "chat")
     {
         /** Current user */
@@ -180,7 +195,6 @@ JS::Promise<nlohmann::json> Service::OnGetMetadataAsync(CallerId callerId, nlohm
     else if (path[0] == "model")
     {
         /** Any */
-        CheckAdmin(callerId.userId);
         if (path.size() != 2)
         {
             throw Schema::Rpc::Exception(Schema::Rpc::ErrorCode::BAD_REQUEST, "Invalid model path");
@@ -212,6 +226,17 @@ JS::Promise<nlohmann::json> Service::OnGetMetadataAsync(CallerId callerId, nlohm
             throw Schema::Rpc::Exception(Schema::Rpc::ErrorCode::BAD_REQUEST, "Invalid user public path");
         }
         metadataString = _database->GetUserPublicMetadata(targetUserId);
+    }
+    else if (path[0] == "userAdmin")
+    {
+        /** Admin */
+        CheckAdmin(callerId.userId);
+        if (path.size() != 2)
+        {
+            throw Schema::Rpc::Exception(Schema::Rpc::ErrorCode::BAD_REQUEST, "Invalid user admin path");
+        }
+        Common::Uuid targetUserId{path[1]};
+        metadataString = _database->GetUserAdminMetadata(targetUserId);
     }
     else if (path[0] == "chat")
     {
@@ -294,6 +319,21 @@ JS::Promise<nlohmann::json> Service::OnDeleteMetadataAsync(CallerId callerId, nl
         auto newMetadataString = TryDeleteMetadata(metadataString, params.get_keys());
         co_await _database->SetUserPublicMetadataAsync(
             callerId.userId,
+            std::move(newMetadataString));
+    }
+    else if (path[0] == "userAdmin")
+    {
+        /** Admin */
+        CheckAdmin(callerId.userId);
+        if (path.size() != 2)
+        {
+            throw Schema::Rpc::Exception(Schema::Rpc::ErrorCode::BAD_REQUEST, "Invalid user admin path");
+        }
+        Common::Uuid targetUserId{path[1]};
+        auto metadataString = _database->GetUserAdminMetadata(targetUserId);
+        auto newMetadataString = TryDeleteMetadata(metadataString, params.get_keys());
+        co_await _database->SetUserAdminMetadataAsync(
+            targetUserId,
             std::move(newMetadataString));
     }
     else if (path[0] == "chat")
@@ -784,11 +824,17 @@ JS::Promise<nlohmann::json> Service::OnGetUserListAsync(CallerId callerId, nlohm
         auto userAdminSettings = nlohmann::json::parse(item.adminSettings).get<Schema::IServer::UserAdminSettings>();
         /** @todo force up to date the user admin settings */
         entry.set_admin_settings(std::move(userAdminSettings));
-        if (params.get_metadata_keys().has_value())
+        if (params.get_public_metadata_keys().has_value())
         {
             using MetadataType = std::remove_reference<decltype(entry.get_public_metadata())>::type;
-            MetadataType metadata{TryGetMetadata(params.get_metadata_keys().value(), item.publicMetadata)};
+            MetadataType metadata{TryGetMetadata(params.get_public_metadata_keys().value(), item.publicMetadata)};
             entry.set_public_metadata(std::move(metadata));
+        }
+        if (params.get_admin_metadata_keys().has_value())
+        {
+            using MetadataType = std::remove_reference<decltype(entry.get_admin_metadata())>::type;
+            MetadataType metadata{TryGetMetadata(params.get_admin_metadata_keys().value(), item.adminMetadata)};
+            entry.set_admin_metadata(std::move(metadata));
         }
         if (callerId.userId == item.id)
         {
