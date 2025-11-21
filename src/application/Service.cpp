@@ -889,6 +889,9 @@ JS::Promise<nlohmann::json> Service::OnDeleteUserAsync(CallerId callerId, nlohma
 
     co_await _database->DeleteUserAsync(userId);
     _userRoleCache.erase(userId);
+    _rpcServer->CloseConnection([=](const CallerId& id)-> bool {
+        return id.userId == userId;
+    });
     /** Return null */
     co_return nlohmann::json{};
 }
