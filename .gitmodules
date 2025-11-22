@@ -1,3 +1,3 @@
 [submodule "src/schema/src/types"]
 	path = src/schema/src/types
-	url = git@github.com:tiny-webui/types.git
+	url = https://github.com/tiny-webui/types.git

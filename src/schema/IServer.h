@@ -510,11 +510,15 @@ namespace IServer {
         virtual ~GetUserListParams() = default;
 
         private:
-        std::optional<std::vector<std::string>> metadata_keys;
+        std::optional<std::vector<std::string>> public_metadata_keys;
+        std::optional<std::vector<std::string>> admin_metadata_keys;
 
         public:
-        std::optional<std::vector<std::string>> get_metadata_keys() const { return metadata_keys; }
-        void set_metadata_keys(std::optional<std::vector<std::string>> value) { this->metadata_keys = value; }
+        std::optional<std::vector<std::string>> get_public_metadata_keys() const { return public_metadata_keys; }
+        void set_public_metadata_keys(std::optional<std::vector<std::string>> value) { this->public_metadata_keys = value; }
+
+        std::optional<std::vector<std::string>> get_admin_metadata_keys() const { return admin_metadata_keys; }
+        void set_admin_metadata_keys(std::optional<std::vector<std::string>> value) { this->admin_metadata_keys = value; }
     };
 
     class GetUserListResultElement {
@@ -527,6 +531,7 @@ namespace IServer {
         std::string id;
         std::optional<bool> is_self;
         std::optional<std::map<std::string, nlohmann::json>> public_metadata;
+        std::optional<std::map<std::string, nlohmann::json>> admin_metadata;
         std::string user_name;
 
         public:
@@ -543,6 +548,9 @@ namespace IServer {
 
         std::optional<std::map<std::string, nlohmann::json>> get_public_metadata() const { return public_metadata; }
         void set_public_metadata(std::optional<std::map<std::string, nlohmann::json>> value) { this->public_metadata = value; }
+
+        std::optional<std::map<std::string, nlohmann::json>> get_admin_metadata() const { return admin_metadata; }
+        void set_admin_metadata(std::optional<std::map<std::string, nlohmann::json>> value) { this->admin_metadata = value; }
 
         const std::string & get_user_name() const { return user_name; }
         std::string & get_mutable_user_name() { return user_name; }
@@ -945,13 +953,17 @@ namespace IServer {
     }
 
     inline void from_json(const json & j, GetUserListParams& x) {
-        x.set_metadata_keys(get_stack_optional<std::vector<std::string>>(j, "metadataKeys"));
+        x.set_public_metadata_keys(get_stack_optional<std::vector<std::string>>(j, "publicMetadataKeys"));
+        x.set_admin_metadata_keys(get_stack_optional<std::vector<std::string>>(j, "adminMetadataKeys"));
     }
 
     inline void to_json(json & j, const GetUserListParams & x) {
         j = json::object();
-        if (x.get_metadata_keys()) {
-            j["metadataKeys"] = x.get_metadata_keys();
+        if (x.get_public_metadata_keys()) {
+            j["publicMetadataKeys"] = x.get_public_metadata_keys();
+        }
+        if (x.get_admin_metadata_keys()) {
+            j["adminMetadataKeys"] = x.get_admin_metadata_keys();
         }
     }
 
@@ -960,6 +972,7 @@ namespace IServer {
         x.set_id(j.at("id").get<std::string>());
         x.set_is_self(get_stack_optional<bool>(j, "isSelf"));
         x.set_public_metadata(get_stack_optional<std::map<std::string, nlohmann::json>>(j, "publicMetadata"));
+        x.set_admin_metadata(get_stack_optional<std::map<std::string, nlohmann::json>>(j, "adminMetadata"));
         x.set_user_name(j.at("userName").get<std::string>());
     }
 
@@ -972,6 +985,9 @@ namespace IServer {
         }
         if (x.get_public_metadata()) {
             j["publicMetadata"] = x.get_public_metadata();
+        }
+        if (x.get_admin_metadata()) {
+            j["adminMetadata"] = x.get_admin_metadata();
         }
         j["userName"] = x.get_user_name();
     }

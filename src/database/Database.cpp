@@ -27,6 +27,7 @@ JS::Promise<std::shared_ptr<Database>> Database::CreateAsync(Tev& tev, const std
         "username TEXT UNIQUE, "
         "metadata TEXT, "
         "public_metadata TEXT, "
+        "admin_metadata TEXT, "
         "admin_settings TEXT, "
         "credential TEXT);");
     co_await db->_db->ExecAsync(
@@ -151,7 +152,7 @@ JS::Promise<void> Database::DeleteUserAsync(const Uuid& id)
 
 std::list<Database::UserListItem> Database::ListUser()
 {
-    auto result = _db->Exec("SELECT id, username, admin_settings, public_metadata FROM user;");
+    auto result = _db->Exec("SELECT id, username, admin_settings, public_metadata, admin_metadata FROM user;");
     std::list<UserListItem> list{};
     for (auto& row : result)
     {
@@ -178,24 +179,44 @@ std::list<Database::UserListItem> Database::ListUser()
             }
             std::string adminSettings = std::move(std::get<std::string>(adminSettingsItem->second));
 
-            auto metadataItem = row.find("public_metadata");
-            std::string metadata{};
-            if (metadataItem == row.end())
+            auto publicMetadataItem = row.find("public_metadata");
+            std::string publicMetadata{};
+            if (publicMetadataItem == row.end())
             {
                 continue;
             }
-            if (std::holds_alternative<std::string>(metadataItem->second))
+            if (std::holds_alternative<std::string>(publicMetadataItem->second))
             {
-                metadata = std::move(std::get<std::string>(metadataItem->second));
+                publicMetadata = std::move(std::get<std::string>(publicMetadataItem->second));
             }
-            else if (!std::holds_alternative<std::nullptr_t>(metadataItem->second))
+            else if (!std::holds_alternative<std::nullptr_t>(publicMetadataItem->second))
+            {
+                /** Invalid metadata */
+                continue;
+            }
+
+            auto adminMetadataItem = row.find("admin_metadata");
+            std::string adminMetadata{};
+            if (adminMetadataItem == row.end())
+            {
+                continue;
+            }
+            if (std::holds_alternative<std::string>(adminMetadataItem->second))
+            {
+                adminMetadata = std::move(std::get<std::string>(adminMetadataItem->second));
+            }
+            else if (!std::holds_alternative<std::nullptr_t>(adminMetadataItem->second))
             {
                 /** Invalid metadata */
                 continue;
             }
 
             list.emplace_back(
-                id, std::move(username), std::move(adminSettings), std::move(metadata));
+                id,
+                std::move(username),
+                std::move(adminSettings),
+                std::move(publicMetadata),
+                std::move(adminMetadata));
         }
         catch(...)
         {
@@ -214,6 +235,16 @@ JS::Promise<void> Database::SetUserPublicMetadataAsync(const Uuid& id, std::stri
 std::string Database::GetUserPublicMetadata(const Uuid& id)
 {
     return GetStringFromTableById("user", id, "public_metadata");
+}
+
+JS::Promise<void> Database::SetUserAdminMetadataAsync(const Uuid& id, std::string metadata)
+{
+    return SetStringToTableById("user", id, "admin_metadata", std::move(metadata));
+}
+
+std::string Database::GetUserAdminMetadata(const Uuid& id)
+{
+    return GetStringFromTableById("user", id, "admin_metadata");
 }
 
 JS::Promise<void> Database::SetUserMetadataAsync(const Uuid& id, std::string metadata)
