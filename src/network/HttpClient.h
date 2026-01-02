@@ -59,6 +59,7 @@ namespace TUI::Network::Http
         {
             JS::AsyncGenerator<std::string> generator{};
             std::weak_ptr<CurlTypes::Curl> curl{};
+            std::string lastSegment{};
         };
 
         std::shared_ptr<State> _state{std::make_shared<State>()};
