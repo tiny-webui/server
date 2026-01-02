@@ -40,7 +40,9 @@ extern "C" size_t Http::StreamRequest::CurlWriteFunction(char* ptr, size_t size,
     {
         auto state = static_cast<Http::StreamRequest::State*>(userdata);
         size_t total_size = size * nmemb;
-        state->generator.Feed(std::string(ptr, total_size));
+        std::string segment(ptr, total_size);
+        state->lastSegment = segment;
+        state->generator.Feed(std::move(segment));
         return total_size;
     }
     catch(...)
@@ -257,7 +259,8 @@ void Http::Client::SocketActionHandler(int fd, int events)
                     auto httpCode = curl->GetInfo<CURLINFO_HTTP_CODE>();
                     if (httpCode < 200 || httpCode >= 300)
                     {
-                        request._state->promise.Reject("HTTP error: " + std::to_string(httpCode));
+                        request._state->promise.Reject(
+                            "HTTP error: " + std::to_string(httpCode) + "\n" + request._state->response);
                         break;
                     }
                     request._state->promise.Resolve(std::move(request._state->response));
@@ -280,7 +283,8 @@ void Http::Client::SocketActionHandler(int fd, int events)
                     auto httpCode = curl->GetInfo<CURLINFO_HTTP_CODE>();
                     if (httpCode < 200 || httpCode >= 300)
                     {
-                        streamRequest._state->generator.Reject("HTTP error: " + std::to_string(httpCode));
+                        streamRequest._state->generator.Reject(
+                            "HTTP error: " + std::to_string(httpCode) + "\n" + streamRequest._state->lastSegment);
                         break;
                     }
                     streamRequest._state->generator.Finish();
