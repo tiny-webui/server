@@ -11,8 +11,31 @@ env:
   BUILD_TYPE: Release
   TEST_BUILD_TYPE: Debug
   NON_INTERACTIVE_TESTS: |
+    TestApiProviderOption
     TestBase64
+    TestBruteForceLimiter
     TestCache
+    TestChaCha20Poly1305
+    TestCounter
+    TestCryptoKdfHkdfSha256
+    TestDatabase /tmp/tui-test.db
+    TestEcdhePsk
+    TestEd25519
+    TestFakeCredentialGenerator
+    TestHttpClient
+    TestHttpStreamResponseParser
+    TestRegister username password
+    TestResourceVersionManager
+    TestRpcServer
+    TestSecureSession
+    TestSpake2p
+    TestSqlite /tmp/tui-test.db
+    TestStreamBatcher
+    TestTevInjectionQueue
+    TestTlv
+    TestUtf8
+    TestUuid
+    TestWorkerThread
 
 jobs:
   build-and-test:
@@ -82,15 +105,21 @@ jobs:
         if: env.NON_INTERACTIVE_TESTS != ''
         run: |
           set -euo pipefail
-          mapfile -t tests < <(printf '%s\n' "$NON_INTERACTIVE_TESTS" | sed '/^$/d')
+          mapfile -t tests < <(printf '%s\n' "$NON_INTERACTIVE_TESTS" | sed '/^$/d' | sed '/^#/d')
           pushd test/build
-          for t in "${tests[@]}"; do
-            if [[ ! -x "$t" ]]; then
-              echo "Missing test binary: $PWD/$t" >&2
+          for line in "${tests[@]}"; do
+            set -- $line
+            bin="$1"
+            shift || true
+            if [[ -z "$bin" ]]; then
+              continue
+            fi
+            if [[ ! -x "$bin" ]]; then
+              echo "Missing test binary: $PWD/$bin" >&2
               exit 1
             fi
-            echo "::group::valgrind $t"
-            valgrind --leak-check=full --errors-for-leak-kinds=definite,possible --error-exitcode=42 "./$t"
+            echo "::group::valgrind $bin $*"
+            valgrind --leak-check=full --errors-for-leak-kinds=definite,possible --error-exitcode=42 "./$bin" "$@"
             echo "::endgroup::"
           done
           popd
