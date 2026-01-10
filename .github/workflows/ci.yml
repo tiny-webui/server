@@ -1,0 +1,96 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  BUILD_TYPE: Release
+  TEST_BUILD_TYPE: Debug
+  NON_INTERACTIVE_TESTS: |
+    TestBase64
+    TestCache
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install base packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            cmake \
+            ninja-build \
+            pkg-config \
+            curl \
+            git \
+            libcurl4-openssl-dev \
+            libwebsockets-dev \
+            libsqlite3-dev \
+            uuid-dev \
+            nlohmann-json3-dev \
+            libssl-dev \
+            valgrind
+
+      - name: Install libsodium (>=1.0.19) from source
+        run: |
+          set -euo pipefail
+          curl -L https://download.libsodium.org/libsodium/releases/libsodium-1.0.20-stable.tar.gz -o /tmp/libsodium.tar.gz
+          tar -xf /tmp/libsodium.tar.gz -C /tmp
+          pushd /tmp/libsodium-stable
+          ./configure --enable-shared
+          make -j"$(nproc)"
+          sudo make install
+          popd
+
+      - name: Install libtev-cpp from source
+        run: |
+          set -euo pipefail
+          git clone --depth=1 https://github.com/chemwolf6922/tiny-event-loop-cpp /tmp/tev-cpp
+          cmake -S /tmp/tev-cpp -B /tmp/tev-cpp/build -DCMAKE_BUILD_TYPE="$BUILD_TYPE" -DCMAKE_POSITION_INDEPENDENT_CODE=ON
+          cmake --build /tmp/tev-cpp/build --parallel
+          sudo cmake --install /tmp/tev-cpp/build
+
+      - name: Install js-style-co-routine from source
+        run: |
+          set -euo pipefail
+          git clone --depth=1 https://github.com/chemwolf6922/js-style-co-routine /tmp/js-style-co-routine
+          cmake -S /tmp/js-style-co-routine -B /tmp/js-style-co-routine/build -DCMAKE_BUILD_TYPE="$BUILD_TYPE" -DCMAKE_POSITION_INDEPENDENT_CODE=ON
+          cmake --build /tmp/js-style-co-routine/build --parallel
+          sudo cmake --install /tmp/js-style-co-routine/build
+
+      - name: Configure main build
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE="$BUILD_TYPE"
+
+      - name: Build binaries
+        run: cmake --build build --parallel
+
+      - name: Configure tests
+        run: cmake -S test -B test/build -DCMAKE_BUILD_TYPE="$TEST_BUILD_TYPE"
+
+      - name: Build tests
+        run: cmake --build test/build --parallel
+
+      - name: Run selected non-interactive tests with valgrind
+        if: env.NON_INTERACTIVE_TESTS != ''
+        run: |
+          set -euo pipefail
+          mapfile -t tests < <(printf '%s\n' "$NON_INTERACTIVE_TESTS" | sed '/^$/d')
+          pushd test/build
+          for t in "${tests[@]}"; do
+            if [[ ! -x "$t" ]]; then
+              echo "Missing test binary: $PWD/$t" >&2
+              exit 1
+            fi
+            echo "::group::valgrind $t"
+            valgrind --leak-check=full --errors-for-leak-kinds=definite,possible --error-exitcode=42 "./$t"
+            echo "::endgroup::"
+          done
+          popd
