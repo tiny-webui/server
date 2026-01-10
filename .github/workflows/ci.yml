@@ -71,6 +71,7 @@ jobs:
           ./configure --enable-shared
           make -j"$(nproc)"
           sudo make install
+          sudo ldconfig
           popd
 
       - name: Install libtev-cpp from source
@@ -80,6 +81,7 @@ jobs:
           cmake -S /tmp/tev-cpp -B /tmp/tev-cpp/build -DCMAKE_BUILD_TYPE="$BUILD_TYPE" -DCMAKE_POSITION_INDEPENDENT_CODE=ON
           cmake --build /tmp/tev-cpp/build --parallel
           sudo cmake --install /tmp/tev-cpp/build
+          sudo ldconfig
 
       - name: Install js-style-co-routine from source
         run: |
@@ -88,6 +90,7 @@ jobs:
           cmake -S /tmp/js-style-co-routine -B /tmp/js-style-co-routine/build -DCMAKE_BUILD_TYPE="$BUILD_TYPE" -DCMAKE_POSITION_INDEPENDENT_CODE=ON
           cmake --build /tmp/js-style-co-routine/build --parallel
           sudo cmake --install /tmp/js-style-co-routine/build
+          sudo ldconfig
 
       - name: Configure main build
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE="$BUILD_TYPE"
