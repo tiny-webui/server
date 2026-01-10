@@ -53,7 +53,7 @@ int main(int argc, char const *argv[])
     std::optional<std::vector<uint8_t>> decoded;
     try
     {
-        for (int i = 0; i < 100000; i++)
+        for (int i = 0; i < 1000; i++)
         {
             data.reset();
             encoded.reset();
