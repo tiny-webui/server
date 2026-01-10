@@ -108,7 +108,7 @@ RequestData OpenAI::FormatRequest(const Schema::IServer::LinearHistory& history,
 			if (content.get_type() == Schema::IServer::Type::TEXT || content.get_type() == Schema::IServer::Type::REFUSAL)
 			{
 				messageJson["content"].push_back({
-					{"type", "input_text"},
+					{"type", message.get_role() == Schema::IServer::MessageRole::ASSISTANT ? "output_text" : "input_text"},
 					{"text", content.get_data()}
 				});
 			}
@@ -116,9 +116,7 @@ RequestData OpenAI::FormatRequest(const Schema::IServer::LinearHistory& history,
 			{
 				messageJson["content"].push_back({
 					{"type", "input_image"},
-					{"image_url", {
-						{"url", content.get_data()}
-					}}
+					{"image_url", content.get_data()}
 				});
 			}
 			else
