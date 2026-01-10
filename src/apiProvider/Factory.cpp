@@ -2,11 +2,13 @@
 #include "Factory.h"
 
 #include "AzureOpenAI.h"
+#include "OpenAI.h"
 
 using namespace TUI::ApiProvider;
 
 static std::unordered_map<std::string, std::function<std::shared_ptr<IProvider>()>> providerMap = {
-    {"AzureOpenAI", [](){return std::make_shared<AzureOpenAI>();}}
+    {"AzureOpenAI", [](){return std::make_shared<AzureOpenAI>();}},
+    {"OpenAI", [](){return std::make_shared<OpenAI>();}}
     /** Register new providers here */
 };
 
