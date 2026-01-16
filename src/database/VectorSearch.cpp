@@ -177,7 +177,7 @@ static int32_t DotProductInt8_AVX2(
     score = _mm_cvtsi128_si32(sum128);
 
     /** Try avoid this */
-    if (remainder != 0)
+    if (__builtin_expect(remainder != 0, 0))
     {
         size_t offset = nBlocks * 16;
         int32_t sum = 0;
@@ -266,14 +266,25 @@ size_t TUI::Database::VectorSearch::SearchTopKInt8(
         g_cpuCapability, distanceMetric);
 
     ScoreKeeper scoreKeeper(k, KeepMode::MAX_N);
-    for(size_t i = 0; i < nDataVectors; i++)
+
+    constexpr size_t batchSize = 1024;
+    std::vector<int32_t> scores(batchSize);
+    for(size_t offset = 0; offset < nDataVectors; offset += batchSize)
     {
-        if (excludeIndices.contains(i))
+        size_t actualBatchSize = std::min(static_cast<size_t>(batchSize), nDataVectors - offset);
+        for(size_t i = 0; i < actualBatchSize; i++)
         {
-            continue;
+            scores[i] = metricFunc(dimension, queryVector, dataVectors + (offset + i) * dimension);
         }
-        int32_t score = metricFunc(dimension, queryVector, dataVectors + i * dimension);
-        scoreKeeper.AddScore(score, i);
+        for(size_t i = 0; i < actualBatchSize; i++)
+        {
+            size_t dataIndex = offset + i;
+            if (__builtin_expect(excludeIndices.contains(dataIndex), 0))
+            {
+                continue;
+            }
+            scoreKeeper.AddScore(scores[i], dataIndex);
+        }
     }
 
     return scoreKeeper.DumpResults(outIndices);
