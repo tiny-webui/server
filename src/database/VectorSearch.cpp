@@ -101,18 +101,13 @@ namespace
         AVX512,
         NEON,
     };
-
-    constexpr size_t MAX_BATCH_SIZE_NONE = 1;
-    constexpr size_t MAX_BATCH_SIZE_AVX2 = 11;
-    constexpr size_t MAX_BATCH_SIZE_AVX512 = 16;
-    constexpr size_t MAX_BATCH_SIZE_NEON = 8;
 }
 
 static CpuCapability DetectCpuCapability()
 {
 #if defined(__x86_64__)
     __builtin_cpu_init();
-    if (__builtin_cpu_supports("avx512f"))
+    if (__builtin_cpu_supports("avx512f") && __builtin_cpu_supports("avx512bw"))
     {
         return CpuCapability::AVX512;
     }
@@ -127,141 +122,87 @@ static CpuCapability DetectCpuCapability()
     return CpuCapability::NONE;
 }
 
-static size_t GetMaxBatchSize(CpuCapability capability)
-{
-    switch (capability)
-    {
-    case CpuCapability::AVX2:
-        return MAX_BATCH_SIZE_AVX2;
-    case CpuCapability::AVX512:
-        return MAX_BATCH_SIZE_AVX512;
-    case CpuCapability::NEON:
-        return MAX_BATCH_SIZE_NEON;
-    default:
-        return MAX_BATCH_SIZE_NONE;
-    }
-}
-
-typedef void (*BatchMetricInt8Func)(
+typedef int32_t (*MetricInt8Func)(
     size_t dimension,
-    size_t batchSize,
     const int8_t* queryVector,
-    const int8_t* dataVectors,
-    int32_t* outScores);
+    const int8_t* dataVectors);
 
-static void BatchDotProductInt8_None(
+static int32_t DotProductInt8_None(
     size_t dimension,
-    size_t batchSize,
     const int8_t* queryVector,
-    const int8_t* dataVectors,
-    int32_t* outScores)
+    const int8_t* dataVectors)
 {
-    for (size_t i = 0; i < batchSize; i++)
+    int32_t score = 0;
+    for (size_t d = 0; d < dimension; d++)
     {
-        int32_t score = 0;
-        for (size_t d = 0; d < dimension; d++)
-        {
-            score += static_cast<int32_t>(queryVector[d]) * static_cast<int32_t>(dataVectors[i * dimension + d]);
-        }
-        outScores[i] = score;
+        score += static_cast<int32_t>(queryVector[d]) * static_cast<int32_t>(dataVectors[d]);
     }
+    return score;
 }
 
 #if defined(__x86_64__)
 
 __attribute__((target("avx2")))
-static void BatchDotProductInt8_AVX2(
+static int32_t DotProductInt8_AVX2(
     size_t dimension,
-    size_t batchSize,
     const int8_t* queryVector,
-    const int8_t* dataVectors,
-    int32_t* outScores)
+    const int8_t* dataVectors)
 {
-    if (batchSize > MAX_BATCH_SIZE_AVX2)
-    {
-        throw std::invalid_argument("Batch size exceeds MAX_BATCH_SIZE_AVX2");
-    }
+    size_t nBlocks = dimension / 16;
+    size_t remainder = dimension % 16;
 
-    size_t nBlocks = dimension / 32;
-    size_t remainder = dimension % 32;
-
-    /** Batch size registers */
-    __m256i accumulators[MAX_BATCH_SIZE_AVX2];
-    for (size_t j = 0; j < batchSize; j++)
-    {
-        accumulators[j] = _mm256_setzero_si256();
-    }
+    __m256i accumulator = _mm256_setzero_si256();
 
     for (size_t i = 0; i < nBlocks; i++)
     {
-        __m256i queryVec = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(
-            queryVector + i * 32));
-        __m128i queryLo = _mm256_castsi256_si128(queryVec);
-        __m128i queryHi = _mm256_extracti128_si256(queryVec, 1);
-        /** 2 registers */
-        __m256i queryLoS16 = _mm256_cvtepi8_epi16(queryLo);
-        __m256i queryHiS16 = _mm256_cvtepi8_epi16(queryHi);
+        __m128i queryVec = _mm_loadu_si128(reinterpret_cast<const __m128i*>(
+            queryVector + i * 16));
+        __m256i queryVecS16 = _mm256_cvtepi8_epi16(queryVec);
 
-        for (size_t j = 0; j < batchSize; j++)
-        {
-            __m256i dataVec = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(
-                dataVectors + j * dimension + i * 32));
-            __m128i dataLo = _mm256_castsi256_si128(dataVec);
-            __m128i dataHi = _mm256_extracti128_si256(dataVec, 1);
-            /** 2 registers */
-            __m256i dataLoS16 = _mm256_cvtepi8_epi16(dataLo);
-            __m256i dataHiS16 = _mm256_cvtepi8_epi16(dataHi);
+        __m128i dataVec = _mm_loadu_si128(reinterpret_cast<const __m128i*>(
+            dataVectors + i * 16));
+        __m256i dataVecS16 = _mm256_cvtepi8_epi16(dataVec);
 
-            /** 1 register (can reuse dataLoS16) */
-            __m256i prod = _mm256_madd_epi16(queryLoS16, dataLoS16);
-            accumulators[j] = _mm256_add_epi32(accumulators[j], prod);
-            prod = _mm256_madd_epi16(queryHiS16, dataHiS16);
-            accumulators[j] = _mm256_add_epi32(accumulators[j], prod);
-        }
+        __m256i prod = _mm256_madd_epi16(queryVecS16, dataVecS16);
+        accumulator = _mm256_add_epi32(accumulator, prod);
     }
 
     /** Horizontal sum */
-    for (size_t j = 0; j < batchSize; j++)
-    {
-        __m128i sum128 = _mm_add_epi32(
-            _mm256_castsi256_si128(accumulators[j]),
-            _mm256_extracti128_si256(accumulators[j], 1));
-        sum128 = _mm_hadd_epi32(sum128, sum128);
-        sum128 = _mm_hadd_epi32(sum128, sum128);
-        outScores[j] = _mm_cvtsi128_si32(sum128);
-    }
+    int32_t score = 0;
+    __m128i sum128 = _mm_add_epi32(
+        _mm256_castsi256_si128(accumulator),
+        _mm256_extracti128_si256(accumulator, 1));
+    sum128 = _mm_hadd_epi32(sum128, sum128);
+    sum128 = _mm_hadd_epi32(sum128, sum128);
+    score = _mm_cvtsi128_si32(sum128);
 
     /** Try avoid this */
     if (remainder != 0)
     {
-        size_t offset = nBlocks * 32;
-        for (size_t j = 0; j < batchSize; j++)
+        size_t offset = nBlocks * 16;
+        int32_t sum = 0;
+        for (size_t d = 0; d < remainder; d++)
         {
-            int32_t score = 0;
-            for (size_t d = 0; d < remainder; d++)
-            {
-                score += static_cast<int32_t>(queryVector[offset + d]) *
-                         static_cast<int32_t>(dataVectors[j * dimension + offset + d]);
-            }
-            outScores[j] += score;
+            sum += static_cast<int32_t>(queryVector[offset + d]) *
+                        static_cast<int32_t>(dataVectors[offset + d]);
         }
+        score += sum;
     }
+
+    return score;
 }
 
-__attribute__((target("avx512f")))
-static void BatchDotProductInt8_AVX512(
+__attribute__((target("avx512f,avx512bw")))
+static int32_t DotProductInt8_AVX512(
     size_t dimension,
-    size_t batchSize,
     const int8_t* queryVector,
-    const int8_t* dataVectors,
-    int32_t* outScores)
+    const int8_t* dataVectors)
 {
     (void)dimension;
-    (void)batchSize;
     (void)queryVector;
     (void)dataVectors;
-    (void)outScores;
     /** @todo */
+    throw std::runtime_error("DotProductInt8_AVX512 not implemented");
 }
 
 #endif // x86_64 / i386
@@ -269,19 +210,21 @@ static void BatchDotProductInt8_AVX512(
 #if defined(__aarch64__)
 
 __attribute__((target("neon")))
-static void BatchDotProductInt8_NEON(
+static int32_t DotProductInt8_NEON(
     size_t dimension,
-    size_t batchSize,
     const int8_t* queryVector,
-    const int8_t* dataVectors,
-    int32_t* outScores)
+    const int8_t* dataVectors)
 {
+    (void)dimension;
+    (void)queryVector;
+    (void)dataVectors;
     /** @todo */
+    throw std::runtime_error("DotProductInt8_NEON not implemented");
 }
 
 #endif
 
-static BatchMetricInt8Func GetBatchMetricInt8Function(
+static MetricInt8Func GetMetricInt8Function(
     CpuCapability capability, DistanceMetric metric)
 {
     switch (metric)
@@ -291,16 +234,16 @@ static BatchMetricInt8Func GetBatchMetricInt8Function(
         {
 #if defined(__x86_64__) || defined(__i386__)
         case CpuCapability::AVX2:
-            return &BatchDotProductInt8_AVX2;
+            return &DotProductInt8_AVX2;
         case CpuCapability::AVX512:
-            return &BatchDotProductInt8_AVX512;
+            return &DotProductInt8_AVX512;
 #endif // x86_64 / i386
 #if defined(__aarch64__)
         case CpuCapability::NEON:
-            return &BatchDotProductInt8_NEON;
+            return &DotProductInt8_NEON;
 #endif // aarch64
         default:
-            return &BatchDotProductInt8_None;
+            return &DotProductInt8_None;
         }
     default:
         throw std::invalid_argument("Unsupported DistanceMetric");
@@ -317,29 +260,20 @@ size_t TUI::Database::VectorSearch::SearchTopKInt8(
     DistanceMetric distanceMetric,
     const int8_t* queryVector,
     const int8_t* dataVectors,
-    uint64_t* outIndices)
+    size_t* outIndices)
 {
-    size_t maxBatchSize = GetMaxBatchSize(g_cpuCapability);
-    BatchMetricInt8Func batchMetricFunc = GetBatchMetricInt8Function(
+    MetricInt8Func metricFunc = GetMetricInt8Function(
         g_cpuCapability, distanceMetric);
 
     ScoreKeeper scoreKeeper(k, KeepMode::MAX_N);
-    size_t i = 0;
-    std::vector<int32_t> batchScores(maxBatchSize);
-    while (i < nDataVectors)
+    for(size_t i = 0; i < nDataVectors; i++)
     {
-        size_t batchSize = std::min(maxBatchSize, nDataVectors - i);
-        batchMetricFunc(
-            dimension, batchSize, queryVector, dataVectors + i * dimension, batchScores.data());
-        for (size_t j = 0; j < batchSize; ++j)
+        if (excludeIndices.contains(i))
         {
-            if (excludeIndices.find(i + j) != excludeIndices.end())
-            {
-                continue;
-            }
-            scoreKeeper.AddScore(batchScores[j], static_cast<uint64_t>(i + j));
+            continue;
         }
-        i += batchSize;
+        int32_t score = metricFunc(dimension, queryVector, dataVectors + i * dimension);
+        scoreKeeper.AddScore(score, i);
     }
 
     return scoreKeeper.DumpResults(outIndices);
@@ -354,17 +288,11 @@ void TUI::Database::VectorSearch::TestMetricCalculation(
     const int8_t* dataVectors,
     int32_t* outScores)
 {
-    size_t maxBatchSize = GetMaxBatchSize(g_cpuCapability);
-    BatchMetricInt8Func batchMetricFunc = GetBatchMetricInt8Function(
+    MetricInt8Func metricFunc = GetMetricInt8Function(
         g_cpuCapability, distanceMetric);
-
-    size_t i = 0;
-    while (i < nDataVectors)
+    for(size_t i = 0; i < nDataVectors; i++)
     {
-        size_t batchSize = std::min(maxBatchSize, nDataVectors - i);
-        batchMetricFunc(
-            dimension, batchSize, queryVector, dataVectors + i * dimension, outScores + i);
-        i += batchSize;
+        outScores[i] = metricFunc(dimension, queryVector, dataVectors + i * dimension);
     }
 }
 #endif // TUI_TEST_INTERFACES

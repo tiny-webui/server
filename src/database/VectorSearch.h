@@ -21,7 +21,7 @@ namespace TUI::Database::VectorSearch
      * @param nDataVectors 
      * @param queryVector Must be of size dimension * sizeof(int8_t)
      * @param dataVectors Must be of size nDataVectors * dimension * sizeof(int8_t)
-     * @param outIndices Must be of size at least k * sizeof(uint64_t)
+     * @param outIndices Must be of size at least k * sizeof(size_t)
      * 
      * @return size_t The actual number of results written to outIndices.
      */
@@ -33,7 +33,7 @@ namespace TUI::Database::VectorSearch
         DistanceMetric distanceMetric,
         const int8_t* queryVector,
         const int8_t* dataVectors,
-        uint64_t* outIndices);
+        size_t* outIndices);
 
 #ifdef TUI_TEST_INTERFACES
     void TestMetricCalculation(

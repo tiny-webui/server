@@ -160,6 +160,58 @@ static void TestDotProductInt8Performance()
     std::cout << "Cycles per vector calculation: " << cyclesPerVector << std::endl;
 
 }
+
+static void TestSearchTopKInt8Performance()
+{
+    constexpr size_t kDimension = 1024;
+    constexpr size_t kDataVectors = 10'000;
+    constexpr size_t kTopK = 10;
+
+    std::vector<int8_t> dataVectors(kDataVectors * kDimension);
+    std::mt19937 rng(43);
+    std::uniform_int_distribution<int> dist(-128, 127);
+    for (auto& v : dataVectors)
+    {
+        v = static_cast<int8_t>(dist(rng));
+    }
+
+    std::vector<size_t> outIndices(kTopK);
+    std::unordered_set<size_t> excludeIndices;
+
+    PerfEventCounter cycleCounter(PERF_COUNT_HW_CPU_CYCLES);
+    cycleCounter.Reset();
+    cycleCounter.Start();
+
+    size_t accumulation = 0;
+    for (size_t q = 0; q < kDataVectors; ++q)
+    {
+        const int8_t* query = dataVectors.data() + q * kDimension;
+        size_t results = SearchTopKInt8(
+            kTopK,
+            kDimension,
+            kDataVectors,
+            excludeIndices,
+            DistanceMetric::DOT_PRODUCT,
+            query,
+            dataVectors.data(),
+            outIndices.data());
+
+        if (results > 0)
+        {
+            accumulation += static_cast<size_t>(outIndices[0]);
+        }
+    }
+
+    long long cycles = cycleCounter.StopAndRead();
+
+    const double totalCalculations = static_cast<double>(kDataVectors) * static_cast<double>(kDataVectors);
+    const double cyclesPerVector = static_cast<double>(cycles) / totalCalculations;
+
+    std::cout << "Cycle count accumulation guard: " << accumulation << std::endl;
+    std::cout << "Total cycles: " << cycles << std::endl;
+    std::cout << "Cycles per vector calculation: " << cyclesPerVector << std::endl;
+}
+
 #endif
 
 static void TestDotProductInt8Correctness()
@@ -227,44 +279,35 @@ static void TestDotProductInt8Correctness()
 
 static void TestSearchTopKInt8Correctness()
 {
-    constexpr size_t kDimension = 1024;
-    constexpr size_t kDataVectors = 1000;
-    constexpr size_t kTopK = 10;
+    constexpr size_t dimension = 1024;
+    constexpr size_t nDataVectors = 1000;
+    constexpr size_t topK = 10;
 
-    std::vector<int8_t> dataVectors(kDataVectors * kDimension, 0);
-    std::mt19937 rng(42);
-    std::uniform_int_distribution<int> smallDist(-1, 1);
-
-    // Create mostly-random vectors, but with a unique strong component to ensure
-    // the self dot-product is strictly the maximum.
-    for (size_t i = 0; i < kDataVectors; ++i)
+    std::vector<int8_t> dataVectors(nDataVectors * dimension, 0);
+    std::mt19937 rng(44);
+    std::uniform_int_distribution<int> dist(-128, 127);
+    for (auto& v : dataVectors)
     {
-        int8_t* vec = dataVectors.data() + i * kDimension;
-        for (size_t d = 0; d < kDimension; ++d)
-        {
-            vec[d] = static_cast<int8_t>(smallDist(rng));
-        }
-        // Ensure uniqueness and dominance.
-        vec[i] = static_cast<int8_t>(127);
+        v = static_cast<int8_t>(dist(rng));
     }
 
-    std::vector<uint64_t> outIndices(kTopK);
+    std::vector<size_t> outIndices(topK);
     std::unordered_set<size_t> excludeIndices;
 
-    for (size_t q = 0; q < kDataVectors; ++q)
+    for (size_t q = 0; q < nDataVectors; ++q)
     {
-        const int8_t* query = dataVectors.data() + q * kDimension;
+        const int8_t* query = dataVectors.data() + q * dimension;
         size_t results = SearchTopKInt8(
-            kTopK,
-            kDimension,
-            kDataVectors,
+            topK,
+            dimension,
+            nDataVectors,
             excludeIndices,
             DistanceMetric::DOT_PRODUCT,
             query,
             dataVectors.data(),
             outIndices.data());
 
-        AssertWithMessage(results == kTopK, "Unexpected number of results: " + std::to_string(results));
+        AssertWithMessage(results == topK, "Unexpected number of results: " + std::to_string(results));
         AssertWithMessage(outIndices[0] == q,
             "Top-1 mismatch: query=" + std::to_string(q) +
             " got=" + std::to_string(outIndices[0]));
@@ -278,21 +321,14 @@ static void TestSearchTopInt8ExcludeIndices()
     constexpr size_t kTopK = 10;
 
     std::vector<int8_t> dataVectors(kDataVectors * kDimension, 0);
-    std::mt19937 rng(1337);
-    std::uniform_int_distribution<int> smallDist(-1, 1);
-
-    // Create mostly-random vectors with a unique strong component.
-    for (size_t i = 0; i < kDataVectors; ++i)
+    std::mt19937 rng(45);
+    std::uniform_int_distribution<int> dist(-128, 127);
+    for (auto& v : dataVectors)
     {
-        int8_t* vec = dataVectors.data() + i * kDimension;
-        for (size_t d = 0; d < kDimension; ++d)
-        {
-            vec[d] = static_cast<int8_t>(smallDist(rng));
-        }
-        vec[i] = static_cast<int8_t>(127);
+        v = static_cast<int8_t>(dist(rng));
     }
 
-    std::vector<uint64_t> outIndices(kTopK);
+    std::vector<size_t> outIndices(kTopK);
 
     for (size_t q = 0; q < kDataVectors; ++q)
     {
@@ -328,6 +364,7 @@ int main(int argc, char const *argv[])
 
 #ifdef NDEBUG
     RunTest(TestDotProductInt8Performance());
+    RunTest(TestSearchTopKInt8Performance());
 #endif // NDEBUG
     RunTest(TestDotProductInt8Correctness());
     RunTest(TestSearchTopKInt8Correctness());
