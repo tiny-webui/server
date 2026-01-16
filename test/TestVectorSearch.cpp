@@ -61,7 +61,7 @@ public:
         _fd = static_cast<int>(syscall(__NR_perf_event_open, &attr, 0, -1, -1, 0));
         if (_fd < 0)
         {
-            throw std::runtime_error(std::string("perf_event_open failed: ") + std::strerror(errno));
+            std::cerr << "perf_event_open failed: " << std::strerror(errno) << std::endl;
         }
     }
 
@@ -78,6 +78,10 @@ public:
 
     void Reset()
     {
+        if (_fd < 0)
+        {
+            return;
+        }
         if (ioctl(_fd, PERF_EVENT_IOC_RESET, 0) == -1)
         {
             throw std::runtime_error(std::string("Failed to reset perf counter: ") + std::strerror(errno));
@@ -86,6 +90,10 @@ public:
 
     void Start()
     {
+        if (_fd < 0)
+        {
+            return;
+        }
         if (ioctl(_fd, PERF_EVENT_IOC_ENABLE, 0) == -1)
         {
             throw std::runtime_error(std::string("Failed to start perf counter: ") + std::strerror(errno));
@@ -94,16 +102,14 @@ public:
 
     long long StopAndRead()
     {
+        if (_fd < 0)
+        {
+            return 0;
+        }
         if (ioctl(_fd, PERF_EVENT_IOC_DISABLE, 0) == -1)
         {
             throw std::runtime_error(std::string("Failed to stop perf counter: ") + std::strerror(errno));
         }
-        return Read();
-    }
-
-private:
-    long long Read() const
-    {
         long long value = 0;
         ssize_t bytes = ::read(_fd, &value, sizeof(value));
         if (bytes != static_cast<ssize_t>(sizeof(value)))
@@ -113,6 +119,7 @@ private:
         return value;
     }
 
+private:
     int _fd = -1;
 };
 

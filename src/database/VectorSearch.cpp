@@ -235,16 +235,7 @@ static void DotProductInt8Batch_AVX512(
             accumulator = _mm512_add_epi32(accumulator, prod);
         }
 
-        int32_t score = 0;
-        __m256i sum256 = _mm256_add_epi32(
-            _mm512_castsi512_si256(accumulator),
-            _mm512_extracti64x4_epi64(accumulator, 1));
-        __m128i sum128 = _mm_add_epi32(
-            _mm256_castsi256_si128(sum256),
-            _mm256_extracti128_si256(sum256, 1));
-        sum128 = _mm_hadd_epi32(sum128, sum128);
-        sum128 = _mm_hadd_epi32(sum128, sum128);
-        score = _mm_cvtsi128_si32(sum128);
+        int32_t score = _mm512_reduce_add_epi32(accumulator);
 
         if (__builtin_expect(remainder != 0, 0))
         {
@@ -265,7 +256,6 @@ static void DotProductInt8Batch_AVX512(
 
 #if defined(__aarch64__)
 
-__attribute__((target("neon")))
 static void DotProductInt8Batch_NEON(
     size_t dimension,
     size_t nDataVectors,
@@ -273,13 +263,39 @@ static void DotProductInt8Batch_NEON(
     const int8_t* dataVectors,
     int32_t* outScores)
 {
-    (void)dimension;
-    (void)nDataVectors;
-    (void)queryVector;
-    (void)dataVectors;
-    (void)outScores;
-    /** @todo */
-    throw std::runtime_error("DotProductInt8Batch_NEON not implemented");
+    size_t nBlocks = dimension / 16;
+    size_t remainder = dimension % 16;
+
+    const int8_t* dataOffset = dataVectors;
+    for (size_t i = 0; i < nDataVectors; i++)
+    {
+        int32_t accumulator = 0;
+
+        for (size_t j = 0; j < nBlocks; j++)
+        {
+            int8x16_t queryVec = vld1q_s8(queryVector + j * 16);
+            int8x16_t dataVec = vld1q_s8(dataOffset + j * 16);
+
+            int16x8_t prod = vmull_s8(vget_low_s8(queryVec), vget_low_s8(dataVec));
+            accumulator += vaddlvq_s16(prod);
+
+            prod = vmull_high_s8(queryVec, dataVec);
+            accumulator += vaddlvq_s16(prod);
+        }
+
+        if (__builtin_expect(remainder != 0, 0))
+        {
+            size_t offset = nBlocks * 16;
+            for (size_t d = 0; d < remainder; d++)
+            {
+                accumulator += static_cast<int32_t>(queryVector[offset + d]) *
+                            static_cast<int32_t>(dataOffset[offset + d]);
+            }
+        }
+
+        outScores[i] = accumulator;
+        dataOffset += dimension;
+    }
 }
 
 #endif
