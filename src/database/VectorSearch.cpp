@@ -31,7 +31,7 @@ namespace
     {
     public:
         explicit ScoreKeeper(size_t maxSize, KeepMode mode)
-            : maxSize_(maxSize), mode_(mode),
+            : _maxSize(maxSize), _mode(mode),
               heap_([this](const ScoredIndex& a, const ScoredIndex& b) {
                   return Compare(a, b);
               })
@@ -40,7 +40,7 @@ namespace
 
         void AddScore(int32_t score, uint64_t index)
         {
-            if (heap_.size() < maxSize_)
+            if (heap_.size() < _maxSize)
             {
                 heap_.emplace(ScoredIndex{ score, index });
             }
@@ -69,8 +69,8 @@ namespace
             uint64_t index;
         };
 
-        size_t maxSize_;
-        KeepMode mode_;
+        size_t _maxSize;
+        KeepMode _mode;
 
         static bool CompareMax(const ScoredIndex& a, const ScoredIndex& b)
         {
@@ -84,7 +84,7 @@ namespace
 
         bool Compare(const ScoredIndex& a, const ScoredIndex& b) const
         {
-            return (mode_ == KeepMode::MIN_N) ? CompareMin(a, b) : CompareMax(a, b);
+            return (_mode == KeepMode::MIN_N) ? CompareMin(a, b) : CompareMax(a, b);
         }
 
         std::priority_queue<
@@ -122,87 +122,143 @@ static CpuCapability DetectCpuCapability()
     return CpuCapability::NONE;
 }
 
-typedef int32_t (*MetricInt8Func)(
+typedef void (*MetricInt8BatchFunc)(
     size_t dimension,
+    size_t nDataVectors,
     const int8_t* queryVector,
-    const int8_t* dataVectors);
+    const int8_t* dataVectors,
+    int32_t* outScores);
 
-static int32_t DotProductInt8_None(
+static void DotProductInt8Batch_None(
     size_t dimension,
+    size_t nDataVectors,
     const int8_t* queryVector,
-    const int8_t* dataVectors)
+    const int8_t* dataVectors,
+    int32_t* outScores)
 {
-    int32_t score = 0;
-    for (size_t d = 0; d < dimension; d++)
+    for (size_t i = 0; i < nDataVectors; i++)
     {
-        score += static_cast<int32_t>(queryVector[d]) * static_cast<int32_t>(dataVectors[d]);
+        int32_t score = 0;
+        for (size_t d = 0; d < dimension; d++)
+        {
+            score += static_cast<int32_t>(queryVector[d]) * 
+                static_cast<int32_t>(dataVectors[i * dimension + d]);
+        }
+        outScores[i] = score;
     }
-    return score;
 }
 
 #if defined(__x86_64__)
 
 __attribute__((target("avx2")))
-static int32_t DotProductInt8_AVX2(
+static void DotProductInt8Batch_AVX2(
     size_t dimension,
+    size_t nDataVectors,
     const int8_t* queryVector,
-    const int8_t* dataVectors)
+    const int8_t* dataVectors,
+    int32_t* outScores)
 {
     size_t nBlocks = dimension / 16;
     size_t remainder = dimension % 16;
 
-    __m256i accumulator = _mm256_setzero_si256();
-
-    for (size_t i = 0; i < nBlocks; i++)
+    const int8_t* dataOffset = dataVectors;
+    for (size_t i = 0; i < nDataVectors; i++)
     {
-        __m128i queryVec = _mm_loadu_si128(reinterpret_cast<const __m128i*>(
-            queryVector + i * 16));
-        __m256i queryVecS16 = _mm256_cvtepi8_epi16(queryVec);
+        __m256i accumulator = _mm256_setzero_si256();
 
-        __m128i dataVec = _mm_loadu_si128(reinterpret_cast<const __m128i*>(
-            dataVectors + i * 16));
-        __m256i dataVecS16 = _mm256_cvtepi8_epi16(dataVec);
-
-        __m256i prod = _mm256_madd_epi16(queryVecS16, dataVecS16);
-        accumulator = _mm256_add_epi32(accumulator, prod);
-    }
-
-    /** Horizontal sum */
-    int32_t score = 0;
-    __m128i sum128 = _mm_add_epi32(
-        _mm256_castsi256_si128(accumulator),
-        _mm256_extracti128_si256(accumulator, 1));
-    sum128 = _mm_hadd_epi32(sum128, sum128);
-    sum128 = _mm_hadd_epi32(sum128, sum128);
-    score = _mm_cvtsi128_si32(sum128);
-
-    /** Try avoid this */
-    if (__builtin_expect(remainder != 0, 0))
-    {
-        size_t offset = nBlocks * 16;
-        int32_t sum = 0;
-        for (size_t d = 0; d < remainder; d++)
+        for (size_t j = 0; j < nBlocks; j++)
         {
-            sum += static_cast<int32_t>(queryVector[offset + d]) *
-                        static_cast<int32_t>(dataVectors[offset + d]);
-        }
-        score += sum;
-    }
+            __m128i queryVec = _mm_loadu_si128(reinterpret_cast<const __m128i*>(
+                queryVector + j * 16));
+            __m256i queryVecS16 = _mm256_cvtepi8_epi16(queryVec);
 
-    return score;
+            __m128i dataVec = _mm_loadu_si128(reinterpret_cast<const __m128i*>(
+                dataOffset + j * 16));
+            __m256i dataVecS16 = _mm256_cvtepi8_epi16(dataVec);
+
+            __m256i prod = _mm256_madd_epi16(queryVecS16, dataVecS16);
+            accumulator = _mm256_add_epi32(accumulator, prod);
+        }
+
+        /** Horizontal sum */
+        int32_t score = 0;
+        __m128i sum128 = _mm_add_epi32(
+            _mm256_castsi256_si128(accumulator),
+            _mm256_extracti128_si256(accumulator, 1));
+        sum128 = _mm_hadd_epi32(sum128, sum128);
+        sum128 = _mm_hadd_epi32(sum128, sum128);
+        score = _mm_cvtsi128_si32(sum128);
+
+        /** Try avoid this */
+        if (__builtin_expect(remainder != 0, 0))
+        {
+            size_t offset = nBlocks * 16;
+            for (size_t d = 0; d < remainder; d++)
+            {
+                score += static_cast<int32_t>(queryVector[offset + d]) *
+                            static_cast<int32_t>(dataOffset[offset + d]);
+            }
+        }
+
+        outScores[i] = score;
+        dataOffset += dimension;
+    }
 }
 
 __attribute__((target("avx512f,avx512bw")))
-static int32_t DotProductInt8_AVX512(
+static void DotProductInt8Batch_AVX512(
     size_t dimension,
+    size_t nDataVectors,
     const int8_t* queryVector,
-    const int8_t* dataVectors)
+    const int8_t* dataVectors,
+    int32_t* outScores)
 {
-    (void)dimension;
-    (void)queryVector;
-    (void)dataVectors;
-    /** @todo */
-    throw std::runtime_error("DotProductInt8_AVX512 not implemented");
+    size_t nBlocks = dimension / 32;
+    size_t remainder = dimension % 32;
+
+    const int8_t* dataOffset = dataVectors;
+    for (size_t i = 0; i < nDataVectors; i++)
+    {
+        __m512i accumulator = _mm512_setzero_si512();
+        
+        for (size_t j = 0; j < nBlocks; j++)
+        {
+            __m256i queryVec = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(
+                queryVector + j * 32));
+            __m512i queryVecS16 = _mm512_cvtepi8_epi16(queryVec);
+
+            __m256i dataVec = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(
+                dataOffset + j * 32));
+            __m512i dataVecS16 = _mm512_cvtepi8_epi16(dataVec);
+
+            __m512i prod = _mm512_madd_epi16(queryVecS16, dataVecS16);
+            accumulator = _mm512_add_epi32(accumulator, prod);
+        }
+
+        int32_t score = 0;
+        __m256i sum256 = _mm256_add_epi32(
+            _mm512_castsi512_si256(accumulator),
+            _mm512_extracti64x4_epi64(accumulator, 1));
+        __m128i sum128 = _mm_add_epi32(
+            _mm256_castsi256_si128(sum256),
+            _mm256_extracti128_si256(sum256, 1));
+        sum128 = _mm_hadd_epi32(sum128, sum128);
+        sum128 = _mm_hadd_epi32(sum128, sum128);
+        score = _mm_cvtsi128_si32(sum128);
+
+        if (__builtin_expect(remainder != 0, 0))
+        {
+            size_t offset = nBlocks * 32;
+            for (size_t d = 0; d < remainder; d++)
+            {
+                score += static_cast<int32_t>(queryVector[offset + d]) *
+                            static_cast<int32_t>(dataOffset[offset + d]);
+            }
+        }
+
+        outScores[i] = score;
+        dataOffset += dimension;
+    }
 }
 
 #endif // x86_64 / i386
@@ -210,21 +266,25 @@ static int32_t DotProductInt8_AVX512(
 #if defined(__aarch64__)
 
 __attribute__((target("neon")))
-static int32_t DotProductInt8_NEON(
+static void DotProductInt8Batch_NEON(
     size_t dimension,
+    size_t nDataVectors,
     const int8_t* queryVector,
-    const int8_t* dataVectors)
+    const int8_t* dataVectors,
+    int32_t* outScores)
 {
     (void)dimension;
+    (void)nDataVectors;
     (void)queryVector;
     (void)dataVectors;
+    (void)outScores;
     /** @todo */
-    throw std::runtime_error("DotProductInt8_NEON not implemented");
+    throw std::runtime_error("DotProductInt8Batch_NEON not implemented");
 }
 
 #endif
 
-static MetricInt8Func GetMetricInt8Function(
+static MetricInt8BatchFunc GetMetricInt8BatchFunction(
     CpuCapability capability, DistanceMetric metric)
 {
     switch (metric)
@@ -234,16 +294,16 @@ static MetricInt8Func GetMetricInt8Function(
         {
 #if defined(__x86_64__) || defined(__i386__)
         case CpuCapability::AVX2:
-            return &DotProductInt8_AVX2;
+            return &DotProductInt8Batch_AVX2;
         case CpuCapability::AVX512:
-            return &DotProductInt8_AVX512;
+            return &DotProductInt8Batch_AVX512;
 #endif // x86_64 / i386
 #if defined(__aarch64__)
         case CpuCapability::NEON:
-            return &DotProductInt8_NEON;
+            return &DotProductInt8Batch_NEON;
 #endif // aarch64
         default:
-            return &DotProductInt8_None;
+            return &DotProductInt8Batch_None;
         }
     default:
         throw std::invalid_argument("Unsupported DistanceMetric");
@@ -262,7 +322,7 @@ size_t TUI::Database::VectorSearch::SearchTopKInt8(
     const int8_t* dataVectors,
     size_t* outIndices)
 {
-    MetricInt8Func metricFunc = GetMetricInt8Function(
+    MetricInt8BatchFunc metricFunc = GetMetricInt8BatchFunction(
         g_cpuCapability, distanceMetric);
 
     ScoreKeeper scoreKeeper(k, KeepMode::MAX_N);
@@ -272,10 +332,12 @@ size_t TUI::Database::VectorSearch::SearchTopKInt8(
     for(size_t offset = 0; offset < nDataVectors; offset += batchSize)
     {
         size_t actualBatchSize = std::min(static_cast<size_t>(batchSize), nDataVectors - offset);
-        for(size_t i = 0; i < actualBatchSize; i++)
-        {
-            scores[i] = metricFunc(dimension, queryVector, dataVectors + (offset + i) * dimension);
-        }
+        metricFunc(
+            dimension,
+            actualBatchSize,
+            queryVector,
+            dataVectors + offset * dimension,
+            scores.data());
         for(size_t i = 0; i < actualBatchSize; i++)
         {
             size_t dataIndex = offset + i;
@@ -299,11 +361,13 @@ void TUI::Database::VectorSearch::TestMetricCalculation(
     const int8_t* dataVectors,
     int32_t* outScores)
 {
-    MetricInt8Func metricFunc = GetMetricInt8Function(
+    MetricInt8BatchFunc metricFunc = GetMetricInt8BatchFunction(
         g_cpuCapability, distanceMetric);
-    for(size_t i = 0; i < nDataVectors; i++)
-    {
-        outScores[i] = metricFunc(dimension, queryVector, dataVectors + i * dimension);
-    }
+    metricFunc(
+        dimension,
+        nDataVectors,
+        queryVector,
+        dataVectors,
+        outScores);
 }
 #endif // TUI_TEST_INTERFACES
