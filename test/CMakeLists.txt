@@ -390,3 +390,15 @@ target_link_libraries(TestTuiServer
         sqlite3
         uuid
         sodium)
+
+add_executable(TestVectorSearch
+    TestVectorSearch.cpp
+    ../src/database/VectorSearch.cpp)
+
+target_include_directories(TestVectorSearch
+    PRIVATE
+        ../src)
+
+target_compile_definitions(TestVectorSearch
+    PRIVATE
+        TUI_TEST_INTERFACES)
