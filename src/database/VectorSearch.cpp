@@ -17,83 +17,10 @@
 #include <arm_neon.h>
 #endif  // architecture selection
 
-using namespace TUI::Database::VectorSearch;
+using namespace TUI::Database;
 
 namespace
 {
-    enum class KeepMode
-    {
-        MAX_N,
-        MIN_N,
-    };
-
-    class ScoreKeeper
-    {
-    public:
-        explicit ScoreKeeper(size_t maxSize, KeepMode mode)
-            : _maxSize(maxSize), _mode(mode),
-              heap_([this](const ScoredIndex& a, const ScoredIndex& b) {
-                  return Compare(a, b);
-              })
-        {
-        }
-
-        void AddScore(int32_t score, uint64_t index)
-        {
-            if (heap_.size() < _maxSize)
-            {
-                heap_.emplace(ScoredIndex{ score, index });
-            }
-            else if (Compare({ score, index }, heap_.top()))
-            {
-                heap_.pop();
-                heap_.emplace(ScoredIndex{ score, index });
-            }
-        }
-
-        size_t DumpResults(uint64_t* outIndices)
-        {
-            size_t count = heap_.size();
-            for (size_t i = 0; i < count; ++i)
-            {
-                outIndices[count - i - 1] = heap_.top().index;
-                heap_.pop();
-            }
-            return count;
-        }
-    
-    private:
-        struct ScoredIndex
-        {
-            int32_t score;
-            uint64_t index;
-        };
-
-        size_t _maxSize;
-        KeepMode _mode;
-
-        static bool CompareMax(const ScoredIndex& a, const ScoredIndex& b)
-        {
-            return a.score > b.score;
-        }
-
-        static bool CompareMin(const ScoredIndex& a, const ScoredIndex& b)
-        {
-            return a.score < b.score;
-        }
-
-        bool Compare(const ScoredIndex& a, const ScoredIndex& b) const
-        {
-            return (_mode == KeepMode::MIN_N) ? CompareMin(a, b) : CompareMax(a, b);
-        }
-
-        std::priority_queue<
-            ScoredIndex,
-            std::vector<ScoredIndex>,
-            std::function<bool(const ScoredIndex&, const ScoredIndex&)>>
-            heap_;
-    };
-
     enum class CpuCapability
     {
         NONE,
@@ -102,6 +29,11 @@ namespace
         NEON,
     };
 }
+
+static CpuCapability DetectCpuCapability();
+
+static CpuCapability g_capability = DetectCpuCapability();
+
 
 static CpuCapability DetectCpuCapability()
 {
@@ -121,13 +53,6 @@ static CpuCapability DetectCpuCapability()
 #endif  // architecture selection
     return CpuCapability::NONE;
 }
-
-typedef void (*MetricInt8BatchFunc)(
-    size_t dimension,
-    size_t nDataVectors,
-    const int8_t* queryVector,
-    const int8_t* dataVectors,
-    int32_t* outScores);
 
 static void DotProductInt8Batch_None(
     size_t dimension,
@@ -300,13 +225,12 @@ static void DotProductInt8Batch_NEON(
 
 #endif
 
-static MetricInt8BatchFunc GetMetricInt8BatchFunction(
-    CpuCapability capability, DistanceMetric metric)
+VectorSearch::MetricInt8BatchFunc VectorSearch::GetMetricInt8BatchFunction(DistanceMetric metric)
 {
     switch (metric)
     {
     case DistanceMetric::DOT_PRODUCT:
-        switch (capability)
+        switch (g_capability)
         {
 #if defined(__x86_64__) || defined(__i386__)
         case CpuCapability::AVX2:
@@ -326,22 +250,34 @@ static MetricInt8BatchFunc GetMetricInt8BatchFunction(
     }
 }
 
-static CpuCapability g_cpuCapability = DetectCpuCapability();
+VectorSearch::ScoreMode VectorSearch::GetScoreMode(DistanceMetric distanceMetric)
+{
+    switch (distanceMetric)
+    {
+    case DistanceMetric::DOT_PRODUCT:
+        return ScoreMode::MAX_N;
+    default:
+        throw std::invalid_argument("Unsupported DistanceMetric");
+    }
+}
 
-size_t TUI::Database::VectorSearch::SearchTopKInt8(
+VectorSearch::ScoreKeeper<size_t> VectorSearch::SearchTopKInt8(
     size_t k,
     size_t dimension,
-    size_t nDataVectors,
-    const std::unordered_set<size_t>& excludeIndices,
     DistanceMetric distanceMetric,
     const int8_t* queryVector,
+    size_t nDataVectors,
     const int8_t* dataVectors,
-    size_t* outIndices)
-{
-    MetricInt8BatchFunc metricFunc = GetMetricInt8BatchFunction(
-        g_cpuCapability, distanceMetric);
+    const std::unordered_set<size_t>& excludeIndices,
+    std::optional<ScoreKeeper<size_t>> initialScores)
+{    
+    ScoreKeeper<size_t> scoreKeeper(k, GetScoreMode(distanceMetric));
+    if (initialScores.has_value())
+    {
+        scoreKeeper = std::move(initialScores.value());
+    }
 
-    ScoreKeeper scoreKeeper(k, KeepMode::MAX_N);
+    MetricInt8BatchFunc metricFunc = GetMetricInt8BatchFunction(distanceMetric);
 
     constexpr size_t batchSize = 1024;
     std::vector<int32_t> scores(batchSize);
@@ -365,25 +301,5 @@ size_t TUI::Database::VectorSearch::SearchTopKInt8(
         }
     }
 
-    return scoreKeeper.DumpResults(outIndices);
+    return scoreKeeper;
 }
-
-#ifdef TUI_TEST_INTERFACES
-void TUI::Database::VectorSearch::TestMetricCalculation(
-    size_t dimension,
-    size_t nDataVectors,
-    DistanceMetric distanceMetric,
-    const int8_t* queryVector,
-    const int8_t* dataVectors,
-    int32_t* outScores)
-{
-    MetricInt8BatchFunc metricFunc = GetMetricInt8BatchFunction(
-        g_cpuCapability, distanceMetric);
-    metricFunc(
-        dimension,
-        nDataVectors,
-        queryVector,
-        dataVectors,
-        outScores);
-}
-#endif // TUI_TEST_INTERFACES

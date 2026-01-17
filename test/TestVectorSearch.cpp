@@ -5,10 +5,12 @@
 #include <random>
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include <sys/ioctl.h>
 #include <sys/syscall.h>
 #include <unistd.h>
 #include <unordered_set>
+#include <unordered_map>
 #include <vector>
 
 /**
@@ -24,7 +26,7 @@
 #include <../src/database/VectorSearch.h>
 #include "Utility.h"
 
-using namespace TUI::Database::VectorSearch;
+using namespace TUI::Database;
 
 static void DotProductInt8_Baseline(
     size_t dimension,
@@ -126,10 +128,10 @@ private:
 #ifdef NDEBUG
 static void TestDotProductInt8Performance()
 {
-    constexpr size_t kDimension = 1024;
-    constexpr size_t kDataVectors = 10'000;
+    constexpr size_t dimension = 1024;
+    constexpr size_t nDataVectors = 10'000;
 
-    std::vector<int8_t> dataVectors(kDataVectors * kDimension);
+    std::vector<int8_t> dataVectors(nDataVectors * dimension);
     std::mt19937 rng(42);
     std::uniform_int_distribution<int> dist(-128, 127);
     for (auto& v : dataVectors)
@@ -137,20 +139,20 @@ static void TestDotProductInt8Performance()
         v = static_cast<int8_t>(dist(rng));
     }
 
-    std::vector<int32_t> scores(kDataVectors);
+    std::vector<int32_t> scores(nDataVectors);
 
     PerfEventCounter cycleCounter(PERF_COUNT_HW_CPU_CYCLES);
     cycleCounter.Reset();
     cycleCounter.Start();
 
     size_t accumulation = 0;
-    for (size_t q = 0; q < kDataVectors; ++q)
+    for (size_t q = 0; q < nDataVectors; ++q)
     {
-        const int8_t* query = dataVectors.data() + q * kDimension;
-        TestMetricCalculation(
-            kDimension,
-            kDataVectors,
-            DistanceMetric::DOT_PRODUCT,
+        const int8_t* query = dataVectors.data() + q * dimension;
+        auto metricFunc = VectorSearch::GetMetricInt8BatchFunction(VectorSearch::DistanceMetric::DOT_PRODUCT);
+        metricFunc(
+            dimension,
+            nDataVectors,
             query,
             dataVectors.data(),
             scores.data());
@@ -159,7 +161,7 @@ static void TestDotProductInt8Performance()
 
     long long cycles = cycleCounter.StopAndRead();
 
-    const double totalCalculations = static_cast<double>(kDataVectors) * static_cast<double>(kDataVectors);
+    const double totalCalculations = static_cast<double>(nDataVectors) * static_cast<double>(nDataVectors);
     const double cyclesPerVector = static_cast<double>(cycles) / totalCalculations;
 
     std::cout << "Cycle count accumulation guard: " << accumulation << std::endl;
@@ -170,11 +172,11 @@ static void TestDotProductInt8Performance()
 
 static void TestSearchTopKInt8Performance()
 {
-    constexpr size_t kDimension = 1024;
-    constexpr size_t kDataVectors = 10'000;
-    constexpr size_t kTopK = 10;
+    constexpr size_t dimension = 1024;
+    constexpr size_t nDataVectors = 10'000;
+    constexpr size_t topK = 10;
 
-    std::vector<int8_t> dataVectors(kDataVectors * kDimension);
+    std::vector<int8_t> dataVectors(nDataVectors * dimension);
     std::mt19937 rng(43);
     std::uniform_int_distribution<int> dist(-128, 127);
     for (auto& v : dataVectors)
@@ -182,7 +184,6 @@ static void TestSearchTopKInt8Performance()
         v = static_cast<int8_t>(dist(rng));
     }
 
-    std::vector<size_t> outIndices(kTopK);
     std::unordered_set<size_t> excludeIndices;
 
     PerfEventCounter cycleCounter(PERF_COUNT_HW_CPU_CYCLES);
@@ -190,28 +191,86 @@ static void TestSearchTopKInt8Performance()
     cycleCounter.Start();
 
     size_t accumulation = 0;
-    for (size_t q = 0; q < kDataVectors; ++q)
+    for (size_t q = 0; q < nDataVectors; ++q)
     {
-        const int8_t* query = dataVectors.data() + q * kDimension;
-        size_t results = SearchTopKInt8(
-            kTopK,
-            kDimension,
-            kDataVectors,
-            excludeIndices,
-            DistanceMetric::DOT_PRODUCT,
+        const int8_t* query = dataVectors.data() + q * dimension;
+        auto scoreKeeper = VectorSearch::SearchTopKInt8(
+            topK,
+            dimension,
+            VectorSearch::DistanceMetric::DOT_PRODUCT,
             query,
+            nDataVectors,
             dataVectors.data(),
-            outIndices.data());
+            excludeIndices);
 
-        if (results > 0)
+        auto results = scoreKeeper.GetResultsAndClear();
+        if (!results.empty())
         {
-            accumulation += static_cast<size_t>(outIndices[0]);
+            accumulation += static_cast<size_t>(results.front().index);
         }
     }
 
     long long cycles = cycleCounter.StopAndRead();
 
-    const double totalCalculations = static_cast<double>(kDataVectors) * static_cast<double>(kDataVectors);
+    const double totalCalculations = static_cast<double>(nDataVectors) * static_cast<double>(nDataVectors);
+    const double cyclesPerVector = static_cast<double>(cycles) / totalCalculations;
+
+    std::cout << "Cycle count accumulation guard: " << accumulation << std::endl;
+    std::cout << "Total cycles: " << cycles << std::endl;
+    std::cout << "Cycles per vector calculation: " << cyclesPerVector << std::endl;
+}
+
+static void TestSearchTopKInt8MapPerformance()
+{
+    constexpr size_t dimension = 1024;
+    constexpr size_t nDataVectors = 10'000;
+    constexpr size_t topK = 10;
+
+    std::unordered_map<size_t, std::vector<int8_t>> dataVectorMap;
+    dataVectorMap.reserve(nDataVectors * 2);
+    std::vector<size_t> keys;
+    keys.reserve(nDataVectors);
+
+    std::mt19937 rng(46);
+    std::uniform_int_distribution<int> dist(-128, 127);
+    for (size_t i = 0; i < nDataVectors; ++i)
+    {
+        std::vector<int8_t> vec(dimension);
+        for (auto& v : vec)
+        {
+            v = static_cast<int8_t>(dist(rng));
+        }
+        keys.push_back(i);
+        dataVectorMap.emplace(i, std::move(vec));
+    }
+
+    PerfEventCounter cycleCounter(PERF_COUNT_HW_CPU_CYCLES);
+    cycleCounter.Reset();
+    cycleCounter.Start();
+
+    size_t accumulation = 0;
+    for (size_t q = 0; q < nDataVectors; ++q)
+    {
+        size_t key = keys[q];
+        const int8_t* query = dataVectorMap[key].data();
+
+        auto scoreKeeper = VectorSearch::SearchTopKInt8(
+            topK,
+            dimension,
+            VectorSearch::DistanceMetric::DOT_PRODUCT,
+            query,
+            dataVectorMap);
+
+        auto results = scoreKeeper.GetResultsAndClear();
+        if (!results.empty())
+        {
+            accumulation += static_cast<size_t>(results.front().index);
+        }
+    }
+
+    long long cycles = cycleCounter.StopAndRead();
+
+    const double totalCalculations = static_cast<double>(nDataVectors) * static_cast<double>(nDataVectors);
     const double cyclesPerVector = static_cast<double>(cycles) / totalCalculations;
 
     std::cout << "Cycle count accumulation guard: " << accumulation << std::endl;
@@ -260,10 +319,10 @@ static void TestDotProductInt8Correctness()
                 data.data(),
                 baseline.data());
 
-            TestMetricCalculation(
+            auto metricFunc = VectorSearch::GetMetricInt8BatchFunction(VectorSearch::DistanceMetric::DOT_PRODUCT);
+            metricFunc(
                 c.dimension,
                 c.nDataVectors,
-                DistanceMetric::DOT_PRODUCT,
                 query,
                 data.data(),
                 candidate.data());
@@ -298,36 +357,36 @@ static void TestSearchTopKInt8Correctness()
         v = static_cast<int8_t>(dist(rng));
     }
 
-    std::vector<size_t> outIndices(topK);
     std::unordered_set<size_t> excludeIndices;
 
     for (size_t q = 0; q < nDataVectors; ++q)
     {
         const int8_t* query = dataVectors.data() + q * dimension;
-        size_t results = SearchTopKInt8(
+        auto scoreKeeper = VectorSearch::SearchTopKInt8(
             topK,
             dimension,
-            nDataVectors,
-            excludeIndices,
-            DistanceMetric::DOT_PRODUCT,
+            VectorSearch::DistanceMetric::DOT_PRODUCT,
             query,
+            nDataVectors,
             dataVectors.data(),
-            outIndices.data());
+            excludeIndices);
 
-        AssertWithMessage(results == topK, "Unexpected number of results: " + std::to_string(results));
-        AssertWithMessage(outIndices[0] == q,
+        auto results = scoreKeeper.GetResultsAndClear();
+
+        AssertWithMessage(results.size() == topK, "Unexpected number of results: " + std::to_string(results.size()));
+        AssertWithMessage(!results.empty() && results.front().index == q,
             "Top-1 mismatch: query=" + std::to_string(q) +
-            " got=" + std::to_string(outIndices[0]));
+            " got=" + std::to_string(results.front().index));
     }
 }
 
 static void TestSearchTopInt8ExcludeIndices()
 {
-    constexpr size_t kDimension = 1024;
-    constexpr size_t kDataVectors = 1000;
-    constexpr size_t kTopK = 10;
+    constexpr size_t dimension = 1024;
+    constexpr size_t nDataVectors = 1000;
+    constexpr size_t topK = 10;
 
-    std::vector<int8_t> dataVectors(kDataVectors * kDimension, 0);
+    std::vector<int8_t> dataVectors(nDataVectors * dimension, 0);
     std::mt19937 rng(45);
     std::uniform_int_distribution<int> dist(-128, 127);
     for (auto& v : dataVectors)
@@ -335,32 +394,173 @@ static void TestSearchTopInt8ExcludeIndices()
         v = static_cast<int8_t>(dist(rng));
     }
 
-    std::vector<size_t> outIndices(kTopK);
-
-    for (size_t q = 0; q < kDataVectors; ++q)
+    for (size_t q = 0; q < nDataVectors; ++q)
     {
-        std::unordered_set<size_t> excludeIndices = { q, (q + 1) % kDataVectors };
-        const int8_t* query = dataVectors.data() + q * kDimension;
+        std::unordered_set<size_t> excludeIndices = { q, (q + 1) % nDataVectors };
+        const int8_t* query = dataVectors.data() + q * dimension;
 
-        size_t results = SearchTopKInt8(
-            kTopK,
-            kDimension,
-            kDataVectors,
-            excludeIndices,
-            DistanceMetric::DOT_PRODUCT,
+        auto scoreKeeper = VectorSearch::SearchTopKInt8(
+            topK,
+            dimension,
+            VectorSearch::DistanceMetric::DOT_PRODUCT,
             query,
+            nDataVectors,
             dataVectors.data(),
-            outIndices.data());
+            excludeIndices);
 
-        AssertWithMessage(results == kTopK, "Unexpected number of results: " + std::to_string(results));
+        auto results = scoreKeeper.GetResultsAndClear();
+        AssertWithMessage(results.size() == topK, "Unexpected number of results: " + std::to_string(results.size()));
 
-        for (size_t i = 0; i < results; ++i)
+        for (const auto& scoredIndex : results)
         {
-            size_t idx = static_cast<size_t>(outIndices[i]);
+            size_t idx = static_cast<size_t>(scoredIndex.index);
             AssertWithMessage(excludeIndices.find(idx) == excludeIndices.end(),
                 "Excluded index returned: query=" + std::to_string(q) +
                 " index=" + std::to_string(idx));
         }
+    }
+}
+
+static void TestSearchTopKInt8InitialScores()
+{
+    constexpr size_t dimension = 4;
+    constexpr size_t nDataVectors = 3;
+    constexpr size_t topK = 3;
+
+    const int8_t query[dimension] = { 1, 1, 1, 1 };
+    const int8_t dataVectors[nDataVectors * dimension] = {
+        1, 1, 1, 1,
+        2, 2, 2, 2,
+        3, 3, 3, 3,
+    };
+
+    VectorSearch::ScoreKeeper<size_t> initialScores(
+        topK, VectorSearch::GetScoreMode(VectorSearch::DistanceMetric::DOT_PRODUCT));
+    initialScores.AddScore(10, 99);
+    initialScores.AddScore(5, 98);
+
+    std::unordered_set<size_t> excludeIndices;
+
+    auto scoreKeeper = VectorSearch::SearchTopKInt8(
+        topK,
+        dimension,
+        VectorSearch::DistanceMetric::DOT_PRODUCT,
+        query,
+        nDataVectors,
+        dataVectors,
+        excludeIndices,
+        std::move(initialScores));
+
+    auto resultsList = scoreKeeper.GetResultsAndClear();
+    std::vector<VectorSearch::ScoredIndex<size_t>> results(resultsList.begin(), resultsList.end());
+
+    const std::vector<size_t> expectedIndices = { 2, 99, 1 };
+    const std::vector<int32_t> expectedScores = { 12, 10, 8 };
+
+    AssertWithMessage(results.size() == expectedIndices.size(),
+        "Unexpected number of results: " + std::to_string(results.size()));
+
+    for (size_t i = 0; i < expectedIndices.size(); ++i)
+    {
+        AssertWithMessage(results[i].index == expectedIndices[i],
+            "Index mismatch at position " + std::to_string(i) +
+            " expected=" + std::to_string(expectedIndices[i]) +
+            " got=" + std::to_string(results[i].index));
+        AssertWithMessage(results[i].score == expectedScores[i],
+            "Score mismatch at position " + std::to_string(i) +
+            " expected=" + std::to_string(expectedScores[i]) +
+            " got=" + std::to_string(results[i].score));
+    }
+}
+
+static void TestSearchTopKInt8MapRandomCorrectness()
+{
+    constexpr size_t dimension = 1024;
+    constexpr size_t nDataVectors = 1000;
+    constexpr size_t topK = 10;
+
+    std::unordered_map<size_t, std::vector<int8_t>> dataVectorMap;
+    dataVectorMap.reserve(nDataVectors * 2);
+
+    std::mt19937 rng(47);
+    std::uniform_int_distribution<int> dist(-128, 127);
+    for (size_t i = 0; i < nDataVectors; ++i)
+    {
+        std::vector<int8_t> vec(dimension);
+        for (auto& v : vec)
+        {
+            v = static_cast<int8_t>(dist(rng));
+        }
+        dataVectorMap.emplace(i, std::move(vec));
+    }
+
+    for (size_t q = 0; q < nDataVectors; ++q)
+    {
+        const int8_t* query = dataVectorMap[q].data();
+        auto scoreKeeper = VectorSearch::SearchTopKInt8(
+            topK,
+            dimension,
+            VectorSearch::DistanceMetric::DOT_PRODUCT,
+            query,
+            dataVectorMap);
+
+        auto results = scoreKeeper.GetResultsAndClear();
+
+        AssertWithMessage(results.size() == topK, "Unexpected number of results: " + std::to_string(results.size()));
+        AssertWithMessage(!results.empty() && results.front().index == q,
+            "Top-1 mismatch: query=" + std::to_string(q) +
+            " got=" + std::to_string(results.front().index));
+    }
+}
+
+static void TestSearchTopKInt8MapInitialScores()
+{
+    constexpr size_t dimension = 4;
+    constexpr size_t topK = 3;
+
+    const int8_t query[dimension] = { 1, 1, 1, 1 };
+
+    std::unordered_map<size_t, std::vector<int8_t>> dataVectorMap = {
+        { 21, { 4, 4, 4, 4 } },
+        { 13, { 3, 3, 3, 3 } },
+        { 11, { 2, 2, 2, 2 } },
+        { 7,  { 1, 1, 1, 1 } },
+        { 5,  { -1, -1, -1, -1 } },
+    };
+
+    VectorSearch::ScoreKeeper<size_t> initialScores(
+        topK, VectorSearch::GetScoreMode(VectorSearch::DistanceMetric::DOT_PRODUCT));
+    initialScores.AddScore(10, 99);
+    initialScores.AddScore(5, 98);
+    auto initialOpt = std::optional<VectorSearch::ScoreKeeper<size_t>>(std::move(initialScores));
+
+    auto scoreKeeper = VectorSearch::SearchTopKInt8(
+        topK,
+        dimension,
+        VectorSearch::DistanceMetric::DOT_PRODUCT,
+        query,
+        dataVectorMap,
+        std::move(initialOpt));
+
+    auto resultsList = scoreKeeper.GetResultsAndClear();
+    std::vector<VectorSearch::ScoredIndex<size_t>> results(resultsList.begin(), resultsList.end());
+
+    const std::vector<size_t> expectedIndices = { 21, 13, 99 };
+    const std::vector<int32_t> expectedScores = { 16, 12, 10 };
+
+    AssertWithMessage(results.size() == expectedIndices.size(),
+        "Unexpected number of results: " + std::to_string(results.size()));
+
+    for (size_t i = 0; i < expectedIndices.size(); ++i)
+    {
+        AssertWithMessage(results[i].index == expectedIndices[i],
+            "Index mismatch at position " + std::to_string(i) +
+            " expected=" + std::to_string(expectedIndices[i]) +
+            " got=" + std::to_string(results[i].index));
+        AssertWithMessage(results[i].score == expectedScores[i],
+            "Score mismatch at position " + std::to_string(i) +
+            " expected=" + std::to_string(expectedScores[i]) +
+            " got=" + std::to_string(results[i].score));
     }
 }
 
@@ -372,10 +572,14 @@ int main(int argc, char const *argv[])
 #ifdef NDEBUG
     RunTest(TestDotProductInt8Performance());
     RunTest(TestSearchTopKInt8Performance());
+    RunTest(TestSearchTopKInt8MapPerformance());
 #endif // NDEBUG
     RunTest(TestDotProductInt8Correctness());
     RunTest(TestSearchTopKInt8Correctness());
     RunTest(TestSearchTopInt8ExcludeIndices());
+    RunTest(TestSearchTopKInt8InitialScores());
+    RunTest(TestSearchTopKInt8MapInitialScores());
+    RunTest(TestSearchTopKInt8MapRandomCorrectness());
 
     return 0;
 }
