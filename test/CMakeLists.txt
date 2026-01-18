@@ -402,3 +402,16 @@ target_include_directories(TestVectorSearch
 target_compile_definitions(TestVectorSearch
     PRIVATE
         TUI_TEST_INTERFACES)
+
+add_executable(TestVectorDatabase
+    TestVectorDatabase.cpp
+    ../src/database/VectorDatabase.cpp
+    ../src/database/VectorSearch.cpp)
+
+target_include_directories(TestVectorDatabase
+    PRIVATE
+        ../src)
+
+target_link_libraries(TestVectorDatabase
+    PRIVATE
+        uuid)

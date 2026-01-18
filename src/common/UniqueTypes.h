@@ -43,6 +43,15 @@ namespace TUI::Common::Unique
         {
             return _fd;
         }
+
+        void Close()
+        {
+            if (_fd != -1)
+            {
+                close(_fd);
+                _fd = -1;
+            }
+        }
     private:
         int _fd{-1};
     };

@@ -31,7 +31,14 @@ namespace TUI::Common
 
         ~WorkerThread()
         {
-            Close();
+            try
+            {
+                Close();
+            }
+            catch(...)
+            {
+                /** ignore */
+            }
         }
 
         WorkerThread(const WorkerThread&) = delete;

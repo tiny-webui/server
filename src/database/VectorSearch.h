@@ -111,9 +111,9 @@ private:
     static MetricInt8BatchFunc GetMetricInt8BatchFunction(
         DistanceMetric distanceMetric);
 
-    static ScoreMode GetScoreMode(DistanceMetric distanceMetric);
-
 public:
+
+    static ScoreMode GetScoreMode(DistanceMetric distanceMetric);
 
     /**
      * @brief 

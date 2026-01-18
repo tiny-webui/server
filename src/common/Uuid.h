@@ -20,6 +20,18 @@ namespace TUI::Common
                 throw std::runtime_error("Invalid UUID string");
             }
         }
+        explicit Uuid(const char* str, size_t len)
+        {
+            if (len < UUID_STR_LEN - 1)
+            {
+                throw std::runtime_error("Invalid UUID string");
+            }
+            std::string uuidStr(str, UUID_STR_LEN - 1);
+            if (uuid_parse(uuidStr.c_str(), _uuid) != 0)
+            {
+                throw std::runtime_error("Invalid UUID string");
+            }
+        }
         explicit Uuid(std::nullptr_t)
         {
             uuid_clear(_uuid);
