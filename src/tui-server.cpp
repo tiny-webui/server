@@ -90,6 +90,9 @@ static App gApp{};
 
 int main(int argc, char const *argv[])
 {
+    /** Ignore sigpipe */
+    signal(SIGPIPE, SIG_IGN);
+
     auto params = AppParams::Parse(argc, argv);
     try
     {
