@@ -1,7 +1,6 @@
 ## Prerequisites
 Install the following packages from your package manager:
 * libcurl
-* libwebsockets
 * libsqlite3
 * libuuid
 * nlohmann-json
@@ -9,7 +8,7 @@ Install the following packages from your package manager:
 
 For example, on debian, these can be installed:
 ```bash
-sudo apt install libcurl4-openssl-dev libwebsockets-dev libsqlite3-dev  uuid-dev nlohmann-json3-dev
+sudo apt install libcurl4-openssl-dev libsqlite3-dev  uuid-dev nlohmann-json3-dev
 ```
 Install the following packages from source:
 * [libtev-cpp](https://github.com/chemwolf6922/tiny-event-loop-cpp)
@@ -26,6 +25,16 @@ sudo make install
 ```bash
 git clone https://github.com/chemwolf6922/js-style-co-routine
 cd js-style-co-routine
+mkdir build
+cd build
+cmake ..
+make
+sudo make install
+```
+* [tiny-websocket](https://github.com/chemwolf6922/tiny-websocket)
+```bash
+git clone https://github.com/chemwolf6922/tiny-websocket
+cd tiny-websocket
 mkdir build
 cd build
 cmake ..

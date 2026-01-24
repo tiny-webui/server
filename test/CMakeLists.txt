@@ -41,7 +41,7 @@ target_link_libraries(TestHttpClient
 
 add_executable(TestWebSocketServer
     TestWebSocketServer.cpp
-    ../src/network/LwsTypes.cpp
+    ../src/network/TwsTypes.cpp
     ../src/network/WebSocketServer.cpp)
 
 target_include_directories(TestWebSocketServer
@@ -50,7 +50,7 @@ target_include_directories(TestWebSocketServer
 
 target_link_libraries(TestWebSocketServer
     PRIVATE
-        websockets)
+        tws)
 
 add_executable(TestHttpStreamResponseParser
     TestHttpStreamResponseParser.cpp
@@ -370,7 +370,7 @@ target_include_directories(TestService
 target_link_libraries(TestService
     PRIVATE
         curl
-        websockets
+        tws
         sqlite3
         uuid
         sodium)
@@ -386,7 +386,7 @@ target_include_directories(TestTuiServer
 target_link_libraries(TestTuiServer
     PRIVATE
         curl
-        websockets
+        tws
         sqlite3
         uuid
         sodium)

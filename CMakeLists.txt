@@ -45,7 +45,7 @@ target_include_directories(tui-server
 target_link_libraries(tui-server
     PRIVATE
         curl
-        websockets
+        tws
         sqlite3
         uuid
         sodium)
