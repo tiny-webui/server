@@ -55,7 +55,6 @@ jobs:
             curl \
             git \
             libcurl4-openssl-dev \
-            libwebsockets-dev \
             libsqlite3-dev \
             uuid-dev \
             nlohmann-json3-dev \
@@ -90,6 +89,15 @@ jobs:
           cmake -S /tmp/js-style-co-routine -B /tmp/js-style-co-routine/build -DCMAKE_BUILD_TYPE="$BUILD_TYPE" -DCMAKE_POSITION_INDEPENDENT_CODE=ON
           cmake --build /tmp/js-style-co-routine/build --parallel
           sudo cmake --install /tmp/js-style-co-routine/build
+          sudo ldconfig
+      
+      - name: Install tiny-websocket from source
+        run: |
+          set -euo pipefail
+          git clone --depth=1 https://github.com/chemwolf6922/tiny-websocket /tmp/tiny-websocket
+          cmake -S /tmp/tiny-websocket -B /tmp/tiny-websocket/build -DCMAKE_BUILD_TYPE="$BUILD_TYPE" -DCMAKE_POSITION_INDEPENDENT_CODE=ON
+          cmake --build /tmp/tiny-websocket/build --parallel
+          sudo cmake --install /tmp/tiny-websocket/build
           sudo ldconfig
 
       - name: Configure main build
