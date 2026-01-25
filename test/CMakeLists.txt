@@ -390,3 +390,15 @@ target_link_libraries(TestTuiServer
         sqlite3
         uuid
         sodium)
+
+add_executable(TestZstdMessageCodec
+    TestZstdMessageCodec.cpp
+    ../src/application/ZstdMessageCodec.cpp)
+
+target_include_directories(TestZstdMessageCodec
+    PRIVATE
+        ../src)
+
+target_link_libraries(TestZstdMessageCodec
+    PRIVATE
+        zstd)

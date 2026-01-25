@@ -36,6 +36,7 @@ env:
     TestUtf8
     TestUuid
     TestWorkerThread
+    TestZstdMessageCodec
 
 jobs:
   build-and-test:
@@ -59,7 +60,8 @@ jobs:
             uuid-dev \
             nlohmann-json3-dev \
             libssl-dev \
-            valgrind
+            valgrind \
+            libzstd-dev
 
       - name: Install libsodium (>=1.0.19) from source
         run: |

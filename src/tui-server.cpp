@@ -11,6 +11,7 @@
 
 #include "application/SecureSession.h"
 #include "application/Service.h"
+#include "application/ZstdMessageCodec.h"
 #include "common/TevInjectionQueue.h"
 #include "database/Database.h"
 #include "network/IServer.h"
@@ -153,7 +154,8 @@ static JS::Promise<void> MainAsync(AppParams params)
             {
                 return std::nullopt;
             }
-        });
+        },
+        {std::make_shared<Application::ZstdMessageCodec>()});
     gApp.service = std::make_shared<Application::Service>(
         gApp.tev, std::move(secureSessionServer), std::move(database),
         [](const std::string& errorMessage) {
