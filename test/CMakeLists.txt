@@ -373,7 +373,8 @@ target_link_libraries(TestService
         tws
         sqlite3
         uuid
-        sodium)
+        sodium
+        zstd)
 
 add_executable(TestTuiServer
     TestTuiServer.cpp
@@ -389,7 +390,8 @@ target_link_libraries(TestTuiServer
         tws
         sqlite3
         uuid
-        sodium)
+        sodium
+        zstd)
 
 add_executable(TestZstdMessageCodec
     TestZstdMessageCodec.cpp
