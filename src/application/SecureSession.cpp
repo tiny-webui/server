@@ -13,17 +13,50 @@ using namespace TUI::Network;
 using namespace TUI::Application;
 using namespace TUI::Application::SecureSession;
 
+namespace
+{
+
+    class EncryptionCodec : public IMessageCodec
+    {
+    public:
+        EncryptionCodec(
+            Cipher::ChaCha20Poly1305::Encryptor encryptor,
+            Cipher::ChaCha20Poly1305::Decryptor decryptor)
+            : _encryptor(std::move(encryptor)), _decryptor(std::move(decryptor))
+        {
+        }
+        ~EncryptionCodec() override = default;
+        EncryptionCodec(const EncryptionCodec&) = delete;
+        EncryptionCodec& operator=(const EncryptionCodec&) = delete;
+        EncryptionCodec(EncryptionCodec&&) = delete;
+        EncryptionCodec& operator=(EncryptionCodec&&) = delete;
+
+        std::vector<std::uint8_t> Encode(const std::vector<std::uint8_t>& data) override
+        {
+            return _encryptor.Encrypt(data);
+        }
+
+        std::vector<std::uint8_t> Decode(const std::vector<std::uint8_t>& data) override
+        {
+            return _decryptor.Decrypt(data);
+        }
+
+    private:
+        Cipher::ChaCha20Poly1305::Encryptor _encryptor;
+        Cipher::ChaCha20Poly1305::Decryptor _decryptor;
+    };
+
+}
+
 /** Session */
 
 Connection::Connection(
     std::shared_ptr<IConnection<void>> connection,
     const CallerId& callerId,
-    Cipher::ChaCha20Poly1305::Encryptor encryptor,
-    Cipher::ChaCha20Poly1305::Decryptor decryptor,
-    bool turnOffEncryption,
-    std::function<void(CallerId)> onClose)
-    : _connection(std::move(connection)), _callerId(callerId), _encryptor(std::move(encryptor)),
-      _decryptor(std::move(decryptor)), _turnOffEncryption(turnOffEncryption), _onClose(std::move(onClose))
+    std::function<void(CallerId)> onClose,
+    const std::vector<std::shared_ptr<IMessageCodec>>& messageCodecs)
+    : _connection(std::move(connection)), _callerId(callerId), _onClose(std::move(onClose)),
+      _messageCodecs(messageCodecs)
 {
     if (_connection == nullptr)
     {
@@ -62,9 +95,9 @@ void Connection::Send(std::vector<std::uint8_t> message)
     {
         throw std::runtime_error("Connection is closed");
     }
-    if (!_turnOffEncryption)
+    for (const auto& codec : _messageCodecs)
     {
-        message = _encryptor.Encrypt(message);
+        message = codec->Encode(message);
     }
     _connection->Send(std::move(message));
 }
@@ -82,9 +115,9 @@ JS::Promise<std::optional<std::vector<std::uint8_t>>> Connection::ReceiveAsync()
         co_return std::nullopt;
     }
     auto data = std::move(dataOpt.value());
-    if (!_turnOffEncryption)
+    for (auto it = _messageCodecs.rbegin(); it != _messageCodecs.rend(); ++it)
     {
-        data = _decryptor.Decrypt(data);
+        data = (*it)->Decode(data);
     }
     co_return std::move(data);
 }
@@ -99,16 +132,18 @@ CallerId Connection::GetId() const
 std::shared_ptr<IServer<CallerId>> Server::Create(
     Tev& tev,
     std::shared_ptr<IServer<void>> server,
-    GetUserCredentialFunc getUserCredential)
+    GetUserCredentialFunc getUserCredential,
+    const std::vector<std::shared_ptr<IMessageCodec>>& messageCodecs)
 {
-    return std::shared_ptr<Server>(new Server(tev, server, getUserCredential));
+    return std::shared_ptr<Server>(new Server(tev, server, getUserCredential, messageCodecs));
 }
 
 Server::Server(
     Tev& tev,
     std::shared_ptr<IServer<void>> server,
-    GetUserCredentialFunc getUserCredential)
-    : _tev(tev), _server(server), _getUserCredential(getUserCredential)
+    GetUserCredentialFunc getUserCredential,
+    const std::vector<std::shared_ptr<IMessageCodec>>& messageCodecs)
+    : _tev(tev), _server(server), _getUserCredential(getUserCredential), _messageCodecs(messageCodecs)
 {
     if (server == nullptr || getUserCredential == nullptr)
     {
@@ -346,12 +381,14 @@ JS::Promise<void> Server::HandleHandshakeAsync(std::shared_ptr<IConnection<void>
                 connection->Send(std::move(negotiationResponseCipher));
                 /** Create the secure connection */
                 std::weak_ptr<Server> weakThis = shared_from_this();
-                auto secureConnection = std::make_shared<Connection>(
-                    connection,
+                std::vector<std::shared_ptr<IMessageCodec>> codecs = _messageCodecs;
+                if (!negotiationRequest.get_turn_off_encryption())
+                {
+                    codecs.push_back(std::make_shared<EncryptionCodec>(std::move(encryptor), std::move(decryptor)));
+                }
+                auto secureConnection = std::shared_ptr<Connection>(new Connection(
+                    std::move(connection),
                     callerId,
-                    encryptor,
-                    decryptor,
-                    negotiationRequest.get_turn_off_encryption(),
                     [weakThis, resumptionKeyIndex](CallerId id) {
                         auto self = weakThis.lock();
                         if (!self)
@@ -379,7 +416,8 @@ JS::Promise<void> Server::HandleHandshakeAsync(std::shared_ptr<IConnection<void>
                         self->_resumptionKeyTimeouts.emplace(
                             resumptionKeyIndexStr,
                             std::move(resumptionKeyTimeout));
-                    });
+                    },
+                    std::move(codecs)));
                 _connections.emplace(callerId, secureConnection);
                 /** Add the connection to the generator */
                 _connectionGenerator.Feed(secureConnection);

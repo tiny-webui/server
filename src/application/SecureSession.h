@@ -16,20 +16,16 @@
 #include "cipher/FakeCredentialGenerator.h"
 #include "cipher/BruteForceLimiter.h"
 #include "common/Cache.h"
+#include "IMessageCodec.h"
 
 namespace TUI::Application::SecureSession
 {
+    class Server;
+
     class Connection : public Network::IConnection<CallerId>
     {
+        friend class Server;
     public:
-        /** @todo Compression? */
-        Connection(
-            std::shared_ptr<Network::IConnection<void>> connection,
-            const CallerId& callerId,
-            Cipher::ChaCha20Poly1305::Encryptor encryptor,
-            Cipher::ChaCha20Poly1305::Decryptor decryptor,
-            bool turnOffEncryption,
-            std::function<void(CallerId)> onClose);
         ~Connection() override;
         Connection(const Connection&) = delete;
         Connection& operator=(const Connection&) = delete;
@@ -43,13 +39,17 @@ namespace TUI::Application::SecureSession
         CallerId GetId() const override;
 
     private:
+        Connection(
+            std::shared_ptr<Network::IConnection<void>> connection,
+            const CallerId& callerId,
+            std::function<void(CallerId)> onClose,
+            const std::vector<std::shared_ptr<IMessageCodec>>& messageCodecs);
+
         std::shared_ptr<Network::IConnection<void>> _connection;
         CallerId _callerId;
-        Cipher::ChaCha20Poly1305::Encryptor _encryptor;
-        Cipher::ChaCha20Poly1305::Decryptor _decryptor;
-        bool _turnOffEncryption;
         std::function<void(CallerId)> _onClose;
         bool _closed{false};
+        std::vector<std::shared_ptr<IMessageCodec>> _messageCodecs{};
     };
 
     class Server : public Network::IServer<CallerId>, public std::enable_shared_from_this<Server>
@@ -71,7 +71,8 @@ namespace TUI::Application::SecureSession
         static std::shared_ptr<Network::IServer<CallerId>> Create(
             Tev& tev,
             std::shared_ptr<Network::IServer<void>> server,
-            GetUserCredentialFunc getUserCredential);
+            GetUserCredentialFunc getUserCredential,
+            const std::vector<std::shared_ptr<IMessageCodec>>& messageCodecs = {});
         ~Server() override;
         Server(const Server&) = delete;
         Server& operator=(const Server&) = delete;
@@ -94,11 +95,13 @@ namespace TUI::Application::SecureSession
         Cipher::FakeCredentialGenerator _fakeCredentialGenerator{10000};
         /** 5 trials per window, 5 min to 6 hours of lock out time. */
         Cipher::BruteForceLimiter _bruteForceLimiter{5, 5 * 60 * 1000, 6 * 60 * 60 * 1000};
+        std::vector<std::shared_ptr<IMessageCodec>> _messageCodecs{};
 
         Server(
             Tev& tev,
             std::shared_ptr<Network::IServer<void>> server,
-            GetUserCredentialFunc getUserCredential);
+            GetUserCredentialFunc getUserCredential,
+            const std::vector<std::shared_ptr<IMessageCodec>>& messageCodecs);
 
         JS::Promise<void> HandleRawConnections();
         JS::Promise<void> HandleHandshakeAsync(std::shared_ptr<Network::IConnection<void>> connection);

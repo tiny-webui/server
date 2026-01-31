@@ -45,10 +45,11 @@ target_include_directories(tui-server
 target_link_libraries(tui-server
     PRIVATE
         curl
-        websockets
+        tws
         sqlite3
         uuid
-        sodium)
+        sodium
+        zstd)
 
 add_executable(tui-register
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tui-register.cpp
