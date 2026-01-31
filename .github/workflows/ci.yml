@@ -96,7 +96,7 @@ jobs:
       - name: Install tiny-websocket from source
         run: |
           set -euo pipefail
-          git clone --depth=1 https://github.com/chemwolf6922/tiny-websocket /tmp/tiny-websocket
+          git clone --depth=1 --recursive https://github.com/chemwolf6922/tiny-websocket /tmp/tiny-websocket
           cmake -S /tmp/tiny-websocket -B /tmp/tiny-websocket/build -DCMAKE_BUILD_TYPE="$BUILD_TYPE" -DCMAKE_POSITION_INDEPENDENT_CODE=ON
           cmake --build /tmp/tiny-websocket/build --parallel
           sudo cmake --install /tmp/tiny-websocket/build
