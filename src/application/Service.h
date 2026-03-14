@@ -64,6 +64,11 @@ namespace TUI::Application
         JS::Promise<nlohmann::json> OnGetUserAdminSettingsAsync(CallerId callerId, nlohmann::json params);
         JS::Promise<nlohmann::json> OnSetUserAdminSettingsAsync(CallerId callerId, nlohmann::json params);
         JS::Promise<nlohmann::json> OnSetUserCredentialAsync(CallerId callerId, nlohmann::json params);
+        JS::Promise<nlohmann::json> OnPutFileAsync(CallerId callerId, nlohmann::json params);
+        JS::Promise<nlohmann::json> OnGetFileMetaAsync(CallerId callerId, nlohmann::json params);
+        JS::Promise<nlohmann::json> OnGetFileContentAsync(CallerId callerId, nlohmann::json params);
+        JS::Promise<nlohmann::json> OnDeleteFileAsync(CallerId callerId, nlohmann::json params);
+        JS::Promise<nlohmann::json> OnListFileAsync(CallerId callerId, nlohmann::json params);
 
         /** Connection handlers */
         void OnNewConnection(CallerId callerId);

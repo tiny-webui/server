@@ -3,6 +3,7 @@
 #include "network/HttpStreamResponseParser.h"
 #include "common/Timestamp.h"
 #include "common/StreamBatcher.h"
+#include "common/Base64.h"
 
 using namespace TUI;
 using namespace TUI::Application;
@@ -38,7 +39,12 @@ Service::Service(
             {"deleteUser", std::bind(&Service::OnDeleteUserAsync, this, std::placeholders::_1, std::placeholders::_2)},
             {"getUserAdminSettings", std::bind(&Service::OnGetUserAdminSettingsAsync, this, std::placeholders::_1, std::placeholders::_2)},
             {"setUserAdminSettings", std::bind(&Service::OnSetUserAdminSettingsAsync, this, std::placeholders::_1, std::placeholders::_2)},
-            {"setUserCredential", std::bind(&Service::OnSetUserCredentialAsync, this, std::placeholders::_1, std::placeholders::_2)}
+            {"setUserCredential", std::bind(&Service::OnSetUserCredentialAsync, this, std::placeholders::_1, std::placeholders::_2)},
+            {"putFile", std::bind(&Service::OnPutFileAsync, this, std::placeholders::_1, std::placeholders::_2)},
+            {"getFileMeta", std::bind(&Service::OnGetFileMetaAsync, this, std::placeholders::_1, std::placeholders::_2)},
+            {"getFileContent", std::bind(&Service::OnGetFileContentAsync, this, std::placeholders::_1, std::placeholders::_2)},
+            {"deleteFile", std::bind(&Service::OnDeleteFileAsync, this, std::placeholders::_1, std::placeholders::_2)},
+            {"listFile", std::bind(&Service::OnListFileAsync, this, std::placeholders::_1, std::placeholders::_2)}
         },
         std::unordered_map<std::string, Rpc::RpcServer<CallerId>::StreamRequestHandler>{
             {"chatCompletion", std::bind(&Service::OnChatCompletionAsync, this, std::placeholders::_1, std::placeholders::_2)},
@@ -968,6 +974,80 @@ JS::Promise<nlohmann::json> Service::OnSetUserCredentialAsync(CallerId callerId,
         (static_cast<nlohmann::json>(params)).dump());
     /** Return null */
     co_return nlohmann::json{};
+}
+
+JS::Promise<nlohmann::json> Service::OnPutFileAsync(CallerId callerId, nlohmann::json paramsJson)
+{
+    auto params = ParseParams<Schema::IServer::PutFileParams>(paramsJson);
+    auto fileListLock = _resourceVersionManager->GetWriteLock(
+        {"fileList", static_cast<std::string>(callerId.userId)}, callerId);
+    /** 
+     * File metadata and content are not managed by version manager. As they are constants.
+     * It's up to the client to cache them properly.
+     */
+    auto fileContent = Common::Base64::Decode(params.get_content_base64());
+    auto metadataStr = (static_cast<nlohmann::json>(params.get_file_metadata())).dump();
+    auto fileMeta = co_await _database->SaveFileAsync(
+        callerId.userId,
+        std::move(metadataStr),
+        std::move(fileContent));
+    Schema::IServer::PutFileResult result{};
+    result.set_file_id(static_cast<std::string>(fileMeta.fileId));
+    result.set_content_id(fileMeta.contentId);
+    co_return static_cast<nlohmann::json>(result);
+}
+
+JS::Promise<nlohmann::json> Service::OnGetFileMetaAsync(CallerId callerId, nlohmann::json paramsJson)
+{
+    auto params = ParseParams<Schema::IServer::GetFileMetaParams>(paramsJson);
+    Common::Uuid fileId{params.get_file_id()};
+    auto fileMeta = _database->GetFileMeta(callerId.userId, fileId);
+    nlohmann::json metadata = nlohmann::json::parse(fileMeta.metadata);
+    Schema::IServer::GetFileMetaResult result{};
+    result.set_content_id(fileMeta.contentId);
+    result.set_file_metadata(std::move(metadata));
+    co_return static_cast<nlohmann::json>(result);
+}
+
+JS::Promise<nlohmann::json> Service::OnGetFileContentAsync(CallerId callerId, nlohmann::json paramsJson)
+{
+    auto params = ParseParams<Schema::IServer::GetFileContentParams>(paramsJson);
+    auto content = _database->GetFileContent(callerId.userId, params.get_content_id());
+    auto contentBase64 = Common::Base64::Encode(content);
+    Schema::IServer::GetFileContentResult result{};
+    result.set_content_base64(std::move(contentBase64));
+    co_return static_cast<nlohmann::json>(result);
+}
+
+JS::Promise<nlohmann::json> Service::OnDeleteFileAsync(CallerId callerId, nlohmann::json paramsJson)
+{
+    auto params = ParseParams<Schema::IServer::DeleteFileParams>(paramsJson);
+    auto fileListLock = _resourceVersionManager->GetWriteLock(
+        {"fileList", static_cast<std::string>(callerId.userId)}, callerId);
+    Common::Uuid fileId{params.get_file_id()};
+    co_await _database->DeleteFileAsync(callerId.userId, fileId);
+    /** Return null */
+    co_return nlohmann::json{};
+}
+
+JS::Promise<nlohmann::json> Service::OnListFileAsync(CallerId callerId, nlohmann::json paramsJson)
+{
+    (void)paramsJson;
+    auto lock = _resourceVersionManager->GetReadLock(
+        {"fileList", static_cast<std::string>(callerId.userId)}, callerId);
+    auto list = _database->ListFileMeta(callerId.userId);
+    Schema::IServer::ListFileResult result{};
+    result.reserve(list.size());
+    for (const auto& item : list)
+    {
+        using EntryType = decltype(result)::value_type;
+        EntryType entry{};
+        entry.set_file_id(static_cast<std::string>(item.fileId));
+        nlohmann::json metadata = nlohmann::json::parse(item.metadata);
+        entry.set_file_metadata(std::move(metadata));
+        result.push_back(std::move(entry));
+    }
+    co_return static_cast<nlohmann::json>(result);
 }
 
 void Service::OnNewConnection(CallerId callerId)
