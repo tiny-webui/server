@@ -18,7 +18,7 @@ env:
     TestChaCha20Poly1305
     TestCounter
     TestCryptoKdfHkdfSha256
-    TestDatabase /tmp/tui-test.db
+    TestDatabase /tmp/tui-test.db /tmp/files
     TestEcdhePsk
     TestEd25519
     TestFakeCredentialGenerator

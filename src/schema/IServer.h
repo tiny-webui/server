@@ -29,6 +29,14 @@
 //     SetUserAdminSettingsParams data = nlohmann::json::parse(jsonString);
 //     ProtocolNegotiationRequest data = nlohmann::json::parse(jsonString);
 //     ProtocolNegotiationResponse data = nlohmann::json::parse(jsonString);
+//     PutFileParams data = nlohmann::json::parse(jsonString);
+//     PutFileResult data = nlohmann::json::parse(jsonString);
+//     GetFileMetaParams data = nlohmann::json::parse(jsonString);
+//     GetFileMetaResult data = nlohmann::json::parse(jsonString);
+//     GetFileContentParams data = nlohmann::json::parse(jsonString);
+//     GetFileContentResult data = nlohmann::json::parse(jsonString);
+//     DeleteFileParams data = nlohmann::json::parse(jsonString);
+//     ListFileResult data = nlohmann::json::parse(jsonString);
 
 #pragma once
 
@@ -641,11 +649,152 @@ namespace IServer {
         void set_was_under_attack(const bool & value) { this->was_under_attack = value; }
     };
 
+    class PutFileParams {
+        public:
+        PutFileParams() = default;
+        virtual ~PutFileParams() = default;
+
+        private:
+        std::string content_base64;
+        nlohmann::json file_metadata;
+
+        public:
+        const std::string & get_content_base64() const { return content_base64; }
+        std::string & get_mutable_content_base64() { return content_base64; }
+        void set_content_base64(const std::string & value) { this->content_base64 = value; }
+
+        const nlohmann::json & get_file_metadata() const { return file_metadata; }
+        nlohmann::json & get_mutable_file_metadata() { return file_metadata; }
+        void set_file_metadata(const nlohmann::json & value) { this->file_metadata = value; }
+    };
+
+    class PutFileResult {
+        public:
+        PutFileResult() = default;
+        virtual ~PutFileResult() = default;
+
+        private:
+        std::string content_id;
+        std::string file_id;
+
+        public:
+        /**
+         * Multiple file can point to the same content.
+         */
+        const std::string & get_content_id() const { return content_id; }
+        std::string & get_mutable_content_id() { return content_id; }
+        void set_content_id(const std::string & value) { this->content_id = value; }
+
+        const std::string & get_file_id() const { return file_id; }
+        std::string & get_mutable_file_id() { return file_id; }
+        void set_file_id(const std::string & value) { this->file_id = value; }
+    };
+
+    class GetFileMetaParams {
+        public:
+        GetFileMetaParams() = default;
+        virtual ~GetFileMetaParams() = default;
+
+        private:
+        std::string file_id;
+
+        public:
+        const std::string & get_file_id() const { return file_id; }
+        std::string & get_mutable_file_id() { return file_id; }
+        void set_file_id(const std::string & value) { this->file_id = value; }
+    };
+
+    class GetFileMetaResult {
+        public:
+        GetFileMetaResult() = default;
+        virtual ~GetFileMetaResult() = default;
+
+        private:
+        std::string content_id;
+        nlohmann::json file_metadata;
+
+        public:
+        const std::string & get_content_id() const { return content_id; }
+        std::string & get_mutable_content_id() { return content_id; }
+        void set_content_id(const std::string & value) { this->content_id = value; }
+
+        const nlohmann::json & get_file_metadata() const { return file_metadata; }
+        nlohmann::json & get_mutable_file_metadata() { return file_metadata; }
+        void set_file_metadata(const nlohmann::json & value) { this->file_metadata = value; }
+    };
+
+    class GetFileContentParams {
+        public:
+        GetFileContentParams() = default;
+        virtual ~GetFileContentParams() = default;
+
+        private:
+        std::string content_id;
+
+        public:
+        const std::string & get_content_id() const { return content_id; }
+        std::string & get_mutable_content_id() { return content_id; }
+        void set_content_id(const std::string & value) { this->content_id = value; }
+    };
+
+    class GetFileContentResult {
+        public:
+        GetFileContentResult() = default;
+        virtual ~GetFileContentResult() = default;
+
+        private:
+        std::string content_base64;
+
+        public:
+        const std::string & get_content_base64() const { return content_base64; }
+        std::string & get_mutable_content_base64() { return content_base64; }
+        void set_content_base64(const std::string & value) { this->content_base64 = value; }
+    };
+
+    class DeleteFileParams {
+        public:
+        DeleteFileParams() = default;
+        virtual ~DeleteFileParams() = default;
+
+        private:
+        std::string file_id;
+
+        public:
+        const std::string & get_file_id() const { return file_id; }
+        std::string & get_mutable_file_id() { return file_id; }
+        void set_file_id(const std::string & value) { this->file_id = value; }
+    };
+
+    class ListFileResultElement {
+        public:
+        ListFileResultElement() = default;
+        virtual ~ListFileResultElement() = default;
+
+        private:
+        std::string content_id;
+        std::string file_id;
+        nlohmann::json file_metadata;
+
+        public:
+        const std::string & get_content_id() const { return content_id; }
+        std::string & get_mutable_content_id() { return content_id; }
+        void set_content_id(const std::string & value) { this->content_id = value; }
+
+        const std::string & get_file_id() const { return file_id; }
+        std::string & get_mutable_file_id() { return file_id; }
+        void set_file_id(const std::string & value) { this->file_id = value; }
+
+        const nlohmann::json & get_file_metadata() const { return file_metadata; }
+        nlohmann::json & get_mutable_file_metadata() { return file_metadata; }
+        void set_file_metadata(const nlohmann::json & value) { this->file_metadata = value; }
+    };
+
     using GetMetadataResult = std::map<std::string, nlohmann::json>;
     using LinearHistory = std::vector<Message>;
     using GetChatListResult = std::vector<GetChatListResultElement>;
     using GetModelListResult = std::vector<GetModelListResultElement>;
     using GetUserListResult = std::vector<GetUserListResultElement>;
+    using ListFileResult = std::vector<ListFileResultElement>;
 }
 }
 }
@@ -1036,6 +1185,88 @@ namespace IServer {
         j["sessionResumptionKey"] = x.get_session_resumption_key();
         j["sessionResumptionKeyIndex"] = x.get_session_resumption_key_index();
         j["wasUnderAttack"] = x.get_was_under_attack();
+    }
+
+    inline void from_json(const json & j, PutFileParams& x) {
+        x.set_content_base64(j.at("contentBase64").get<std::string>());
+        x.set_file_metadata(get_untyped(j, "fileMetadata"));
+    }
+
+    inline void to_json(json & j, const PutFileParams & x) {
+        j = json::object();
+        j["contentBase64"] = x.get_content_base64();
+        j["fileMetadata"] = x.get_file_metadata();
+    }
+
+    inline void from_json(const json & j, PutFileResult& x) {
+        x.set_content_id(j.at("contentId").get<std::string>());
+        x.set_file_id(j.at("fileId").get<std::string>());
+    }
+
+    inline void to_json(json & j, const PutFileResult & x) {
+        j = json::object();
+        j["contentId"] = x.get_content_id();
+        j["fileId"] = x.get_file_id();
+    }
+
+    inline void from_json(const json & j, GetFileMetaParams& x) {
+        x.set_file_id(j.at("fileId").get<std::string>());
+    }
+
+    inline void to_json(json & j, const GetFileMetaParams & x) {
+        j = json::object();
+        j["fileId"] = x.get_file_id();
+    }
+
+    inline void from_json(const json & j, GetFileMetaResult& x) {
+        x.set_content_id(j.at("contentId").get<std::string>());
+        x.set_file_metadata(get_untyped(j, "fileMetadata"));
+    }
+
+    inline void to_json(json & j, const GetFileMetaResult & x) {
+        j = json::object();
+        j["contentId"] = x.get_content_id();
+        j["fileMetadata"] = x.get_file_metadata();
+    }
+
+    inline void from_json(const json & j, GetFileContentParams& x) {
+        x.set_content_id(j.at("contentId").get<std::string>());
+    }
+
+    inline void to_json(json & j, const GetFileContentParams & x) {
+        j = json::object();
+        j["contentId"] = x.get_content_id();
+    }
+
+    inline void from_json(const json & j, GetFileContentResult& x) {
+        x.set_content_base64(j.at("contentBase64").get<std::string>());
+    }
+
+    inline void to_json(json & j, const GetFileContentResult & x) {
+        j = json::object();
+        j["contentBase64"] = x.get_content_base64();
+    }
+
+    inline void from_json(const json & j, DeleteFileParams& x) {
+        x.set_file_id(j.at("fileId").get<std::string>());
+    }
+
+    inline void to_json(json & j, const DeleteFileParams & x) {
+        j = json::object();
+        j["fileId"] = x.get_file_id();
+    }
+
+    inline void from_json(const json & j, ListFileResultElement& x) {
+        x.set_content_id(j.at("contentId").get<std::string>());
+        x.set_file_id(j.at("fileId").get<std::string>());
+        x.set_file_metadata(get_untyped(j, "fileMetadata"));
+    }
+
+    inline void to_json(json & j, const ListFileResultElement & x) {
+        j = json::object();
+        j["contentId"] = x.get_content_id();
+        j["fileId"] = x.get_file_id();
+        j["fileMetadata"] = x.get_file_metadata();
     }
 
     inline void from_json(const json & j, Type & x) {

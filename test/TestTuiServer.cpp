@@ -23,13 +23,14 @@ using namespace TUI;
 struct AppParams
 {
     std::optional<std::filesystem::path> dbPath{std::nullopt};
+    std::optional<std::filesystem::path> fileRoot{std::nullopt};
     std::optional<std::filesystem::path> configPath{std::nullopt};
 
     static AppParams Parse(int argc, char const *argv[])
     {
         int opt = -1;
         AppParams params{};
-        while ((opt = getopt(argc, const_cast<char**>(argv), "d:c:")) != -1)
+        while ((opt = getopt(argc, const_cast<char**>(argv), "d:c:f:")) != -1)
         {
             switch (opt)
             {
@@ -38,6 +39,9 @@ struct AppParams
                 break;
             case 'c':
                 params.configPath = std::filesystem::path(optarg);
+                break;
+            case 'f':
+                params.fileRoot = std::filesystem::path(optarg);
                 break;
             default:
                 break;
@@ -52,6 +56,10 @@ struct AppParams
         {
             throw std::invalid_argument("Database path is required");
         }
+        if (!fileRoot.has_value())
+        {
+            throw std::invalid_argument("File root path is required");
+        }
     }
 
     std::string getHelp(const std::string& programName) const
@@ -60,6 +68,7 @@ struct AppParams
         oss << "Usage: " << std::endl 
             << programName << std::endl
             << "    -d <database_path>" << std::endl
+            << "    -f <file_root_path>" << std::endl
             << "    [-c <config_path>]" << std::endl;
         return oss.str();
     }
@@ -137,7 +146,8 @@ static JS::Promise<void> PrepareTestDatabaseAsync(AppParams params)
         std::filesystem::remove(params.dbPath->string() + "-shm");
     }
 
-    auto database = co_await Database::Database::CreateAsync(gApp.tev, params.dbPath.value());
+    auto database = co_await Database::Database::CreateAsync(
+        gApp.tev, params.dbPath.value(), params.fileRoot.value());
     /** Register a test user */
     auto registration = Cipher::Spake2p::Register(std::string(testUsername), std::string(testPassword));
     Schema::IServer::UserCredential userCredential;
@@ -173,7 +183,8 @@ static JS::Promise<void> PrepareTestDatabaseAsync(AppParams params)
 
 static JS::Promise<void> MainAsync(AppParams params)
 {
-    auto database = co_await Database::Database::CreateAsync(gApp.tev, params.dbPath.value());
+    auto database = co_await Database::Database::CreateAsync(
+        gApp.tev, params.dbPath.value(), params.fileRoot.value());
     std::shared_ptr<Network::IServer<void>> webSocketServer{nullptr};
     webSocketServer = Network::WebSocket::Server::Create(
         gApp.tev, std::string(serverAddress), serverPort);

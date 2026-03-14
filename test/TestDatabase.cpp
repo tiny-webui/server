@@ -12,11 +12,12 @@ using namespace TUI::Schema;
 
 Tev tev{};
 std::string dbPath{};
+std::string fileRoot{};
 std::shared_ptr<Database> db{nullptr};
 
 JS::Promise<void> TestCreateAsync()
 {
-    db = co_await Database::CreateAsync(tev, dbPath);
+    db = co_await Database::CreateAsync(tev, dbPath, fileRoot);
 }
 
 void TestClose()
@@ -262,6 +263,91 @@ JS::Promise<void> TestChatAsync()
     AssertWithMessage(!chatFound, "Deleted chat found");
 }
 
+JS::Promise<void> TestFileAsync()
+{
+    std::string username = "test-user-file";
+    auto userId = co_await db->CreateUserAsync(username, "", "");
+
+    std::string metadataInput = "test-file-metadata";
+    std::vector<uint8_t> contentInput = {'H', 'e', 'l', 'l', 'o'};
+
+    auto fileMeta = co_await db->SaveFileAsync(userId, metadataInput, contentInput);
+    AssertWithMessage(fileMeta.fileId != nullptr, "File ID should not be empty");
+    AssertWithMessage(!fileMeta.contentId.empty(), "Content ID should not be empty");
+    AssertWithMessage(fileMeta.metadata == metadataInput, "File metadata should match");
+
+    auto retrievedMeta = db->GetFileMeta(userId, fileMeta.fileId);
+    AssertWithMessage(retrievedMeta.fileId == fileMeta.fileId, "Retrieved file ID should match");
+    AssertWithMessage(retrievedMeta.contentId == fileMeta.contentId, "Retrieved content ID should match");
+    AssertWithMessage(retrievedMeta.metadata == metadataInput, "Retrieved metadata should match");
+
+    auto retrievedContent = db->GetFileContent(userId, fileMeta.contentId);
+    AssertWithMessage(retrievedContent == contentInput, "Retrieved file content should match");
+
+    auto fileList = db->ListFileMeta(userId);
+    bool fileFound = false;
+    for (const auto& f : fileList)
+    {
+        if (f.fileId == fileMeta.fileId)
+        {
+            fileFound = true;
+            break;
+        }
+    }
+    AssertWithMessage(fileFound, "Saved file should appear in list");
+
+    /** Save another file with the same content to test content deduplication */
+    std::string metadataInput2 = "test-file-metadata-2";
+    auto fileMeta2 = co_await db->SaveFileAsync(userId, metadataInput2, contentInput);
+    AssertWithMessage(fileMeta2.fileId != fileMeta.fileId, "Second file should have a different file ID");
+    AssertWithMessage(fileMeta2.contentId == fileMeta.contentId, "Same content should produce the same content ID");
+
+    fileList = db->ListFileMeta(userId);
+    size_t fileCount = 0;
+    for (const auto& f : fileList)
+    {
+        if (f.fileId == fileMeta.fileId || f.fileId == fileMeta2.fileId)
+        {
+            fileCount++;
+        }
+    }
+    AssertWithMessage(fileCount == 2, "Both files should appear in list");
+
+    /** Delete first file; content should still exist because second file references it */
+    co_await db->DeleteFileAsync(userId, fileMeta.fileId);
+    fileList = db->ListFileMeta(userId);
+    fileFound = false;
+    for (const auto& f : fileList)
+    {
+        if (f.fileId == fileMeta.fileId)
+        {
+            fileFound = true;
+            break;
+        }
+    }
+    AssertWithMessage(!fileFound, "Deleted file should not appear in list");
+
+    auto contentAfterFirstDelete = db->GetFileContent(userId, fileMeta2.contentId);
+    AssertWithMessage(contentAfterFirstDelete == contentInput, "Content should still exist after deleting first reference");
+
+    /** Delete second file; content should now be removed */
+    co_await db->DeleteFileAsync(userId, fileMeta2.fileId);
+    fileList = db->ListFileMeta(userId);
+    AssertWithMessage(fileList.empty(), "File list should be empty after deleting all files");
+
+    /** Save a file with different content */
+    std::vector<uint8_t> contentInput3 = {'W', 'o', 'r', 'l', 'd'};
+    auto fileMeta3 = co_await db->SaveFileAsync(userId, "metadata-3", contentInput3);
+    AssertWithMessage(fileMeta3.contentId != fileMeta.contentId, "Different content should produce a different content ID");
+    auto retrievedContent3 = db->GetFileContent(userId, fileMeta3.contentId);
+    AssertWithMessage(retrievedContent3 == contentInput3, "Retrieved content should match for third file");
+
+    /** Files should be deleted with the user */
+    co_await db->DeleteUserAsync(userId);
+    fileList = db->ListFileMeta(userId);
+    AssertWithMessage(fileList.empty(), "Files should be deleted with the user");
+}
+
 JS::Promise<void> TestAsync()
 {
     /** Always run this first */
@@ -270,17 +356,19 @@ JS::Promise<void> TestAsync()
     RunAsyncTest(TestModelAsync());
     RunAsyncTest(TestUserAsync());
     RunAsyncTest(TestChatAsync());
+    RunAsyncTest(TestFileAsync());
     RunTest(TestClose());
 }
 
 int main(int argc, char const *argv[])
 {
-    if (argc < 2)
+    if (argc < 3)
     {
-        std::cerr << "Usage: " << argv[0] << " <database_path>" << std::endl;
+        std::cerr << "Usage: " << argv[0] << " <database_path>" << " <file_root>" << std::endl;
         return 1;
     }
     dbPath = argv[1];
+    fileRoot = argv[2];
     /** Delete the old database */
     if (std::filesystem::exists(dbPath))
     {

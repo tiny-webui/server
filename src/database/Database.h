@@ -19,7 +19,10 @@ namespace TUI::Database
     class Database
     {
     public:
-        static JS::Promise<std::shared_ptr<Database>> CreateAsync(Tev& tev, const std::filesystem::path& dbPath);
+        static JS::Promise<std::shared_ptr<Database>> CreateAsync(
+            Tev& tev,
+            const std::filesystem::path& dbPath,
+            const std::filesystem::path& fileDirectory);
         
         Database(const Database&) = delete;
         Database& operator=(const Database&) = delete;
@@ -88,6 +91,22 @@ namespace TUI::Database
             bool updateParent = true);
         Schema::IServer::TreeHistory GetChatHistory(const Common::Uuid& userId, const Common::Uuid& chatId);
 
+        /** File */
+        struct FileMeta
+        {
+            Common::Uuid fileId;
+            std::string contentId;
+            std::string metadata;
+        };
+        JS::Promise<FileMeta> SaveFileAsync(
+            const Common::Uuid& userId,
+            std::string metadata,
+            std::vector<uint8_t> content);
+        JS::Promise<void> DeleteFileAsync(const Common::Uuid& userId, const Common::Uuid& fileId);
+        FileMeta GetFileMeta(const Common::Uuid& userId, const Common::Uuid& fileId);
+        std::vector<uint8_t> GetFileContent(const Common::Uuid& userId, const std::string& contentId);
+        std::list<FileMeta> ListFileMeta(const Common::Uuid& userId);
+
     private:
         Database() = default;
 
@@ -103,5 +122,6 @@ namespace TUI::Database
             const Common::Uuid& userId, const Common::Uuid& id, const std::string& name);
 
         std::shared_ptr<Sqlite> _db;
+        std::filesystem::path _fileDirectory;
     };
 }

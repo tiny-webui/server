@@ -1,5 +1,7 @@
 #include <format>
 #include <nlohmann/json.hpp>
+#include <xxhash.h>
+#include <fstream>
 #include "Database.h"
 #include "common/Timestamp.h"
 
@@ -7,9 +9,26 @@ using namespace TUI::Common;
 using namespace TUI::Database;
 using namespace TUI::Schema;
 
-JS::Promise<std::shared_ptr<Database>> Database::CreateAsync(Tev& tev, const std::filesystem::path& dbPath)
+JS::Promise<std::shared_ptr<Database>> Database::CreateAsync(
+    Tev& tev,
+    const std::filesystem::path& dbPath,
+    const std::filesystem::path& fileDirectory)
 {
     auto db = std::shared_ptr<Database>(new Database());
+
+    db->_fileDirectory = fileDirectory;
+    if (!std::filesystem::exists(fileDirectory))
+    {
+        std::filesystem::create_directories(fileDirectory);
+    }
+    else
+    {
+        if (!std::filesystem::is_directory(fileDirectory))
+        {
+            throw std::runtime_error("File directory path exists but is not a directory");
+        }
+    }
+
     db->_db = co_await Sqlite::CreateAsync(tev, dbPath);
     /** Create tables */
     co_await db->_db->ExecAsync(
@@ -47,6 +66,13 @@ JS::Promise<std::shared_ptr<Database>> Database::CreateAsync(Tev& tev, const std
         "message TEXT, "
         "timestamp INTEGER, "
         "PRIMARY KEY (user_id, chat_id, id));");
+    co_await db->_db->ExecAsync(
+        "CREATE TABLE IF NOT EXISTS file_meta ("
+        "user_id TEXT, "
+        "id TEXT, "
+        "content_id TEXT, "
+        "metadata TEXT, "
+        "PRIMARY KEY (user_id, id));");
     co_return db;
 }
 
@@ -148,6 +174,14 @@ JS::Promise<void> Database::DeleteUserAsync(const Uuid& id)
     co_await _db->ExecAsync(
         "DELETE FROM chat_content WHERE user_id = ?;",
         static_cast<std::string>(id));
+    co_await _db->ExecAsync(
+        "DELETE FROM file_meta WHERE user_id = ?;",
+        static_cast<std::string>(id));
+    auto userDirectory = _fileDirectory / static_cast<std::string>(id);
+    if (std::filesystem::exists(userDirectory))
+    {
+        std::filesystem::remove_all(userDirectory);
+    }
 }
 
 std::list<Database::UserListItem> Database::ListUser()
@@ -612,3 +646,180 @@ std::string Database::GetStringFromChat(
     }
 }
 
+JS::Promise<Database::FileMeta> Database::SaveFileAsync(
+    const Common::Uuid& userId, std::string metadata, std::vector<uint8_t> content)
+{
+    Uuid fileId{};
+    auto fileHash = XXH3_128bits(content.data(), content.size());
+    std::string contentId = std::format("{:016x}{:016x}", fileHash.high64, fileHash.low64);
+    std::string userIdStr = static_cast<std::string>(userId);
+    auto userDirectory = _fileDirectory / userIdStr;
+    if (!std::filesystem::exists(userDirectory))
+    {
+        std::filesystem::create_directories(userDirectory);
+    }
+    auto filePath = userDirectory / contentId;
+    if (!std::filesystem::exists(filePath))
+    {
+        /** @todo: Make this async */
+        std::ofstream ofs(filePath, std::ios::binary);
+        ofs.write(reinterpret_cast<const char*>(content.data()), content.size());
+        if (!ofs)
+        {
+            throw std::runtime_error("Failed to write file");
+        }
+    }
+    auto sql = "INSERT INTO file_meta (user_id, id, content_id, metadata) VALUES (?, ?, ?, ?);";
+    co_await _db->ExecAsync(
+        sql,
+        userIdStr,
+        static_cast<std::string>(fileId),
+        contentId,
+        metadata);
+    co_return FileMeta{fileId, contentId, std::move(metadata)};
+}
+
+JS::Promise<void> Database::DeleteFileAsync(
+    const Common::Uuid& userId, const Common::Uuid& fileId)
+{
+    auto sql = "SELECT content_id FROM file_meta WHERE user_id = ? AND id = ?;";
+    auto result = _db->Exec(
+        sql, static_cast<std::string>(userId), static_cast<std::string>(fileId));
+    if (result.empty())
+    {
+        co_return;
+    }
+    auto& row = result.front();
+    auto contentIdItem = row.find("content_id");
+    if (contentIdItem == row.end() || !std::holds_alternative<std::string>(contentIdItem->second))
+    {
+        throw std::runtime_error("content_id not found or invalid");
+    }
+    std::string contentId = std::get<std::string>(contentIdItem->second);
+    sql = "DELETE FROM file_meta WHERE user_id = ? AND id = ?;";
+    co_await _db->ExecAsync(
+        sql,
+        static_cast<std::string>(userId),
+        static_cast<std::string>(fileId));
+    sql = "SELECT COUNT(*) AS count FROM file_meta WHERE content_id = ?;";
+    result = _db->Exec(sql, contentId);
+    if (result.empty())
+    {
+        throw std::runtime_error("Failed to count file_meta with content_id");
+    }
+    auto& countRow = result.front();
+    auto countItem = countRow.find("count");
+    if (countItem == countRow.end() || !std::holds_alternative<int64_t>(countItem->second))
+    {
+        throw std::runtime_error("count not found or invalid");
+    }
+    int64_t count = std::get<int64_t>(countItem->second);
+    if (count != 0)
+    {
+        co_return;
+    }
+    auto filePath = _fileDirectory / static_cast<std::string>(userId) / contentId;
+    if (std::filesystem::exists(filePath))
+    {
+        std::filesystem::remove(filePath);
+    }
+}
+
+Database::FileMeta Database::GetFileMeta(
+    const Common::Uuid& userId, const Common::Uuid& fileId)
+{
+    auto sql = "SELECT content_id, metadata FROM file_meta WHERE user_id = ? AND id = ?;";
+    auto result = _db->Exec(
+        sql, static_cast<std::string>(userId), static_cast<std::string>(fileId));
+    if (result.empty())
+    {
+        throw std::runtime_error("File not found");
+    }
+    auto& row = result.front();
+    auto contentIdItem = row.find("content_id");
+    if (contentIdItem == row.end() || !std::holds_alternative<std::string>(contentIdItem->second))
+    {
+        throw std::runtime_error("content_id not found or invalid");
+    }
+    std::string contentId = std::get<std::string>(contentIdItem->second);
+    auto metadataItem = row.find("metadata");
+    std::string metadata{};
+    if (metadataItem != row.end())
+    {
+        if (std::holds_alternative<std::string>(metadataItem->second))
+        {
+            metadata = std::get<std::string>(metadataItem->second);
+        }
+        else if (!std::holds_alternative<std::nullptr_t>(metadataItem->second))
+        {
+            throw std::runtime_error("Invalid metadata type");
+        }
+    }
+    return FileMeta{fileId, contentId, std::move(metadata)};
+}
+
+std::vector<uint8_t> Database::GetFileContent(
+    const Common::Uuid& userId, const std::string& contentId)
+{
+    auto filePath = _fileDirectory / static_cast<std::string>(userId) / contentId;
+    if (!std::filesystem::exists(filePath))
+    {
+        throw std::runtime_error("File content not found");
+    }
+    std::ifstream ifs(filePath, std::ios::binary);
+    if (!ifs)
+    {
+        throw std::runtime_error("Failed to open file");
+    }
+    std::vector<uint8_t> content((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
+    return content;
+}
+
+std::list<Database::FileMeta> Database::ListFileMeta(const Common::Uuid& userId)
+{
+    auto sql = "SELECT id, content_id, metadata FROM file_meta WHERE user_id = ?;";
+    auto result = _db->Exec(sql, static_cast<std::string>(userId));
+    std::list<FileMeta> list{};
+    for (auto& row : result)
+    {
+        try
+        {
+            auto idItem = row.find("id");
+            if (idItem == row.end())
+            {
+                continue;
+            }
+            Uuid id{std::get<std::string>(idItem->second)};
+
+            auto contentIdItem = row.find("content_id");
+            if (contentIdItem == row.end() || !std::holds_alternative<std::string>(contentIdItem->second))
+            {
+                continue;
+            }
+            std::string contentId = std::get<std::string>(contentIdItem->second);
+
+            auto metadataItem = row.find("metadata");
+            std::string metadata{};
+            if (metadataItem != row.end())
+            {
+                if (std::holds_alternative<std::string>(metadataItem->second))
+                {
+                    metadata = std::get<std::string>(metadataItem->second);
+                }
+                else if (!std::holds_alternative<std::nullptr_t>(metadataItem->second))
+                {
+                    /** Invalid metadata type, ignore */
+                    continue;
+                }
+            }
+
+            list.emplace_back(id, contentId, std::move(metadata));
+        }
+        catch(...)
+        {
+            /** @todo log */
+            /** Ignored, avoid corrupted data from corrupting the whole application */
+        }
+    }
+    return list;
+}

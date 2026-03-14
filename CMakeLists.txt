@@ -49,7 +49,8 @@ target_link_libraries(tui-server
         sqlite3
         uuid
         sodium
-        zstd)
+        zstd
+        xxhash)
 
 add_executable(tui-register
     ${CMAKE_CURRENT_SOURCE_DIR}/src/tui-register.cpp
@@ -66,7 +67,8 @@ target_include_directories(tui-register
 target_link_libraries(tui-register
     PRIVATE
         sqlite3
-        uuid)
+        uuid
+        xxhash)
 
 install(TARGETS tui-server RUNTIME DESTINATION bin)
 install(TARGETS tui-register RUNTIME DESTINATION bin)
