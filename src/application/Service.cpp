@@ -484,22 +484,20 @@ JS::Promise<nlohmann::json> Service::DeleteChatAsync(CallerId callerId, nlohmann
  */
 JS::AsyncGenerator<nlohmann::json, nlohmann::json> Service::OnChatCompletionAsync(CallerId callerId, nlohmann::json paramsJson)
 {
-    using MessageRoleType = std::remove_reference<std::invoke_result_t<decltype(&Schema::IServer::Message::get_role), Schema::IServer::Message&>>::type;
-
     auto params = ParseParams<Schema::IServer::ChatCompletionParams>(paramsJson);
-    if (params.get_user_message().get_role() != MessageRoleType::USER)
+    if (params.get_messages().empty())
     {
         throw Schema::Rpc::Exception(
             Schema::Rpc::ErrorCode::BAD_REQUEST,
-            "The user message must have the role user");
+            "Messages must not be empty");
     }
     Common::Uuid chatId{params.get_id()};
     auto lock = _resourceVersionManager->GetWriteLock(
         {"chat", static_cast<std::string>(callerId.userId), static_cast<std::string>(chatId)}, callerId);
 
-    int64_t userMessageTimestamp = Common::Timestamp::GetWallClock();
+    int64_t inputTimestamp = Common::Timestamp::GetWallClock();
 
-    /** Construct the linear history from the tree history and the new user message */
+    /** Construct the linear history from the tree history and the new messages */
     Common::Uuid parentId{nullptr};
     Schema::IServer::LinearHistory history{};
     {
@@ -526,16 +524,11 @@ JS::AsyncGenerator<nlohmann::json, nlohmann::json> Service::OnChatCompletionAsyn
             historyList.push_front(node.get_message());
             parentIdStr = node.get_parent();
         }
-        /** The previous message should be a assistant message if it exists */
-        if (!historyList.empty() && historyList.back().get_role() != MessageRoleType::ASSISTANT)
-        {
-            throw Schema::Rpc::Exception(
-                Schema::Rpc::ErrorCode::BAD_REQUEST,
-                "The parent message must be an assistant message");
-        }
 
-        /** We need to use the user message later. So don't move it. */
-        historyList.push_back(params.get_user_message());
+        for (const auto& msg : params.get_messages())
+        {
+            historyList.push_back(msg);
+        }
         history.reserve(historyList.size());
         for (auto&& item : historyList)
         {
@@ -543,12 +536,12 @@ JS::AsyncGenerator<nlohmann::json, nlohmann::json> Service::OnChatCompletionAsyn
         }
     }
     
-    /** Send the request */
-    std::string wholeResponse{};
+    /** Send the request and stream response */
+    std::vector<Schema::IServer::Message> responseMessages{};
     {
         Common::Uuid modelId{params.get_model_id()};
         auto provider = GetProvider(modelId);
-        auto requestData = provider->FormatRequest(history, true);
+        auto requestData = provider->FormatRequest(history, true, params.get_tools());
         auto request = _httpClient->MakeStreamRequest(
             Network::Http::Method::POST,
             requestData);
@@ -557,6 +550,22 @@ JS::AsyncGenerator<nlohmann::json, nlohmann::json> Service::OnChatCompletionAsyn
         auto eventStream = parser.Parse();
         auto streamBatcher = Common::StreamBatcher::BatchStream(_tev, std::move(eventStream), STREAM_BATCHING_INTERVAL_MS);
 
+        std::string currentText{};
+        Schema::IServer::FunctionCallMessage pendingCall{};
+        bool hasPendingCall = false;
+
+        auto flushCurrentText = [&]() {
+            if (currentText.empty()) return;
+            Schema::IServer::ChatMessage chatMsg{};
+            chatMsg.set_role(Schema::IServer::ChatMessageRole::ASSISTANT);
+            Schema::IServer::MessageContent content{};
+            content.set_type(Schema::IServer::MessageContentType::TEXT);
+            content.set_data(std::move(currentText));
+            chatMsg.set_content({std::move(content)});
+            responseMessages.push_back(std::move(chatMsg));
+            currentText.clear();
+        };
+
         while (true)
         {
             auto events = co_await streamBatcher.NextAsync();
@@ -564,73 +573,126 @@ JS::AsyncGenerator<nlohmann::json, nlohmann::json> Service::OnChatCompletionAsyn
             {
                 break;
             }
-            std::string segment = "";
+            std::string batchText{};
             for (const auto& event : events.value())
             {
-                auto content = provider->ParseStreamResponse(event);
-                if (!content.has_value())
+                auto segment = provider->ParseStreamResponse(event);
+                if (!segment.has_value())
                 {
                     continue;
                 }
-                using ContentTypeType = std::remove_reference<decltype(content.value().get_type())>::type;
-                if (content.value().get_type() != ContentTypeType::TEXT)
+                auto& seg = segment.value();
+                if (std::holds_alternative<std::string>(seg))
                 {
-                    throw Schema::Rpc::Exception(
-                        Schema::Rpc::ErrorCode::BAD_GATEWAY,
-                        content.value().get_data());
+                    auto& text = std::get<std::string>(seg);
+                    batchText += text;
+                    currentText += text;
                 }
-                auto& data = content.value().get_data();
-                segment += data;
+                else
+                {
+                    if (!batchText.empty())
+                    {
+                        co_yield static_cast<nlohmann::json>(
+                            Schema::IServer::ChatCompletionSegment{std::move(batchText)});
+                        batchText.clear();
+                    }
+                    auto segClass = std::get<Schema::IServer::ChatCompletionSegmentClass>(seg);
+                    if (segClass.get_event() == Schema::IServer::Event::FUNCTION_CALL_START)
+                    {
+                        /** Flush any accumulated text as an assistant message */
+                        flushCurrentText();
+                        auto data = segClass.get_data();
+                        if (data.has_value())
+                        {
+                            pendingCall = std::move(data.value());
+                        }
+                        hasPendingCall = true;
+                    }
+                    else if (segClass.get_event() == Schema::IServer::Event::FUNCTION_CALL_END)
+                    {
+                        if (hasPendingCall)
+                        {
+                            auto data = segClass.get_data();
+                            if (data.has_value())
+                            {
+                                pendingCall.set_arguments(data.value().get_arguments());
+                            }
+                            responseMessages.push_back(std::move(pendingCall));
+                            hasPendingCall = false;
+                        }
+                    }
+                    co_yield static_cast<nlohmann::json>(
+                        Schema::IServer::ChatCompletionSegment{std::move(segClass)});
+                }
             }
-            wholeResponse += segment;
-            co_yield static_cast<nlohmann::json>(segment);
+            if (!batchText.empty())
+            {
+                co_yield static_cast<nlohmann::json>(
+                    Schema::IServer::ChatCompletionSegment{std::move(batchText)});
+            }
         }
+        /** Flush any remaining text after stream ends */
+        flushCurrentText();
     }
 
-    /** Save changes to the database */
-    Common::Uuid userMessageId{};
-    Common::Uuid responseMessageId{};
+    /** Save all new messages to the database as a chain */
+    std::vector<std::string> allMessageIds{};
     {
-        Schema::IServer::MessageNode userNode{};
-        userNode.set_id(static_cast<std::string>(userMessageId));
-        userNode.set_message(std::move(params.get_mutable_user_message()));
-        if (parentId != nullptr)
+        std::vector<Schema::IServer::MessageNode> allNodes{};
+        double inputTs = static_cast<double>(inputTimestamp);
+        for (auto& msg : params.get_mutable_messages())
         {
-            userNode.set_parent(static_cast<std::string>(parentId));
+            Schema::IServer::MessageNode node{};
+            node.set_id(static_cast<std::string>(Common::Uuid{}));
+            node.set_message(std::move(msg));
+            node.set_timestamp(inputTs);
+            allNodes.push_back(std::move(node));
         }
-        userNode.set_children({static_cast<std::string>(responseMessageId)});
-        userNode.set_timestamp(static_cast<double>(userMessageTimestamp));
-        co_await _database->AppendChatHistoryAsync(
-            callerId.userId, chatId,
-            std::move(userNode));
-    }
-    {
-        Schema::IServer::MessageNode responseNode{};   
-        responseNode.set_id(static_cast<std::string>(responseMessageId));
-        Schema::IServer::Message responseMessage{};
-        responseMessage.set_role(MessageRoleType::ASSISTANT);
-        using MessageContentType = std::remove_reference<decltype(responseMessage.get_mutable_content())>::type;
-        MessageContentType responseContents{};
-        decltype(responseContents)::value_type responseContent{};
-        using ContentTypeType = std::remove_reference<decltype(responseContent.get_mutable_type())>::type;
-        responseContent.set_type(ContentTypeType::TEXT);
-        responseContent.set_data(wholeResponse);
-        responseContents.push_back(std::move(responseContent));
-        responseMessage.set_content(std::move(responseContents));
-        responseNode.set_message(std::move(responseMessage));
-        responseNode.set_parent(static_cast<std::string>(userMessageId));
-        responseNode.set_timestamp(static_cast<double>(Common::Timestamp::GetWallClock()));
-        co_await _database->AppendChatHistoryAsync(
-            callerId.userId, chatId,
-            std::move(responseNode),
-            /** Skip parent update. As the user node is already written */
-            false);
+        double responseTs = static_cast<double>(Common::Timestamp::GetWallClock());
+        for (auto& msg : responseMessages)
+        {
+            Schema::IServer::MessageNode node{};
+            node.set_id(static_cast<std::string>(Common::Uuid{}));
+            node.set_message(std::move(msg));
+            node.set_timestamp(responseTs);
+            allNodes.push_back(std::move(node));
+        }
+
+        /** Chain nodes together */
+        for (size_t i = 0; i < allNodes.size(); ++i)
+        {
+            if (i == 0)
+            {
+                if (parentId != nullptr)
+                {
+                    allNodes[i].set_parent(static_cast<std::string>(parentId));
+                }
+            }
+            else
+            {
+                allNodes[i].set_parent(allNodes[i - 1].get_id());
+            }
+
+            if (i + 1 < allNodes.size())
+            {
+                allNodes[i].set_children({allNodes[i + 1].get_id()});
+            }
+        }
+
+        /** Write nodes to the database */
+        for (size_t i = 0; i < allNodes.size(); ++i)
+        {
+            allMessageIds.push_back(allNodes[i].get_id());
+            co_await _database->AppendChatHistoryAsync(
+                callerId.userId, chatId,
+                std::move(allNodes[i]),
+                i == 0);
+        }
     }
 
     /** Return completion info */
     Schema::IServer::ChatCompletionInfo completionInfo{};
-    completionInfo.set_user_message_id(static_cast<std::string>(userMessageId));
-    completionInfo.set_assistant_message_id(static_cast<std::string>(responseMessageId));
+    completionInfo.set_message_ids(std::move(allMessageIds));
     co_return static_cast<nlohmann::json>(completionInfo);
 }
 
@@ -649,22 +711,15 @@ JS::Promise<nlohmann::json> Service::OnExecuteGenerationTaskAsync(CallerId calle
     auto params = ParseParams<Schema::IServer::ExecuteGenerationTaskParams>(paramsJson);
     Common::Uuid modelId{params.get_model_id()};
     auto provider = GetProvider(modelId);
-    Schema::IServer::LinearHistory history{};
-    history.push_back(std::move(params.get_message()));
-    auto requestData = provider->FormatRequest(history, false);
+    auto requestData = provider->FormatRequest(params.get_messages(), false, params.get_tools());
     auto request = _httpClient->MakeRequest(
         Network::Http::Method::POST,
         requestData);
     auto response = co_await request.GetResponseAsync();
-    auto content = provider->ParseResponse(response);
-    using ContentTypeType = std::remove_reference<decltype(content.get_type())>::type;
-    if (content.get_type() != ContentTypeType::TEXT)
-    {
-        throw Schema::Rpc::Exception(
-            Schema::Rpc::ErrorCode::BAD_GATEWAY,
-            content.get_data());
-    }
-    co_return static_cast<nlohmann::json>(content.get_data());
+    auto result = provider->ParseResponse(response);
+    Schema::IServer::ExecuteGenerationTaskResult taskResult;
+    taskResult.set_messages(std::move(result));
+    co_return static_cast<nlohmann::json>(taskResult);
 }
 
 /**
