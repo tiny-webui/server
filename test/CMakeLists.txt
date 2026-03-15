@@ -407,3 +407,10 @@ target_include_directories(TestZstdMessageCodec
 target_link_libraries(TestZstdMessageCodec
     PRIVATE
         zstd)
+
+add_executable(TestIServerSchema
+    TestIServerSchema.cpp)
+
+target_include_directories(TestIServerSchema
+    PRIVATE
+        ../src)

@@ -250,7 +250,7 @@ namespace IServer {
         private:
         std::string arguments;
         std::string call_id;
-        nlohmann::json extra;
+        std::optional<nlohmann::json> extra;
         std::string name;
         FunctionCallMessageType type;
 
@@ -266,9 +266,8 @@ namespace IServer {
         /**
          * Provider specific trash required for the message but not the logic.
          */
-        const nlohmann::json & get_extra() const { return extra; }
-        nlohmann::json & get_mutable_extra() { return extra; }
-        void set_extra(const nlohmann::json & value) { this->extra = value; }
+        std::optional<nlohmann::json> get_extra() const { return extra; }
+        void set_extra(std::optional<nlohmann::json> value) { this->extra = value; }
 
         const std::string & get_name() const { return name; }
         std::string & get_mutable_name() { return name; }
@@ -288,7 +287,7 @@ namespace IServer {
 
         private:
         std::string call_id;
-        nlohmann::json extra;
+        std::optional<nlohmann::json> extra;
         std::vector<MessageContent> output;
         FunctionCallOutputMessageType type;
 
@@ -300,9 +299,8 @@ namespace IServer {
         /**
          * Provider specific trash.
          */
-        const nlohmann::json & get_extra() const { return extra; }
-        nlohmann::json & get_mutable_extra() { return extra; }
-        void set_extra(const nlohmann::json & value) { this->extra = value; }
+        std::optional<nlohmann::json> get_extra() const { return extra; }
+        void set_extra(std::optional<nlohmann::json> value) { this->extra = value; }
 
         const std::vector<MessageContent> & get_output() const { return output; }
         std::vector<MessageContent> & get_mutable_output() { return output; }
@@ -313,54 +311,7 @@ namespace IServer {
         void set_type(const FunctionCallOutputMessageType & value) { this->type = value; }
     };
 
-    enum class MessageType : int { FUNCTION_CALL, FUNCTION_CALL_OUTPUT };
-
-    class Message {
-        public:
-        Message() = default;
-        virtual ~Message() = default;
-
-        private:
-        std::optional<std::vector<MessageContent>> content;
-        std::optional<ChatMessageRole> role;
-        std::optional<std::string> arguments;
-        std::optional<std::string> call_id;
-        nlohmann::json extra;
-        std::optional<std::string> name;
-        std::optional<MessageType> type;
-        std::optional<std::vector<MessageContent>> output;
-
-        public:
-        std::optional<std::vector<MessageContent>> get_content() const { return content; }
-        void set_content(std::optional<std::vector<MessageContent>> value) { this->content = value; }
-
-        std::optional<ChatMessageRole> get_role() const { return role; }
-        void set_role(std::optional<ChatMessageRole> value) { this->role = value; }
-
-        std::optional<std::string> get_arguments() const { return arguments; }
-        void set_arguments(std::optional<std::string> value) { this->arguments = value; }
-
-        std::optional<std::string> get_call_id() const { return call_id; }
-        void set_call_id(std::optional<std::string> value) { this->call_id = value; }
-
-        /**
-         * Provider specific trash required for the message but not the logic.
-         *
-         * Provider specific trash.
-         */
-        const nlohmann::json & get_extra() const { return extra; }
-        nlohmann::json & get_mutable_extra() { return extra; }
-        void set_extra(const nlohmann::json & value) { this->extra = value; }
-
-        std::optional<std::string> get_name() const { return name; }
-        void set_name(std::optional<std::string> value) { this->name = value; }
-
-        std::optional<MessageType> get_type() const { return type; }
-        void set_type(std::optional<MessageType> value) { this->type = value; }
-
-        std::optional<std::vector<MessageContent>> get_output() const { return output; }
-        void set_output(std::optional<std::vector<MessageContent>> value) { this->output = value; }
-    };
+    using Message = std::variant<ChatMessage, FunctionCallMessage, FunctionCallOutputMessage>;
 
     class MessageNode {
         public:
@@ -974,9 +925,6 @@ void to_json(json & j, const FunctionCallMessage & x);
 void from_json(const json & j, FunctionCallOutputMessage & x);
 void to_json(json & j, const FunctionCallOutputMessage & x);
 
-void from_json(const json & j, Message & x);
-void to_json(json & j, const Message & x);
-
 void from_json(const json & j, MessageNode & x);
 void to_json(json & j, const MessageNode & x);
 
@@ -1073,9 +1021,6 @@ void to_json(json & j, const FunctionCallMessageType & x);
 void from_json(const json & j, FunctionCallOutputMessageType & x);
 void to_json(json & j, const FunctionCallOutputMessageType & x);
 
-void from_json(const json & j, MessageType & x);
-void to_json(json & j, const MessageType & x);
-
 void from_json(const json & j, Event & x);
 void to_json(json & j, const Event & x);
 
@@ -1085,6 +1030,11 @@ void to_json(json & j, const UserAdminSettingsRole & x);
 }
 }
 namespace nlohmann {
+template <>
+struct adl_serializer<std::variant<TUI::Schema::IServer::ChatMessage, TUI::Schema::IServer::FunctionCallMessage, TUI::Schema::IServer::FunctionCallOutputMessage>> {
+    static void from_json(const json & j, std::variant<TUI::Schema::IServer::ChatMessage, TUI::Schema::IServer::FunctionCallMessage, TUI::Schema::IServer::FunctionCallOutputMessage> & x);
+    static void to_json(json & j, const std::variant<TUI::Schema::IServer::ChatMessage, TUI::Schema::IServer::FunctionCallMessage, TUI::Schema::IServer::FunctionCallOutputMessage> & x);
+};
 template <>
 struct adl_serializer<std::variant<TUI::Schema::IServer::ChatCompletionSegmentClass, std::string>> {
     static void from_json(const json & j, std::variant<TUI::Schema::IServer::ChatCompletionSegmentClass, std::string> & x);
@@ -1152,7 +1102,7 @@ namespace IServer {
     inline void from_json(const json & j, FunctionCallMessage& x) {
         x.set_arguments(j.at("arguments").get<std::string>());
         x.set_call_id(j.at("call_id").get<std::string>());
-        x.set_extra(get_untyped(j, "extra"));
+        x.set_extra(get_stack_optional<nlohmann::json>(j, "extra"));
         x.set_name(j.at("name").get<std::string>());
         x.set_type(j.at("type").get<FunctionCallMessageType>());
     }
@@ -1170,7 +1120,7 @@ namespace IServer {
 
     inline void from_json(const json & j, FunctionCallOutputMessage& x) {
         x.set_call_id(j.at("call_id").get<std::string>());
-        x.set_extra(get_untyped(j, "extra"));
+        x.set_extra(get_stack_optional<nlohmann::json>(j, "extra"));
         x.set_output(j.at("output").get<std::vector<MessageContent>>());
         x.set_type(j.at("type").get<FunctionCallOutputMessageType>());
     }
@@ -1183,45 +1133,6 @@ namespace IServer {
         }
         j["output"] = x.get_output();
         j["type"] = x.get_type();
-    }
-
-    inline void from_json(const json & j, Message& x) {
-        x.set_content(get_stack_optional<std::vector<MessageContent>>(j, "content"));
-        x.set_role(get_stack_optional<ChatMessageRole>(j, "role"));
-        x.set_arguments(get_stack_optional<std::string>(j, "arguments"));
-        x.set_call_id(get_stack_optional<std::string>(j, "call_id"));
-        x.set_extra(get_untyped(j, "extra"));
-        x.set_name(get_stack_optional<std::string>(j, "name"));
-        x.set_type(get_stack_optional<MessageType>(j, "type"));
-        x.set_output(get_stack_optional<std::vector<MessageContent>>(j, "output"));
-    }
-
-    inline void to_json(json & j, const Message & x) {
-        j = json::object();
-        if (x.get_content()) {
-            j["content"] = x.get_content();
-        }
-        if (x.get_role()) {
-            j["role"] = x.get_role();
-        }
-        if (x.get_arguments()) {
-            j["arguments"] = x.get_arguments();
-        }
-        if (x.get_call_id()) {
-            j["call_id"] = x.get_call_id();
-        }
-        if (x.get_extra()) {
-            j["extra"] = x.get_extra();
-        }
-        if (x.get_name()) {
-            j["name"] = x.get_name();
-        }
-        if (x.get_type()) {
-            j["type"] = x.get_type();
-        }
-        if (x.get_output()) {
-            j["output"] = x.get_output();
-        }
     }
 
     inline void from_json(const json & j, MessageNode& x) {
@@ -1622,20 +1533,6 @@ namespace IServer {
         }
     }
 
-    inline void from_json(const json & j, MessageType & x) {
-        if (j == "function_call") x = MessageType::FUNCTION_CALL;
-        else if (j == "function_call_output") x = MessageType::FUNCTION_CALL_OUTPUT;
-        else { throw std::runtime_error("Input JSON does not conform to schema!"); }
-    }
-
-    inline void to_json(json & j, const MessageType & x) {
-        switch (x) {
-            case MessageType::FUNCTION_CALL: j = "function_call"; break;
-            case MessageType::FUNCTION_CALL_OUTPUT: j = "function_call_output"; break;
-            default: throw std::runtime_error("Unexpected value in enumeration \"MessageType\": " + std::to_string(static_cast<int>(x)));
-        }
-    }
-
     inline void from_json(const json & j, Event & x) {
         if (j == "function_call_end") x = Event::FUNCTION_CALL_END;
         else if (j == "function_call_start") x = Event::FUNCTION_CALL_START;
@@ -1667,6 +1564,31 @@ namespace IServer {
 }
 }
 namespace nlohmann {
+    inline void adl_serializer<std::variant<TUI::Schema::IServer::ChatMessage, TUI::Schema::IServer::FunctionCallMessage, TUI::Schema::IServer::FunctionCallOutputMessage>>::from_json(const json & j, std::variant<TUI::Schema::IServer::ChatMessage, TUI::Schema::IServer::FunctionCallMessage, TUI::Schema::IServer::FunctionCallOutputMessage> & x) {
+        if (j.contains("role"))
+            x = j.get<TUI::Schema::IServer::ChatMessage>();
+        else if (j.contains("type") && j.at("type") == "function_call")
+            x = j.get<TUI::Schema::IServer::FunctionCallMessage>();
+        else if (j.contains("type") && j.at("type") == "function_call_output")
+            x = j.get<TUI::Schema::IServer::FunctionCallOutputMessage>();
+        else throw std::runtime_error("Could not deserialise Message!");
+    }
+
+    inline void adl_serializer<std::variant<TUI::Schema::IServer::ChatMessage, TUI::Schema::IServer::FunctionCallMessage, TUI::Schema::IServer::FunctionCallOutputMessage>>::to_json(json & j, const std::variant<TUI::Schema::IServer::ChatMessage, TUI::Schema::IServer::FunctionCallMessage, TUI::Schema::IServer::FunctionCallOutputMessage> & x) {
+        switch (x.index()) {
+            case 0:
+                j = std::get<TUI::Schema::IServer::ChatMessage>(x);
+                break;
+            case 1:
+                j = std::get<TUI::Schema::IServer::FunctionCallMessage>(x);
+                break;
+            case 2:
+                j = std::get<TUI::Schema::IServer::FunctionCallOutputMessage>(x);
+                break;
+            default: throw std::runtime_error("Input JSON does not conform to schema!");
+        }
+    }
+
     inline void adl_serializer<std::variant<TUI::Schema::IServer::ChatCompletionSegmentClass, std::string>>::from_json(const json & j, std::variant<TUI::Schema::IServer::ChatCompletionSegmentClass, std::string> & x) {
         if (j.is_string())
             x = j.get<std::string>();
