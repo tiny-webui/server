@@ -22,6 +22,7 @@
 //     ChatCompletionSegment data = nlohmann::json::parse(jsonString);
 //     ChatCompletionInfo data = nlohmann::json::parse(jsonString);
 //     ExecuteGenerationTaskParams data = nlohmann::json::parse(jsonString);
+//     ExecuteGenerationTaskResult data = nlohmann::json::parse(jsonString);
 //     GetModelListParams data = nlohmann::json::parse(jsonString);
 //     GetModelListResult data = nlohmann::json::parse(jsonString);
 //     ModelSettings data = nlohmann::json::parse(jsonString);
@@ -480,17 +481,31 @@ namespace IServer {
         virtual ~ExecuteGenerationTaskParams() = default;
 
         private:
-        ChatMessage message;
+        std::vector<Message> messages;
         std::string model_id;
 
         public:
-        const ChatMessage & get_message() const { return message; }
-        ChatMessage & get_mutable_message() { return message; }
-        void set_message(const ChatMessage & value) { this->message = value; }
+        const std::vector<Message> & get_messages() const { return messages; }
+        std::vector<Message> & get_mutable_messages() { return messages; }
+        void set_messages(const std::vector<Message> & value) { this->messages = value; }
 
         const std::string & get_model_id() const { return model_id; }
         std::string & get_mutable_model_id() { return model_id; }
         void set_model_id(const std::string & value) { this->model_id = value; }
+    };
+
+    class ExecuteGenerationTaskResult {
+        public:
+        ExecuteGenerationTaskResult() = default;
+        virtual ~ExecuteGenerationTaskResult() = default;
+
+        private:
+        std::vector<Message> messages;
+
+        public:
+        const std::vector<Message> & get_messages() const { return messages; }
+        std::vector<Message> & get_mutable_messages() { return messages; }
+        void set_messages(const std::vector<Message> & value) { this->messages = value; }
     };
 
     class GetModelListParams {
@@ -949,6 +964,9 @@ void to_json(json & j, const ChatCompletionInfo & x);
 void from_json(const json & j, ExecuteGenerationTaskParams & x);
 void to_json(json & j, const ExecuteGenerationTaskParams & x);
 
+void from_json(const json & j, ExecuteGenerationTaskResult & x);
+void to_json(json & j, const ExecuteGenerationTaskResult & x);
+
 void from_json(const json & j, GetModelListParams & x);
 void to_json(json & j, const GetModelListParams & x);
 
@@ -1231,14 +1249,23 @@ namespace IServer {
     }
 
     inline void from_json(const json & j, ExecuteGenerationTaskParams& x) {
-        x.set_message(j.at("message").get<ChatMessage>());
+        x.set_messages(j.at("messages").get<std::vector<Message>>());
         x.set_model_id(j.at("modelId").get<std::string>());
     }
 
     inline void to_json(json & j, const ExecuteGenerationTaskParams & x) {
         j = json::object();
-        j["message"] = x.get_message();
+        j["messages"] = x.get_messages();
         j["modelId"] = x.get_model_id();
+    }
+
+    inline void from_json(const json & j, ExecuteGenerationTaskResult& x) {
+        x.set_messages(j.at("messages").get<std::vector<Message>>());
+    }
+
+    inline void to_json(json & j, const ExecuteGenerationTaskResult & x) {
+        j = json::object();
+        j["messages"] = x.get_messages();
     }
 
     inline void from_json(const json & j, GetModelListParams& x) {
