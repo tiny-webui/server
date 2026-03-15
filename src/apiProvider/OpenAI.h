@@ -19,9 +19,12 @@ namespace TUI::ApiProvider
 
 		nlohmann::json GetParams() const override;
 		void Initialize(const nlohmann::json& params) override;
-		Network::Http::RequestData FormatRequest(const Schema::IServer::LinearHistory& history, bool stream) const override;
-		Schema::IServer::MessageContent ParseResponse(const std::string& response) const override;
-		std::optional<Schema::IServer::MessageContent> ParseStreamResponse(const Network::Http::StreamResponse::Event& event) const override;
+		Network::Http::RequestData FormatRequest(
+			const Schema::IServer::LinearHistory& history,
+			bool stream,
+			const std::optional<std::vector<Schema::IServer::Tool>>& tools = std::nullopt) const override;
+		Schema::IServer::LinearHistory ParseResponse(const std::string& response) const override;
+		std::optional<Schema::IServer::ChatCompletionSegment> ParseStreamResponse(const Network::Http::StreamResponse::Event& event) const override;
 
 	private:
 		struct Params

@@ -18,6 +18,7 @@
 //     TreeHistory data = nlohmann::json::parse(jsonString);
 //     GetChatListParams data = nlohmann::json::parse(jsonString);
 //     GetChatListResult data = nlohmann::json::parse(jsonString);
+//     Tool data = nlohmann::json::parse(jsonString);
 //     ChatCompletionParams data = nlohmann::json::parse(jsonString);
 //     ChatCompletionSegment data = nlohmann::json::parse(jsonString);
 //     ChatCompletionInfo data = nlohmann::json::parse(jsonString);
@@ -405,6 +406,33 @@ namespace IServer {
         void set_metadata(std::optional<std::map<std::string, nlohmann::json>> value) { this->metadata = value; }
     };
 
+    class Tool {
+        public:
+        Tool() = default;
+        virtual ~Tool() = default;
+
+        private:
+        std::string description;
+        std::string name;
+        nlohmann::json parameters;
+
+        public:
+        const std::string & get_description() const { return description; }
+        std::string & get_mutable_description() { return description; }
+        void set_description(const std::string & value) { this->description = value; }
+
+        const std::string & get_name() const { return name; }
+        std::string & get_mutable_name() { return name; }
+        void set_name(const std::string & value) { this->name = value; }
+
+        /**
+         * JSON schema for the parameter
+         */
+        const nlohmann::json & get_parameters() const { return parameters; }
+        nlohmann::json & get_mutable_parameters() { return parameters; }
+        void set_parameters(const nlohmann::json & value) { this->parameters = value; }
+    };
+
     class ChatCompletionParams {
         public:
         ChatCompletionParams() = default;
@@ -415,6 +443,7 @@ namespace IServer {
         std::vector<Message> messages;
         std::string model_id;
         std::optional<std::string> parent;
+        std::optional<std::vector<Tool>> tools;
 
         public:
         const std::string & get_id() const { return id; }
@@ -434,6 +463,9 @@ namespace IServer {
          */
         std::optional<std::string> get_parent() const { return parent; }
         void set_parent(std::optional<std::string> value) { this->parent = value; }
+
+        std::optional<std::vector<Tool>> get_tools() const { return tools; }
+        void set_tools(std::optional<std::vector<Tool>> value) { this->tools = value; }
     };
 
     enum class Event : int { FUNCTION_CALL_END, FUNCTION_CALL_START };
@@ -483,6 +515,7 @@ namespace IServer {
         private:
         std::vector<Message> messages;
         std::string model_id;
+        std::optional<std::vector<Tool>> tools;
 
         public:
         const std::vector<Message> & get_messages() const { return messages; }
@@ -492,6 +525,9 @@ namespace IServer {
         const std::string & get_model_id() const { return model_id; }
         std::string & get_mutable_model_id() { return model_id; }
         void set_model_id(const std::string & value) { this->model_id = value; }
+
+        std::optional<std::vector<Tool>> get_tools() const { return tools; }
+        void set_tools(std::optional<std::vector<Tool>> value) { this->tools = value; }
     };
 
     class ExecuteGenerationTaskResult {
@@ -952,6 +988,9 @@ void to_json(json & j, const GetChatListParams & x);
 void from_json(const json & j, GetChatListResultElement & x);
 void to_json(json & j, const GetChatListResultElement & x);
 
+void from_json(const json & j, Tool & x);
+void to_json(json & j, const Tool & x);
+
 void from_json(const json & j, ChatCompletionParams & x);
 void to_json(json & j, const ChatCompletionParams & x);
 
@@ -1209,11 +1248,25 @@ namespace IServer {
         }
     }
 
+    inline void from_json(const json & j, Tool& x) {
+        x.set_description(j.at("description").get<std::string>());
+        x.set_name(j.at("name").get<std::string>());
+        x.set_parameters(get_untyped(j, "parameters"));
+    }
+
+    inline void to_json(json & j, const Tool & x) {
+        j = json::object();
+        j["description"] = x.get_description();
+        j["name"] = x.get_name();
+        j["parameters"] = x.get_parameters();
+    }
+
     inline void from_json(const json & j, ChatCompletionParams& x) {
         x.set_id(j.at("id").get<std::string>());
         x.set_messages(j.at("messages").get<std::vector<Message>>());
         x.set_model_id(j.at("modelId").get<std::string>());
         x.set_parent(get_stack_optional<std::string>(j, "parent"));
+        x.set_tools(get_stack_optional<std::vector<Tool>>(j, "tools"));
     }
 
     inline void to_json(json & j, const ChatCompletionParams & x) {
@@ -1223,6 +1276,9 @@ namespace IServer {
         j["modelId"] = x.get_model_id();
         if (x.get_parent()) {
             j["parent"] = x.get_parent();
+        }
+        if (x.get_tools()) {
+            j["tools"] = x.get_tools();
         }
     }
 
@@ -1251,12 +1307,16 @@ namespace IServer {
     inline void from_json(const json & j, ExecuteGenerationTaskParams& x) {
         x.set_messages(j.at("messages").get<std::vector<Message>>());
         x.set_model_id(j.at("modelId").get<std::string>());
+        x.set_tools(get_stack_optional<std::vector<Tool>>(j, "tools"));
     }
 
     inline void to_json(json & j, const ExecuteGenerationTaskParams & x) {
         j = json::object();
         j["messages"] = x.get_messages();
         j["modelId"] = x.get_model_id();
+        if (x.get_tools()) {
+            j["tools"] = x.get_tools();
+        }
     }
 
     inline void from_json(const json & j, ExecuteGenerationTaskResult& x) {
