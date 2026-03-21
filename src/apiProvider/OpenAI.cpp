@@ -161,10 +161,6 @@ RequestData OpenAI::FormatRequest(const Schema::IServer::LinearHistory& history,
 		{
 			const auto& functionCallOutput = std::get<Schema::IServer::FunctionCallOutputMessage>(message);
 			auto functionCallOutputJson = nlohmann::json::object();
-			if (functionCallOutput.get_extra().has_value())
-			{
-				functionCallOutputJson = functionCallOutput.get_extra().value();
-			}
 			functionCallOutputJson["type"] = "function_call_output";
 			functionCallOutputJson["call_id"] = functionCallOutput.get_call_id();
 			std::string outputText;
@@ -254,7 +250,10 @@ Schema::IServer::LinearHistory OpenAI::ParseResponse(const std::string& response
 			functionCall.set_call_id(item.at("call_id").get<std::string>());
 			functionCall.set_name(item.at("name").get<std::string>());
 			functionCall.set_arguments(item.at("arguments").get<std::string>());
-			functionCall.set_extra(std::make_optional<nlohmann::json>(item));
+			nlohmann::json extra;
+			if (item.contains("id")) extra["id"] = item["id"];
+			if (item.contains("status")) extra["status"] = item["status"];
+			if (!extra.empty()) functionCall.set_extra(std::make_optional<nlohmann::json>(extra));
 			results.push_back(std::move(functionCall));
 		}
 	}
@@ -308,15 +307,8 @@ std::optional<Schema::IServer::ChatCompletionSegment> OpenAI::ParseStreamRespons
 			if (json.contains("item") && json.at("item").contains("type")
 				&& json.at("item").at("type").get<std::string>() == "function_call")
 			{
-				const auto& item = json.at("item");
-				Schema::IServer::FunctionCallMessage functionCall;
-				functionCall.set_type(Schema::IServer::FunctionCallMessageType::FUNCTION_CALL);
-				functionCall.set_call_id(item.at("call_id").get<std::string>());
-				functionCall.set_name(item.at("name").get<std::string>());
-				functionCall.set_arguments(item.value("arguments", ""));
 				Schema::IServer::ChatCompletionSegmentClass segment;
 				segment.set_event(Schema::IServer::Event::FUNCTION_CALL_START);
-				segment.set_data(std::move(functionCall));
 				return segment;
 			}
 		}
@@ -325,20 +317,28 @@ std::optional<Schema::IServer::ChatCompletionSegment> OpenAI::ParseStreamRespons
 			return std::nullopt;
 		}
 	}
-	else if (eventType == "response.function_call_arguments.done")
+	else if (eventType == "response.output_item.done")
 	{
 		try
 		{
 			auto json = nlohmann::json::parse(valueString);
-			Schema::IServer::FunctionCallMessage functionCall;
-			functionCall.set_type(Schema::IServer::FunctionCallMessageType::FUNCTION_CALL);
-			functionCall.set_call_id(json.value("call_id", ""));
-			functionCall.set_name(json.value("name", ""));
-			functionCall.set_arguments(json.value("arguments", ""));
-			Schema::IServer::ChatCompletionSegmentClass segment;
-			segment.set_event(Schema::IServer::Event::FUNCTION_CALL_END);
-			segment.set_data(std::move(functionCall));
-			return segment;
+			if (json.contains("item") && json.at("item").contains("type")
+				&& json.at("item").at("type").get<std::string>() == "function_call")
+			{
+				Schema::IServer::ChatCompletionSegmentClass segment;
+				segment.set_event(Schema::IServer::Event::FUNCTION_CALL_END);
+				Schema::IServer::FunctionCallMessage functionCall;
+				functionCall.set_type(Schema::IServer::FunctionCallMessageType::FUNCTION_CALL);
+				const auto& item = json.at("item");
+				functionCall.set_call_id(item.at("call_id").get<std::string>());
+				functionCall.set_name(item.at("name").get<std::string>());
+				functionCall.set_arguments(item.value("arguments", ""));
+				nlohmann::json extra;
+				extra["status"] = "completed";
+				functionCall.set_extra(std::make_optional<nlohmann::json>(extra));
+				segment.set_data(std::move(functionCall));
+				return segment;
+			}
 		}
 		catch (...)
 		{

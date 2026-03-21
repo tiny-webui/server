@@ -551,8 +551,6 @@ JS::AsyncGenerator<nlohmann::json, nlohmann::json> Service::OnChatCompletionAsyn
         auto streamBatcher = Common::StreamBatcher::BatchStream(_tev, std::move(eventStream), STREAM_BATCHING_INTERVAL_MS);
 
         std::string currentText{};
-        Schema::IServer::FunctionCallMessage pendingCall{};
-        bool hasPendingCall = false;
 
         auto flushCurrentText = [&]() {
             if (currentText.empty()) return;
@@ -601,25 +599,15 @@ JS::AsyncGenerator<nlohmann::json, nlohmann::json> Service::OnChatCompletionAsyn
                     {
                         /** Flush any accumulated text as an assistant message */
                         flushCurrentText();
-                        auto data = segClass.get_data();
-                        if (data.has_value())
-                        {
-                            pendingCall = std::move(data.value());
-                        }
-                        hasPendingCall = true;
                     }
                     else if (segClass.get_event() == Schema::IServer::Event::FUNCTION_CALL_END)
                     {
-                        if (hasPendingCall)
+                        auto data = segClass.get_data();
+                        if (!data.has_value())
                         {
-                            auto data = segClass.get_data();
-                            if (data.has_value())
-                            {
-                                pendingCall.set_arguments(data.value().get_arguments());
-                            }
-                            responseMessages.push_back(std::move(pendingCall));
-                            hasPendingCall = false;
+                            throw Schema::Rpc::Exception(Schema::Rpc::ErrorCode::INTERNAL_SERVER_ERROR, "Function call segment missing data");
                         }
+                        responseMessages.push_back(data.value());
                     }
                     co_yield static_cast<nlohmann::json>(
                         Schema::IServer::ChatCompletionSegment{std::move(segClass)});
