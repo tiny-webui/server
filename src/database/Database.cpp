@@ -16,7 +16,6 @@ JS::Promise<std::shared_ptr<Database>> Database::CreateAsync(
 {
     auto db = std::shared_ptr<Database>(new Database());
 
-    db->_fileDirectory = fileDirectory;
     if (!std::filesystem::exists(fileDirectory))
     {
         std::filesystem::create_directories(fileDirectory);
@@ -28,6 +27,7 @@ JS::Promise<std::shared_ptr<Database>> Database::CreateAsync(
             throw std::runtime_error("File directory path exists but is not a directory");
         }
     }
+    db->_fileDirectory = std::filesystem::canonical(fileDirectory);
 
     db->_db = co_await Sqlite::CreateAsync(tev, dbPath);
     /** Create tables */
@@ -646,6 +646,24 @@ std::string Database::GetStringFromChat(
     }
 }
 
+std::filesystem::path Database::ResolveUserFilePath(
+    const Common::Uuid& userId, const std::string& contentId) const
+{
+    if (contentId.empty())
+    {
+        throw std::runtime_error("Invalid contentId: empty");
+    }
+    auto userDirectory = _fileDirectory / static_cast<std::string>(userId);
+    auto filePath = userDirectory / contentId;
+    auto canonicalUserDir = std::filesystem::weakly_canonical(userDirectory);
+    auto canonicalFilePath = std::filesystem::weakly_canonical(filePath);
+    if (canonicalFilePath.parent_path() != canonicalUserDir)
+    {
+        throw std::runtime_error("Invalid contentId: path traversal");
+    }
+    return canonicalFilePath;
+}
+
 JS::Promise<Database::FileMeta> Database::SaveFileAsync(
     const Common::Uuid& userId, std::string metadata, std::vector<uint8_t> content)
 {
@@ -658,7 +676,7 @@ JS::Promise<Database::FileMeta> Database::SaveFileAsync(
     {
         std::filesystem::create_directories(userDirectory);
     }
-    auto filePath = userDirectory / contentId;
+    auto filePath = ResolveUserFilePath(userId, contentId);
     if (!std::filesystem::exists(filePath))
     {
         /** @todo: Make this async */
@@ -718,7 +736,7 @@ JS::Promise<void> Database::DeleteFileAsync(
     {
         co_return;
     }
-    auto filePath = _fileDirectory / static_cast<std::string>(userId) / contentId;
+    auto filePath = ResolveUserFilePath(userId, contentId);
     if (std::filesystem::exists(filePath))
     {
         std::filesystem::remove(filePath);
@@ -761,8 +779,8 @@ Database::FileMeta Database::GetFileMeta(
 std::vector<uint8_t> Database::GetFileContent(
     const Common::Uuid& userId, const std::string& contentId)
 {
-    auto filePath = _fileDirectory / static_cast<std::string>(userId) / contentId;
-    if (!std::filesystem::exists(filePath))
+    auto filePath = ResolveUserFilePath(userId, contentId);
+    if (!std::filesystem::is_regular_file(filePath))
     {
         throw std::runtime_error("File content not found");
     }

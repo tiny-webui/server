@@ -110,6 +110,9 @@ namespace TUI::Database
     private:
         Database() = default;
 
+        std::filesystem::path ResolveUserFilePath(
+            const Common::Uuid& userId, const std::string& contentId) const;
+
         std::list<IdMetadataPair> ParseListTableIdWithMetadataResult(
             Sqlite::ExecResult& result);
         JS::Promise<void> SetStringToTableById(

@@ -1086,6 +1086,7 @@ JS::Promise<nlohmann::json> Service::OnListFileAsync(CallerId callerId, nlohmann
         using EntryType = decltype(result)::value_type;
         EntryType entry{};
         entry.set_file_id(static_cast<std::string>(item.fileId));
+        entry.set_content_id(item.contentId);
         nlohmann::json metadata = nlohmann::json::parse(item.metadata);
         entry.set_file_metadata(std::move(metadata));
         result.push_back(std::move(entry));
