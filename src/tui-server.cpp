@@ -22,6 +22,7 @@ using namespace TUI;
 struct AppParams
 {
     std::optional<std::filesystem::path> dbPath{std::nullopt};
+    std::optional<std::filesystem::path> fileRoot{std::nullopt};
     std::optional<std::string> unixSocketPath{std::nullopt};
     std::optional<std::string> address{std::nullopt};
     std::optional<uint16_t> port{std::nullopt};
@@ -30,12 +31,15 @@ struct AppParams
     {
         int opt = -1;
         AppParams params{};
-        while ((opt = getopt(argc, const_cast<char**>(argv), "d:u:a:p:")) != -1)
+        while ((opt = getopt(argc, const_cast<char**>(argv), "d:u:a:p:f:")) != -1)
         {
             switch (opt)
             {
             case 'd':
                 params.dbPath = std::filesystem::path(optarg);
+                break;
+            case 'f':
+                params.fileRoot = std::filesystem::path(optarg);
                 break;
             case 'u':
                 params.unixSocketPath = std::string(optarg);
@@ -59,6 +63,10 @@ struct AppParams
         {
             throw std::invalid_argument("Database path is required");
         }
+        if (!fileRoot.has_value())
+        {
+            throw std::invalid_argument("File root path is required");
+        }
         if (!unixSocketPath.has_value() && (!address.has_value() || !port.has_value()))
         {
             throw std::invalid_argument("Either unix socket path or address and port must be provided");
@@ -71,6 +79,7 @@ struct AppParams
         oss << "Usage: " << std::endl 
             << programName << std::endl
             << "    -d <database_path>" << std::endl
+            << "    -f <file_root_path>" << std::endl
             << "    -u <unix_socket_path> | -a <address> -p <port>" << std::endl;
         return oss.str();
     }
@@ -129,7 +138,8 @@ static JS::Promise<void> MainNoexceptAsync(AppParams params)
 
 static JS::Promise<void> MainAsync(AppParams params)
 {
-    auto database = co_await Database::Database::CreateAsync(gApp.tev, params.dbPath.value());
+    auto database = co_await Database::Database::CreateAsync(
+        gApp.tev, params.dbPath.value(), params.fileRoot.value());
     std::shared_ptr<Network::IServer<void>> webSocketServer{nullptr};
     if (params.unixSocketPath.has_value())
     {

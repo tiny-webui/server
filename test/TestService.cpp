@@ -106,7 +106,7 @@ static void SignalHandler(int sig)
     gSignalQueue->Inject(sig);
 }
 
-JS::Promise<void> MainAsync(Tev& tev, std::string dbPath)
+JS::Promise<void> MainAsync(Tev& tev, std::string dbPath, std::string fileRoot)
 {
     /** Delete the old database if any */
     if (std::filesystem::exists(dbPath))
@@ -122,7 +122,7 @@ JS::Promise<void> MainAsync(Tev& tev, std::string dbPath)
         std::filesystem::remove(dbPath + "-shm");
     }
 
-    auto database = co_await Database::Database::CreateAsync(tev, dbPath);
+    auto database = co_await Database::Database::CreateAsync(tev, dbPath, fileRoot);
     Common::Uuid userId{};
     {
         /** Create a default user in the database. THIS IS ONLY FOR TESTING */
@@ -157,23 +157,24 @@ JS::Promise<void> MainAsync(Tev& tev, std::string dbPath)
     signal(SIGTERM, SignalHandler);
 }
 
-JS::Promise<void> TestAsync(Tev& tev, std::string dbPath)
+JS::Promise<void> TestAsync(Tev& tev, std::string dbPath, std::string fileRoot)
 {
-    RunAsyncTest(MainAsync(tev, dbPath));
+    RunAsyncTest(MainAsync(tev, std::move(dbPath), std::move(fileRoot)));
 }
 
 int main(int argc, char const *argv[])
 {
-    if (argc < 2)
+    if (argc < 3)
     {
-        std::cerr << "Usage: " << argv[0] << " <database_path>" << std::endl;
+        std::cerr << "Usage: " << argv[0] << " <database_path> <file_root>" << std::endl;
         return 1;
     }
     std::string dbPath = argv[1];
+    std::string fileRoot = argv[2];
 
     Tev tev{};
 
-    TestAsync(tev, dbPath);
+    TestAsync(tev, std::move(dbPath), std::move(fileRoot));
 
     tev.MainLoop();
 

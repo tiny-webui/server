@@ -18,7 +18,7 @@ env:
     TestChaCha20Poly1305
     TestCounter
     TestCryptoKdfHkdfSha256
-    TestDatabase /tmp/tui-test.db
+    TestDatabase /tmp/tui-test.db /tmp/files
     TestEcdhePsk
     TestEd25519
     TestFakeCredentialGenerator
@@ -61,7 +61,8 @@ jobs:
             nlohmann-json3-dev \
             libssl-dev \
             valgrind \
-            libzstd-dev
+            libzstd-dev \
+            libxxhash-dev
 
       - name: Install libsodium (>=1.0.19) from source
         run: |

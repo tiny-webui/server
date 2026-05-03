@@ -12,11 +12,12 @@ using namespace TUI::Schema;
 
 Tev tev{};
 std::string dbPath{};
+std::string fileRoot{};
 std::shared_ptr<Database> db{nullptr};
 
 JS::Promise<void> TestCreateAsync()
 {
-    db = co_await Database::CreateAsync(tev, dbPath);
+    db = co_await Database::CreateAsync(tev, dbPath, fileRoot);
 }
 
 void TestClose()
@@ -169,32 +170,29 @@ JS::Promise<void> TestChatAsync()
     auto metadata = db->GetChatMetadata(userId, chatId);
     AssertWithMessage(metadata == "test-chat-metadata", "Chat metadata should match");
     {
-        IServer::Message message0{};
-        using MessageRoleType = std::remove_reference<decltype(message0.get_mutable_role())>::type;
-        message0.set_role(MessageRoleType::USER);
-        using MessageContentType = std::remove_reference<decltype(message0.get_mutable_content())>::type::value_type;
-        MessageContentType content0{};
-        using MessageContentTypeType = std::remove_reference<decltype(content0.get_mutable_type())>::type;
-        content0.set_type(MessageContentTypeType::TEXT);
+        IServer::ChatMessage chatMsg0{};
+        chatMsg0.set_role(IServer::ChatMessageRole::USER);
+        IServer::MessageContent content0{};
+        content0.set_type(IServer::MessageContentType::TEXT);
         content0.set_data("Hello, this is a test message.");
-        message0.get_mutable_content().push_back(std::move(content0));
+        chatMsg0.set_content({std::move(content0)});
         IServer::MessageNode node0{};
         node0.set_id("node0");
         node0.set_timestamp(1.0);
-        node0.set_message(std::move(message0));
+        node0.set_message(std::move(chatMsg0));
         co_await db->AppendChatHistoryAsync(userId, chatId, node0);
 
         IServer::MessageNode node1{};
         node1.set_id("node1");
         node1.set_parent("node0");
         node1.set_timestamp(2.0);
-        IServer::Message message1{};
-        message1.set_role(MessageRoleType::ASSISTANT);
-        MessageContentType content1{};
-        content1.set_type(MessageContentTypeType::TEXT);
+        IServer::ChatMessage chatMsg1{};
+        chatMsg1.set_role(IServer::ChatMessageRole::ASSISTANT);
+        IServer::MessageContent content1{};
+        content1.set_type(IServer::MessageContentType::TEXT);
         content1.set_data("This is a response message.");
-        message1.get_mutable_content().push_back(std::move(content1));
-        node1.set_message(std::move(message1));
+        chatMsg1.set_content({std::move(content1)});
+        node1.set_message(std::move(chatMsg1));
         co_await db->AppendChatHistoryAsync(userId, chatId, node1);
         
         auto history = db->GetChatHistory(userId, chatId);
@@ -204,9 +202,10 @@ JS::Promise<void> TestChatAsync()
         AssertWithMessage(retrievedNode0It != nodes.end(), "Node0 should be found");
         auto& retrievedNode0 = retrievedNode0It->second;
         AssertWithMessage(retrievedNode0.get_timestamp() == 1.0, "Node0 timestamp should match");
-        AssertWithMessage(retrievedNode0.get_message().get_role() == MessageRoleType::USER, "Node0 role should match");
-        AssertWithMessage(retrievedNode0.get_message().get_content().size() == 1, "Node0 content size should match");
-        AssertWithMessage(retrievedNode0.get_message().get_content().front().get_data() == "Hello, this is a test message.", "Node0 content data should match");
+        auto& msg0 = std::get<IServer::ChatMessage>(retrievedNode0.get_message());
+        AssertWithMessage(msg0.get_role() == IServer::ChatMessageRole::USER, "Node0 role should match");
+        AssertWithMessage(msg0.get_content().size() == 1, "Node0 content size should match");
+        AssertWithMessage(msg0.get_content().front().get_data() == "Hello, this is a test message.", "Node0 content data should match");
         AssertWithMessage(retrievedNode0.get_parent().has_value() == false, "Node0 parent should be null");
         AssertWithMessage(retrievedNode0.get_children().size() == 1, "Node0 should have 1 child");
         AssertWithMessage(retrievedNode0.get_children().front() == "node1", "Node0 child ID should match");
@@ -214,9 +213,10 @@ JS::Promise<void> TestChatAsync()
         AssertWithMessage(retrievedNode1It != nodes.end(), "Node1 should be found");
         auto& retrievedNode1 = retrievedNode1It->second;
         AssertWithMessage(retrievedNode1.get_timestamp() == 2.0, "Node1 timestamp should match");
-        AssertWithMessage(retrievedNode1.get_message().get_role() == MessageRoleType::ASSISTANT, "Node1 role should match");
-        AssertWithMessage(retrievedNode1.get_message().get_content().size() == 1, "Node1 content size should match");
-        AssertWithMessage(retrievedNode1.get_message().get_content().front().get_data() == "This is a response message.", "Node1 content data should match");
+        auto& msg1 = std::get<IServer::ChatMessage>(retrievedNode1.get_message());
+        AssertWithMessage(msg1.get_role() == IServer::ChatMessageRole::ASSISTANT, "Node1 role should match");
+        AssertWithMessage(msg1.get_content().size() == 1, "Node1 content size should match");
+        AssertWithMessage(msg1.get_content().front().get_data() == "This is a response message.", "Node1 content data should match");
         AssertWithMessage(retrievedNode1.get_parent().has_value() == true, "Node1 parent should not be null");
         AssertWithMessage(retrievedNode1.get_parent().value() == "node0", "Node1 parent ID should match");
         AssertWithMessage(retrievedNode1.get_children().empty(), "Node1 should have no children");
@@ -262,6 +262,91 @@ JS::Promise<void> TestChatAsync()
     AssertWithMessage(!chatFound, "Deleted chat found");
 }
 
+JS::Promise<void> TestFileAsync()
+{
+    std::string username = "test-user-file";
+    auto userId = co_await db->CreateUserAsync(username, "", "");
+
+    std::string metadataInput = "test-file-metadata";
+    std::vector<uint8_t> contentInput = {'H', 'e', 'l', 'l', 'o'};
+
+    auto fileMeta = co_await db->SaveFileAsync(userId, metadataInput, contentInput);
+    AssertWithMessage(fileMeta.fileId != nullptr, "File ID should not be empty");
+    AssertWithMessage(!fileMeta.contentId.empty(), "Content ID should not be empty");
+    AssertWithMessage(fileMeta.metadata == metadataInput, "File metadata should match");
+
+    auto retrievedMeta = db->GetFileMeta(userId, fileMeta.fileId);
+    AssertWithMessage(retrievedMeta.fileId == fileMeta.fileId, "Retrieved file ID should match");
+    AssertWithMessage(retrievedMeta.contentId == fileMeta.contentId, "Retrieved content ID should match");
+    AssertWithMessage(retrievedMeta.metadata == metadataInput, "Retrieved metadata should match");
+
+    auto retrievedContent = db->GetFileContent(userId, fileMeta.contentId);
+    AssertWithMessage(retrievedContent == contentInput, "Retrieved file content should match");
+
+    auto fileList = db->ListFileMeta(userId);
+    bool fileFound = false;
+    for (const auto& f : fileList)
+    {
+        if (f.fileId == fileMeta.fileId)
+        {
+            fileFound = true;
+            break;
+        }
+    }
+    AssertWithMessage(fileFound, "Saved file should appear in list");
+
+    /** Save another file with the same content to test content deduplication */
+    std::string metadataInput2 = "test-file-metadata-2";
+    auto fileMeta2 = co_await db->SaveFileAsync(userId, metadataInput2, contentInput);
+    AssertWithMessage(fileMeta2.fileId != fileMeta.fileId, "Second file should have a different file ID");
+    AssertWithMessage(fileMeta2.contentId == fileMeta.contentId, "Same content should produce the same content ID");
+
+    fileList = db->ListFileMeta(userId);
+    size_t fileCount = 0;
+    for (const auto& f : fileList)
+    {
+        if (f.fileId == fileMeta.fileId || f.fileId == fileMeta2.fileId)
+        {
+            fileCount++;
+        }
+    }
+    AssertWithMessage(fileCount == 2, "Both files should appear in list");
+
+    /** Delete first file; content should still exist because second file references it */
+    co_await db->DeleteFileAsync(userId, fileMeta.fileId);
+    fileList = db->ListFileMeta(userId);
+    fileFound = false;
+    for (const auto& f : fileList)
+    {
+        if (f.fileId == fileMeta.fileId)
+        {
+            fileFound = true;
+            break;
+        }
+    }
+    AssertWithMessage(!fileFound, "Deleted file should not appear in list");
+
+    auto contentAfterFirstDelete = db->GetFileContent(userId, fileMeta2.contentId);
+    AssertWithMessage(contentAfterFirstDelete == contentInput, "Content should still exist after deleting first reference");
+
+    /** Delete second file; content should now be removed */
+    co_await db->DeleteFileAsync(userId, fileMeta2.fileId);
+    fileList = db->ListFileMeta(userId);
+    AssertWithMessage(fileList.empty(), "File list should be empty after deleting all files");
+
+    /** Save a file with different content */
+    std::vector<uint8_t> contentInput3 = {'W', 'o', 'r', 'l', 'd'};
+    auto fileMeta3 = co_await db->SaveFileAsync(userId, "metadata-3", contentInput3);
+    AssertWithMessage(fileMeta3.contentId != fileMeta.contentId, "Different content should produce a different content ID");
+    auto retrievedContent3 = db->GetFileContent(userId, fileMeta3.contentId);
+    AssertWithMessage(retrievedContent3 == contentInput3, "Retrieved content should match for third file");
+
+    /** Files should be deleted with the user */
+    co_await db->DeleteUserAsync(userId);
+    fileList = db->ListFileMeta(userId);
+    AssertWithMessage(fileList.empty(), "Files should be deleted with the user");
+}
+
 JS::Promise<void> TestAsync()
 {
     /** Always run this first */
@@ -270,17 +355,19 @@ JS::Promise<void> TestAsync()
     RunAsyncTest(TestModelAsync());
     RunAsyncTest(TestUserAsync());
     RunAsyncTest(TestChatAsync());
+    RunAsyncTest(TestFileAsync());
     RunTest(TestClose());
 }
 
 int main(int argc, char const *argv[])
 {
-    if (argc < 2)
+    if (argc < 3)
     {
-        std::cerr << "Usage: " << argv[0] << " <database_path>" << std::endl;
+        std::cerr << "Usage: " << argv[0] << " <database_path>" << " <file_root>" << std::endl;
         return 1;
     }
     dbPath = argv[1];
+    fileRoot = argv[2];
     /** Delete the old database */
     if (std::filesystem::exists(dbPath))
     {

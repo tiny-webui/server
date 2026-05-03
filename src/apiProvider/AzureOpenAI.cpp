@@ -48,7 +48,7 @@ void AzureOpenAI::Initialize(const nlohmann::json& params)
     _params = ParamsDefinition.Parse(params);
 }
 
-RequestData AzureOpenAI::FormatRequest(const Schema::IServer::LinearHistory& history, bool stream) const
+RequestData AzureOpenAI::FormatRequest(const Schema::IServer::LinearHistory& history, bool stream, const std::optional<std::vector<Schema::IServer::Tool>>& /*tools*/) const
 {
     RequestData data{};
     data.url = _params.url;
@@ -67,55 +67,64 @@ RequestData AzureOpenAI::FormatRequest(const Schema::IServer::LinearHistory& his
     }
     for (const auto& message : history)
     {
-        auto messageJson = nlohmann::json::object();
-        messageJson["content"] = nlohmann::json::array();
-        if (message.get_role() == Schema::IServer::MessageRole::DEVELOPER)
+        if (std::holds_alternative<Schema::IServer::ChatMessage>(message))
         {
-            messageJson["role"] = "system";
-        }
-        else if(message.get_role() == Schema::IServer::MessageRole::USER)
-        {
-            messageJson["role"] = "user";
-        }
-        else if(message.get_role() == Schema::IServer::MessageRole::ASSISTANT)
-        {
-            messageJson["role"] = "assistant";
-        }
-        else
-        {
-            continue;
-        }
-        for (const auto& content : message.get_content())
-        {
-            if (content.get_type() == Schema::IServer::Type::TEXT || content.get_type() == Schema::IServer::Type::REFUSAL)
+            const auto& chatMessage = std::get<Schema::IServer::ChatMessage>(message);
+            auto messageJson = nlohmann::json::object();
+            messageJson["content"] = nlohmann::json::array();
+            if (chatMessage.get_role() == Schema::IServer::ChatMessageRole::DEVELOPER)
             {
-                /** Azure open ai does not seem to have a special REFUSAL message type */
-                messageJson["content"].push_back({
-                    {"type", "text"},
-                    {"text", content.get_data()}
-                });
+                messageJson["role"] = "system";
             }
-            else if (content.get_type() == Schema::IServer::Type::IMAGE_URL)
+            else if(chatMessage.get_role() == Schema::IServer::ChatMessageRole::USER)
             {
-                messageJson["content"].push_back({
-                    {"type", "image_url"},
-                    {"image_url", {
-                        {"url", content.get_data()}
-                    }}
-                });
+                messageJson["role"] = "user";
+            }
+            else if(chatMessage.get_role() == Schema::IServer::ChatMessageRole::ASSISTANT)
+            {
+                messageJson["role"] = "assistant";
             }
             else
             {
                 continue;
             }
+            for (const auto& content : chatMessage.get_content())
+            {
+                if (content.get_type() == Schema::IServer::MessageContentType::TEXT || content.get_type() == Schema::IServer::MessageContentType::REFUSAL)
+                {
+                    /** Azure open ai does not seem to have a special REFUSAL message type */
+                    messageJson["content"].push_back({
+                        {"type", "text"},
+                        {"text", content.get_data()}
+                    });
+                }
+                else if (content.get_type() == Schema::IServer::MessageContentType::IMAGE_URL)
+                {
+                    messageJson["content"].push_back({
+                        {"type", "image_url"},
+                        {"image_url", {
+                            {"url", content.get_data()}
+                        }}
+                    });
+                }
+                else
+                {
+                    continue;
+                }
+            }
+            body["messages"].push_back(messageJson);
         }
-        body["messages"].push_back(messageJson);
+        else if (std::holds_alternative<Schema::IServer::FunctionCallMessage>(message)
+            || std::holds_alternative<Schema::IServer::FunctionCallOutputMessage>(message))
+        {
+            throw std::runtime_error("AzureOpenAI does not support function call messages");
+        }
     }
     data.body = body.dump();
     return data;
 }
 
-Schema::IServer::MessageContent AzureOpenAI::ParseResponse(const std::string& responseString) const
+Schema::IServer::LinearHistory AzureOpenAI::ParseResponse(const std::string& responseString) const
 {
     Schema::AzureOpenAI::BulkResponse response;
     try
@@ -131,14 +140,17 @@ Schema::IServer::MessageContent AzureOpenAI::ParseResponse(const std::string& re
         throw std::runtime_error("No choices in response");
     }
     const auto& choice = response.get_choices().front();
-    const auto& message = choice.get_message();
+    const auto& msg = choice.get_message();
     Schema::IServer::MessageContent content;
-    content.set_type(message.get_refusal() ? Schema::IServer::Type::REFUSAL : Schema::IServer::Type::TEXT);
-    content.set_data(message.get_content());
-    return content;
+    content.set_type(msg.get_refusal() ? Schema::IServer::MessageContentType::REFUSAL : Schema::IServer::MessageContentType::TEXT);
+    content.set_data(msg.get_content());
+    Schema::IServer::ChatMessage chatMessage;
+    chatMessage.set_role(Schema::IServer::ChatMessageRole::ASSISTANT);
+    chatMessage.set_content({content});
+    return Schema::IServer::LinearHistory{std::move(chatMessage)};
 }
 
-std::optional<Schema::IServer::MessageContent> AzureOpenAI::ParseStreamResponse(const StreamResponse::Event& event) const
+std::optional<Schema::IServer::ChatCompletionSegment> AzureOpenAI::ParseStreamResponse(const StreamResponse::Event& event) const
 {
     if (!event.value.has_value())
     {
@@ -172,8 +184,5 @@ std::optional<Schema::IServer::MessageContent> AzureOpenAI::ParseStreamResponse(
     {
         return std::nullopt;
     }
-    Schema::IServer::MessageContent content{};
-    content.set_type(Schema::IServer::Type::TEXT);
-    content.set_data(delta.get_content().value());
-    return content;
+    return delta.get_content().value();
 }

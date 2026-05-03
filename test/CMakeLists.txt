@@ -134,7 +134,8 @@ target_include_directories(TestDatabase
 target_link_libraries(TestDatabase
     PRIVATE
         sqlite3
-        uuid)
+        uuid
+        xxhash)
 
 add_executable(TestRpcServer
     TestRpcServer.cpp)
@@ -374,7 +375,8 @@ target_link_libraries(TestService
         sqlite3
         uuid
         sodium
-        zstd)
+        zstd
+        xxhash)
 
 add_executable(TestTuiServer
     TestTuiServer.cpp
@@ -391,7 +393,8 @@ target_link_libraries(TestTuiServer
         sqlite3
         uuid
         sodium
-        zstd)
+        zstd
+        xxhash)
 
 add_executable(TestZstdMessageCodec
     TestZstdMessageCodec.cpp
@@ -404,3 +407,10 @@ target_include_directories(TestZstdMessageCodec
 target_link_libraries(TestZstdMessageCodec
     PRIVATE
         zstd)
+
+add_executable(TestIServerSchema
+    TestIServerSchema.cpp)
+
+target_include_directories(TestIServerSchema
+    PRIVATE
+        ../src)

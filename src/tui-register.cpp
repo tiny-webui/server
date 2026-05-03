@@ -178,7 +178,8 @@ static JS::Promise<void> MainAsync(Tev& tev, AppParams params)
     credential.set_w0(Common::Base64::Encode(w0Opt.value()));
     credential.set_l(Common::Base64::Encode(LOpt.value()));
     
-    auto database = co_await Database::Database::CreateAsync(tev, params.dbPath.value());
+    /** The file root is not used for tui-register. */
+    auto database = co_await Database::Database::CreateAsync(tev, params.dbPath.value(), "/tmp");
     /**
      * Check if:
      * 1. There is an existing user. If so, this is a password reset.

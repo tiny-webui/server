@@ -22,8 +22,11 @@ namespace TUI::ApiProvider
         virtual ~IProvider() = default;
         virtual nlohmann::json GetParams() const = 0;
         virtual void Initialize(const nlohmann::json& params) = 0;
-        virtual Network::Http::RequestData FormatRequest(const Schema::IServer::LinearHistory& history, bool stream) const = 0;
-        virtual Schema::IServer::MessageContent ParseResponse(const std::string& response) const = 0;
-        virtual std::optional<Schema::IServer::MessageContent> ParseStreamResponse(const Network::Http::StreamResponse::Event& event) const = 0;
+        virtual Network::Http::RequestData FormatRequest(
+            const Schema::IServer::LinearHistory& history,
+            bool stream,
+            const std::optional<std::vector<Schema::IServer::Tool>>& tools = std::nullopt) const = 0;
+        virtual Schema::IServer::LinearHistory ParseResponse(const std::string& response) const = 0;
+        virtual std::optional<Schema::IServer::ChatCompletionSegment> ParseStreamResponse(const Network::Http::StreamResponse::Event& event) const = 0;
     };
 }
