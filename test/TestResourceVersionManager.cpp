@@ -169,6 +169,47 @@ static void TestDelete()
     auto lock = manager->GetReadLock({"test", "resource"}, "1");
 }
 
+static void TestInvalidation()
+{
+    auto manager = TUI::Application::ResourceVersionManager<std::string>::Create();
+    for (const auto& caller : {"1", "2"})
+    {
+        auto lock = manager->GetReadLock({"chatList", "user"}, caller);
+    }
+    manager->Invalidate({"chatList", "user"});
+    try
+    {
+        auto lock = manager->GetReadLock({"chatList", "user"}, "1", true);
+        AssertWithMessage(false, "Invalidated pagination should require refreshing the first page");
+    }
+    catch (const TUI::Schema::Rpc::Exception& error)
+    {
+        AssertWithMessage(error.get_code() == TUI::Schema::Rpc::ErrorCode::CONFLICT,
+            "Invalidated pagination should report CONFLICT");
+    }
+    for (const auto& caller : {"1", "2"})
+    {
+        auto lock = manager->GetReadLock({"chatList", "user"}, caller);
+    }
+}
+
+static void TestInvalidationDuringOperation()
+{
+    auto manager = TUI::Application::ResourceVersionManager<std::string>::Create();
+    {
+        auto lock = manager->GetReadLock({"chatList", "user"}, "1");
+        manager->Invalidate({"chatList", "user"});
+    }
+    {
+        auto lock = manager->GetReadLock({"chatList", "user"}, "1");
+    }
+    {
+        auto lock = manager->GetWriteLock({"chatList", "user"}, "1");
+        manager->Invalidate({"chatList", "user"});
+    }
+    auto lock = manager->GetReadLock({"chatList", "user"}, "1");
+}
+
 int main(int argc, char const *argv[])
 {
     (void)argc;
@@ -185,6 +226,8 @@ int main(int argc, char const *argv[])
     RunTest(TestDoNotConfirm());
     RunTest(TestNoConfirmationOnException());
     RunTest(TestDelete());
+    RunTest(TestInvalidation());
+    RunTest(TestInvalidationDuringOperation());
 
     return 0;
 }

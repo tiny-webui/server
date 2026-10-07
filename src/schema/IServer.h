@@ -406,6 +406,37 @@ namespace IServer {
         void set_metadata(std::optional<std::map<std::string, nlohmann::json>> value) { this->metadata = value; }
     };
 
+    class GetPinnedChatListParams {
+        public:
+        GetPinnedChatListParams() = default;
+        virtual ~GetPinnedChatListParams() = default;
+
+        private:
+        std::optional<std::vector<std::string>> meta_data_keys;
+
+        public:
+        std::optional<std::vector<std::string>> get_meta_data_keys() const { return meta_data_keys; }
+        void set_meta_data_keys(std::optional<std::vector<std::string>> value) { this->meta_data_keys = value; }
+    };
+
+    class SetChatPinnedParams {
+        public:
+        SetChatPinnedParams() = default;
+        virtual ~SetChatPinnedParams() = default;
+
+        private:
+        std::string id;
+        bool pinned{false};
+
+        public:
+        const std::string & get_id() const { return id; }
+        std::string & get_mutable_id() { return id; }
+        void set_id(const std::string & value) { this->id = value; }
+
+        bool get_pinned() const { return pinned; }
+        void set_pinned(bool value) { this->pinned = value; }
+    };
+
     class Tool {
         public:
         Tool() = default;
@@ -945,6 +976,7 @@ namespace IServer {
     using GetMetadataResult = std::map<std::string, nlohmann::json>;
     using LinearHistory = std::vector<Message>;
     using GetChatListResult = std::vector<GetChatListResultElement>;
+    using GetPinnedChatListResult = GetChatListResult;
     using GetModelListResult = std::vector<GetModelListResultElement>;
     using GetUserListResult = std::vector<GetUserListResultElement>;
     using ListFileResult = std::vector<ListFileResultElement>;
@@ -987,6 +1019,12 @@ void to_json(json & j, const GetChatListParams & x);
 
 void from_json(const json & j, GetChatListResultElement & x);
 void to_json(json & j, const GetChatListResultElement & x);
+
+void from_json(const json & jsonValue, GetPinnedChatListParams & value);
+void to_json(json & jsonValue, const GetPinnedChatListParams & value);
+
+void from_json(const json & jsonValue, SetChatPinnedParams & value);
+void to_json(json & jsonValue, const SetChatPinnedParams & value);
 
 void from_json(const json & j, Tool & x);
 void to_json(json & j, const Tool & x);
@@ -1246,6 +1284,28 @@ namespace IServer {
         if (x.get_metadata()) {
             j["metadata"] = x.get_metadata();
         }
+    }
+
+    inline void from_json(const json & jsonValue, GetPinnedChatListParams & value) {
+        value.set_meta_data_keys(get_stack_optional<std::vector<std::string>>(jsonValue, "metaDataKeys"));
+    }
+
+    inline void to_json(json & jsonValue, const GetPinnedChatListParams & value) {
+        jsonValue = json::object();
+        if (value.get_meta_data_keys()) {
+            jsonValue["metaDataKeys"] = value.get_meta_data_keys();
+        }
+    }
+
+    inline void from_json(const json & jsonValue, SetChatPinnedParams & value) {
+        value.set_id(jsonValue.at("id").get<std::string>());
+        value.set_pinned(jsonValue.at("pinned").get<bool>());
+    }
+
+    inline void to_json(json & jsonValue, const SetChatPinnedParams & value) {
+        jsonValue = json::object();
+        jsonValue["id"] = value.get_id();
+        jsonValue["pinned"] = value.get_pinned();
     }
 
     inline void from_json(const json & j, Tool& x) {
