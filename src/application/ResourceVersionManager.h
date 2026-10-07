@@ -74,6 +74,7 @@ namespace TUI::Application
         {
             /** Lock first, then check. */
             LockReadLock(resourcePath, id);
+            auto invalidationVersion = _states.at(resourcePath).invalidationVersion;
             std::weak_ptr<ResourceVersionManager<ID>> manager_ref = this->shared_from_this();
             Lock lock{
                 [=]()
@@ -81,7 +82,7 @@ namespace TUI::Application
                     auto manager = manager_ref.lock();
                     if (manager)
                     {
-                        manager->ConfirmRead(resourcePath, id);
+                        manager->ConfirmRead(resourcePath, id, invalidationVersion);
                     }
                 },
                 [=]()
@@ -116,6 +117,7 @@ namespace TUI::Application
         Lock GetWriteLock(const std::vector<std::string>& resourcePath, const ID& id)
         {
             LockWriteLock(resourcePath, id);
+            auto invalidationVersion = _states.at(resourcePath).invalidationVersion;
             std::weak_ptr<ResourceVersionManager<ID>> manager_ref = this->shared_from_this();
             Lock lock{
                 [=]()
@@ -123,7 +125,7 @@ namespace TUI::Application
                     auto manager = manager_ref.lock();
                     if (manager)
                     {
-                        manager->ConfirmWrite(resourcePath, id);
+                        manager->ConfirmWrite(resourcePath, id, invalidationVersion);
                     }
                 },
                 [=]()
@@ -170,22 +172,37 @@ namespace TUI::Application
             return std::move(lock);
         }
 
+        void Invalidate(const std::vector<std::string>& resourcePath)
+        {
+            auto item = _states.find(resourcePath);
+            if (item != _states.end())
+            {
+                item->second.upToDateSet.clear();
+                ++item->second.invalidationVersion;
+            }
+        }
+
     private:
         struct ResourceState
         {
             std::unordered_set<ID> upToDateSet{};
             std::unordered_set<ID> readLockHolders{};
             std::optional<ID> writeLockHolder{};
+            size_t invalidationVersion{0};
         };
         /** Stores the IDs that are up to date on the resource path (the key). */
         std::map<std::vector<std::string>, ResourceState> _states{};
 
         ResourceVersionManager() = default;
 
-        void ConfirmRead(const std::vector<std::string>& resourcePath, const ID& id)
+        void ConfirmRead(const std::vector<std::string>& resourcePath, const ID& id, size_t invalidationVersion)
         {
             /** This creates the entry if it does not exist. */
             auto& state = _states[resourcePath];
+            if (state.invalidationVersion != invalidationVersion)
+            {
+                return;
+            }
             if (state.upToDateSet.find(id) != state.upToDateSet.end())
             {
                 return;
@@ -193,12 +210,15 @@ namespace TUI::Application
             state.upToDateSet.insert(id);
         };
 
-        void ConfirmWrite(const std::vector<std::string>& resourcePath, const ID& id)
+        void ConfirmWrite(const std::vector<std::string>& resourcePath, const ID& id, size_t invalidationVersion)
         {
             /** This will make id the sole user that's up to date */
             auto& state = _states[resourcePath];
             state.upToDateSet.clear();
-            state.upToDateSet.insert(id);
+            if (state.invalidationVersion == invalidationVersion)
+            {
+                state.upToDateSet.insert(id);
+            }
         };
 
         /**

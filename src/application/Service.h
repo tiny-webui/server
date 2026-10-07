@@ -48,6 +48,8 @@ namespace TUI::Application
         JS::Promise<nlohmann::json> OnGetMetadataAsync(CallerId callerId, nlohmann::json params);
         JS::Promise<nlohmann::json> OnDeleteMetadataAsync(CallerId callerId, nlohmann::json params);
         JS::Promise<nlohmann::json> OnGetChatListAsync(CallerId callerId, nlohmann::json params);
+        JS::Promise<nlohmann::json> OnGetPinnedChatListAsync(CallerId callerId, nlohmann::json params);
+        JS::Promise<nlohmann::json> OnSetChatPinnedAsync(CallerId callerId, nlohmann::json params);
         JS::Promise<nlohmann::json> OnNewChatAsync(CallerId callerId, nlohmann::json params);
         JS::Promise<nlohmann::json> OnGetChatAsync(CallerId callerId, nlohmann::json params);
         JS::Promise<nlohmann::json> DeleteChatAsync(CallerId callerId, nlohmann::json params);
@@ -92,6 +94,10 @@ namespace TUI::Application
         }
 
         std::shared_ptr<ApiProvider::IProvider> GetProvider(const Common::Uuid& providerId);
+        Schema::IServer::GetChatListResult MakeChatListResult(
+            const std::list<Database::Database::IdMetadataPair>& list,
+            const std::optional<std::vector<std::string>>& metadataKeys);
+        void InvalidateChatLists(const Common::Uuid& userId);
         std::map<std::string, nlohmann::json> TryGetMetadata(const std::vector<std::string>& keys, const std::string& metadataString);
         std::string TryMergeMetadata(const std::string& base, std::map<std::string, nlohmann::json>& changes);
         std::string TryDeleteMetadata(const std::string& base, const std::vector<std::string>& keys);

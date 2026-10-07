@@ -55,6 +55,7 @@ JS::Promise<std::shared_ptr<Database>> Database::CreateAsync(
         "user_id TEXT, "
         "id TEXT, "
         "metadata TEXT, "
+        "pinned INTEGER NOT NULL DEFAULT 0 CHECK (pinned IN (0, 1)), "
         "PRIMARY KEY (user_id, id));");
     co_await db->_db->ExecAsync(
         "CREATE TABLE IF NOT EXISTS chat_content ("
@@ -66,6 +67,21 @@ JS::Promise<std::shared_ptr<Database>> Database::CreateAsync(
         "message TEXT, "
         "timestamp INTEGER, "
         "PRIMARY KEY (user_id, chat_id, id));");
+    if (db->_db->Exec("SELECT name FROM pragma_table_info('chat') WHERE name = 'pinned';").empty())
+    {
+        co_await db->_db->ExecAsync("BEGIN IMMEDIATE;");
+        co_await db->_db->ExecAsync(
+            "ALTER TABLE chat ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0 CHECK (pinned IN (0, 1));");
+        co_await db->_db->ExecAsync(
+            "UPDATE chat SET timestamp = COALESCE("
+            "(SELECT MAX(timestamp) FROM chat_content WHERE user_id = chat.user_id AND chat_id = chat.id), "
+            "timestamp);");
+        co_await db->_db->ExecAsync("COMMIT;");
+    }
+    co_await db->_db->ExecAsync(
+        "CREATE INDEX IF NOT EXISTS chat_activity ON chat (user_id, timestamp DESC, id DESC);");
+    co_await db->_db->ExecAsync(
+        "CREATE INDEX IF NOT EXISTS chat_pinned_activity ON chat (user_id, timestamp DESC, id DESC) WHERE pinned = 1;");
     co_await db->_db->ExecAsync(
         "CREATE TABLE IF NOT EXISTS file_meta ("
         "user_id TEXT, "
@@ -372,10 +388,26 @@ std::list<Database::IdMetadataPair> Database::ListChat(
     const Uuid& userId, size_t from , size_t limit)
 {
     auto sql = std::format(
-        "SELECT id, metadata FROM chat WHERE user_id = ? ORDER BY timestamp DESC LIMIT {} OFFSET {}",
+        "SELECT id, metadata FROM chat WHERE user_id = ? ORDER BY timestamp DESC, id DESC LIMIT {} OFFSET {}",
         limit, from);
     auto result = _db->Exec(sql, static_cast<std::string>(userId));
     return ParseListTableIdWithMetadataResult(result);
+}
+
+std::list<Database::IdMetadataPair> Database::ListPinnedChat(const Uuid& userId)
+{
+    auto result = _db->Exec(
+        "SELECT id, metadata FROM chat WHERE user_id = ? AND pinned = 1 ORDER BY timestamp DESC, id DESC;",
+        static_cast<std::string>(userId));
+    return ParseListTableIdWithMetadataResult(result);
+}
+
+JS::Promise<bool> Database::SetChatPinnedAsync(const Uuid& userId, const Uuid& chatId, bool pinned)
+{
+    auto result = co_await _db->ExecAsync(
+        "UPDATE chat SET pinned = ? WHERE user_id = ? AND id = ? RETURNING id;",
+        static_cast<int64_t>(pinned), static_cast<std::string>(userId), static_cast<std::string>(chatId));
+    co_return !result.empty();
 }
 
 JS::Promise<void> Database::SetChatMetadataAsync(const Uuid& userId, const Uuid& id, std::string metadata)
@@ -444,6 +476,10 @@ JS::Promise<void> Database::AppendChatHistoryAsync(
         (static_cast<nlohmann::json>(node.get_children())).dump(),
         (static_cast<nlohmann::json>(node.get_message())).dump(),
         static_cast<int64_t>(node.get_timestamp()));
+    co_await _db->ExecAsync(
+        "UPDATE chat SET timestamp = ? WHERE user_id = ? AND id = ?;",
+        Timestamp::GetWallClock(),
+        static_cast<std::string>(userId), static_cast<std::string>(chatId));
 }
 
 IServer::TreeHistory Database::GetChatHistory(const Uuid& userId, const Uuid& id)
@@ -602,12 +638,11 @@ JS::Promise<void> Database::SetStringToChatAsync(
     const Uuid& userId, const Uuid& id, const std::string& name, std::string value)
 {
     auto sql = std::format(
-        "UPDATE chat SET {} = ?, timestamp = ? WHERE user_id = ? AND id = ?;",
+        "UPDATE chat SET {} = ? WHERE user_id = ? AND id = ?;",
         name);
     co_await _db->ExecAsync(
         sql,
         std::move(value),
-        Timestamp::GetWallClock(),
         static_cast<std::string>(userId),
         static_cast<std::string>(id));
 }

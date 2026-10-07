@@ -25,6 +25,8 @@ Service::Service(
             {"getMetadata", std::bind(&Service::OnGetMetadataAsync, this, std::placeholders::_1, std::placeholders::_2)},
             {"deleteMetadata", std::bind(&Service::OnDeleteMetadataAsync, this, std::placeholders::_1, std::placeholders::_2)},
             {"getChatList", std::bind(&Service::OnGetChatListAsync, this, std::placeholders::_1, std::placeholders::_2)},
+            {"getPinnedChatList", std::bind(&Service::OnGetPinnedChatListAsync, this, std::placeholders::_1, std::placeholders::_2)},
+            {"setChatPinned", std::bind(&Service::OnSetChatPinnedAsync, this, std::placeholders::_1, std::placeholders::_2)},
             {"newChat", std::bind(&Service::OnNewChatAsync, this, std::placeholders::_1, std::placeholders::_2)},
             {"getChat", std::bind(&Service::OnGetChatAsync, this, std::placeholders::_1, std::placeholders::_2)},
             {"deleteChat", std::bind(&Service::DeleteChatAsync, this, std::placeholders::_1, std::placeholders::_2)},
@@ -169,6 +171,7 @@ JS::Promise<nlohmann::json> Service::OnSetMetadataAsync(CallerId callerId, nlohm
         co_await _database->SetChatMetadataAsync(
             callerId.userId, chatId,
             std::move(newMetadataString));
+        InvalidateChatLists(callerId.userId);
     }
     else
     {
@@ -355,6 +358,7 @@ JS::Promise<nlohmann::json> Service::OnDeleteMetadataAsync(CallerId callerId, nl
         co_await _database->SetChatMetadataAsync(
             callerId.userId, chatId,
             std::move(newMetadataString));
+        InvalidateChatLists(callerId.userId);
     }
     else
     {
@@ -390,9 +394,36 @@ JS::Promise<nlohmann::json> Service::OnGetChatListAsync(CallerId callerId, nlohm
     }
 
     auto list = _database->ListChat(callerId.userId, static_cast<size_t>(start), static_cast<size_t>(quantity));
+    co_return static_cast<nlohmann::json>(MakeChatListResult(list, params.get_meta_data_keys()));
+}
+
+JS::Promise<nlohmann::json> Service::OnGetPinnedChatListAsync(CallerId callerId, nlohmann::json paramsJson)
+{
+    auto params = ParseParams<Schema::IServer::GetPinnedChatListParams>(paramsJson);
+    auto lock = _resourceVersionManager->GetReadLock(
+        {"pinnedChatList", static_cast<std::string>(callerId.userId)}, callerId);
+    auto list = _database->ListPinnedChat(callerId.userId);
+    co_return static_cast<nlohmann::json>(MakeChatListResult(list, params.get_meta_data_keys()));
+}
+
+JS::Promise<nlohmann::json> Service::OnSetChatPinnedAsync(CallerId callerId, nlohmann::json paramsJson)
+{
+    auto params = ParseParams<Schema::IServer::SetChatPinnedParams>(paramsJson);
+    Common::Uuid chatId{params.get_id()};
+    if (!(co_await _database->SetChatPinnedAsync(callerId.userId, chatId, params.get_pinned())))
+    {
+        throw Schema::Rpc::Exception(Schema::Rpc::ErrorCode::NOT_FOUND, "Chat not found");
+    }
+    _resourceVersionManager->Invalidate({"pinnedChatList", static_cast<std::string>(callerId.userId)});
+    co_return nlohmann::json{};
+}
+
+Schema::IServer::GetChatListResult Service::MakeChatListResult(
+    const std::list<Database::Database::IdMetadataPair>& list,
+    const std::optional<std::vector<std::string>>& metadataKeys)
+{
     Schema::IServer::GetChatListResult result{};
     result.reserve(list.size());
-    auto metadataKeys = params.get_meta_data_keys();
     for (const auto& item : list)
     {
         using EntryType = std::remove_reference<decltype(result)>::type::value_type;
@@ -407,7 +438,14 @@ JS::Promise<nlohmann::json> Service::OnGetChatListAsync(CallerId callerId, nlohm
         result.push_back(std::move(entry));
     }
     result.shrink_to_fit();
-    co_return static_cast<nlohmann::json>(result);
+    return result;
+}
+
+void Service::InvalidateChatLists(const Common::Uuid& userId)
+{
+    auto userIdString = static_cast<std::string>(userId);
+    _resourceVersionManager->Invalidate({"chatList", userIdString});
+    _resourceVersionManager->Invalidate({"pinnedChatList", userIdString});
 }
 
 /**
@@ -469,6 +507,7 @@ JS::Promise<nlohmann::json> Service::DeleteChatAsync(CallerId callerId, nlohmann
         {"chat", static_cast<std::string>(callerId.userId), static_cast<std::string>(chatId)}, callerId);
 
     co_await _database->DeleteChatAsync(callerId.userId, chatId);
+    InvalidateChatLists(callerId.userId);
     /** Return null */
     co_return nlohmann::json{};
 }
@@ -675,6 +714,7 @@ JS::AsyncGenerator<nlohmann::json, nlohmann::json> Service::OnChatCompletionAsyn
                 callerId.userId, chatId,
                 std::move(allNodes[i]),
                 i == 0);
+            InvalidateChatLists(callerId.userId);
         }
     }
 

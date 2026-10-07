@@ -370,6 +370,43 @@ static void TestChatCompletionSegmentObjectVariant()
     AssertWithMessage(output == objInput, "Round-trip should produce identical JSON");
 }
 
+static void TestPinnedChatListRoundTrip()
+{
+    auto input = R"({"metaDataKeys":["title"]})"_json;
+    auto params = input.get<GetPinnedChatListParams>();
+    AssertWithMessage(json(params) == input, "Pinned list parameters should round-trip");
+    auto empty = json::object().get<GetPinnedChatListParams>();
+    AssertWithMessage(!empty.get_meta_data_keys().has_value(), "Metadata keys should be optional");
+    auto list = R"([{"id":"chat","metadata":{"title":"Pinned"}}])"_json;
+    AssertWithMessage(json(list.get<GetPinnedChatListResult>()) == list,
+        "Pinned results should use the same shape as the regular chat list");
+}
+
+static void TestSetChatPinnedValidation()
+{
+    for (bool pinned : {false, true})
+    {
+        json input = {{"id", "chat"}, {"pinned", pinned}};
+        auto params = input.get<SetChatPinnedParams>();
+        AssertWithMessage(params.get_pinned() == pinned, "Pin state should be preserved");
+        AssertWithMessage(json(params) == input, "Pin parameters should round-trip");
+    }
+    for (const auto& input : {R"({"id":"chat"})"_json, R"({"pinned":true})"_json,
+        R"({"id":"chat","pinned":"true"})"_json})
+    {
+        bool rejected = false;
+        try
+        {
+            input.get<SetChatPinnedParams>();
+        }
+        catch (const json::exception&)
+        {
+            rejected = true;
+        }
+        AssertWithMessage(rejected, "Invalid pin parameters should be rejected");
+    }
+}
+
 int main()
 {
     struct { const char* name; void (*fn)(); } tests[] = {
@@ -389,6 +426,8 @@ int main()
         {"TreeHistoryRoundTrip", TestTreeHistoryRoundTrip},
         {"ChatCompletionSegmentStringVariant", TestChatCompletionSegmentStringVariant},
         {"ChatCompletionSegmentObjectVariant", TestChatCompletionSegmentObjectVariant},
+        {"PinnedChatListRoundTrip", TestPinnedChatListRoundTrip},
+        {"SetChatPinnedValidation", TestSetChatPinnedValidation},
     };
 
     int passed = 0;

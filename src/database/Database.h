@@ -81,6 +81,9 @@ namespace TUI::Database
         size_t GetChatCount(const Common::Uuid& userId);
         std::list<IdMetadataPair> ListChat(
             const Common::Uuid& userId, size_t from = 0, size_t limit = 50);
+        std::list<IdMetadataPair> ListPinnedChat(const Common::Uuid& userId);
+        JS::Promise<bool> SetChatPinnedAsync(
+            const Common::Uuid& userId, const Common::Uuid& chatId, bool pinned);
         JS::Promise<void> SetChatMetadataAsync(
             const Common::Uuid& userId, const Common::Uuid& chatId, std::string metadata);
         std::string GetChatMetadata(const Common::Uuid& userId, const Common::Uuid& chatId);

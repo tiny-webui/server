@@ -25,6 +25,42 @@ void TestClose()
     db = nullptr;
 }
 
+JS::Promise<void> TestChatMigrationAsync()
+{
+    auto legacyPath = dbPath + ".legacy";
+    auto rawDb = co_await Sqlite::CreateAsync(tev, legacyPath);
+    co_await rawDb->ExecAsync(
+        "CREATE TABLE chat (timestamp INTEGER, user_id TEXT, id TEXT, metadata TEXT, PRIMARY KEY (user_id, id));");
+    co_await rawDb->ExecAsync(
+        "CREATE TABLE chat_content (user_id TEXT, chat_id TEXT, id TEXT, parent TEXT, "
+        "children TEXT, message TEXT, timestamp INTEGER, PRIMARY KEY (user_id, chat_id, id));");
+    Uuid userId{};
+    Uuid chatId{};
+    Uuid emptyChatId{};
+    co_await rawDb->ExecAsync(
+        "INSERT INTO chat (timestamp, user_id, id, metadata) VALUES (100, ?, ?, '{}'), (50, ?, ?, '{}');",
+        static_cast<std::string>(userId), static_cast<std::string>(chatId),
+        static_cast<std::string>(userId), static_cast<std::string>(emptyChatId));
+    co_await rawDb->ExecAsync(
+        "INSERT INTO chat_content (user_id, chat_id, id, timestamp) VALUES (?, ?, 'message', 30);",
+        static_cast<std::string>(userId), static_cast<std::string>(chatId));
+
+    auto migrated = co_await Database::CreateAsync(tev, legacyPath, fileRoot);
+    AssertWithMessage(migrated->ListPinnedChat(userId).empty(), "Existing chats should start unpinned");
+    AssertWithMessage(migrated->ListChat(userId).front().id == emptyChatId,
+        "Migration should restore message activity order and preserve empty chats");
+    auto timestamps = rawDb->Exec("SELECT timestamp FROM chat ORDER BY timestamp;");
+    AssertWithMessage(std::get<int64_t>(timestamps.front().at("timestamp")) == 30,
+        "Migration should use the latest message timestamp");
+    AssertWithMessage(std::get<int64_t>(timestamps.back().at("timestamp")) == 50,
+        "Migration should preserve timestamps for chats without messages");
+    co_await migrated->SetChatPinnedAsync(userId, chatId, true);
+    migrated.reset();
+    migrated = co_await Database::CreateAsync(tev, legacyPath, fileRoot);
+    AssertWithMessage(migrated->ListPinnedChat(userId).front().id == chatId,
+        "Pin state should survive reopening an upgraded database");
+}
+
 JS::Promise<void> TestGlobalAsync()
 {
     std::string key = "test-key";
@@ -170,6 +206,28 @@ JS::Promise<void> TestChatAsync()
     auto metadata = db->GetChatMetadata(userId, chatId);
     AssertWithMessage(metadata == "test-chat-metadata", "Chat metadata should match");
     {
+        auto newerChatId = co_await db->CreateChatAsync(userId);
+        auto rawDb = co_await Sqlite::CreateAsync(tev, dbPath);
+        co_await rawDb->ExecAsync(
+            "UPDATE chat SET timestamp = CASE WHEN id = ? THEN 1 ELSE 2 END WHERE user_id = ?;",
+            static_cast<std::string>(chatId), static_cast<std::string>(userId));
+        co_await db->SetChatMetadataAsync(userId, chatId, "renamed-chat");
+        AssertWithMessage(db->ListChat(userId).front().id == newerChatId,
+            "Metadata writes should not reorder chats");
+        AssertWithMessage(db->ListPinnedChat(userId).empty(), "New chats should start unpinned");
+        AssertWithMessage(co_await db->SetChatPinnedAsync(userId, chatId, true), "Pin should find the chat");
+        co_await db->SetChatPinnedAsync(userId, newerChatId, true);
+        co_await db->SetChatPinnedAsync(userId, chatId, true);
+        AssertWithMessage(db->ListPinnedChat(userId).size() == 2, "Pinning should be idempotent");
+        AssertWithMessage(db->ListPinnedChat(userId).front().id == newerChatId,
+            "Pinned chats should use activity order rather than pin order");
+        AssertWithMessage(db->ListChat(userId).front().id == newerChatId,
+            "Pinning should not change activity order");
+        Uuid otherUserId{};
+        AssertWithMessage(db->ListPinnedChat(otherUserId).empty(), "Pins should be scoped to the user");
+        AssertWithMessage(!(co_await db->SetChatPinnedAsync(otherUserId, chatId, false)),
+            "Other users must not modify a chat's pin");
+
         IServer::ChatMessage chatMsg0{};
         chatMsg0.set_role(IServer::ChatMessageRole::USER);
         IServer::MessageContent content0{};
@@ -181,6 +239,10 @@ JS::Promise<void> TestChatAsync()
         node0.set_timestamp(1.0);
         node0.set_message(std::move(chatMsg0));
         co_await db->AppendChatHistoryAsync(userId, chatId, node0);
+        AssertWithMessage(db->ListChat(userId).front().id == chatId,
+            "Successful message writes should move a chat to the top");
+        AssertWithMessage(db->ListPinnedChat(userId).front().id == chatId,
+            "Successful message writes should reorder pinned chats too");
 
         IServer::MessageNode node1{};
         node1.set_id("node1");
@@ -220,6 +282,36 @@ JS::Promise<void> TestChatAsync()
         AssertWithMessage(retrievedNode1.get_parent().has_value() == true, "Node1 parent should not be null");
         AssertWithMessage(retrievedNode1.get_parent().value() == "node0", "Node1 parent ID should match");
         AssertWithMessage(retrievedNode1.get_children().empty(), "Node1 should have no children");
+        co_await rawDb->ExecAsync(
+            "UPDATE chat SET timestamp = 5 WHERE user_id = ?;", static_cast<std::string>(userId));
+        auto expectedFirst = static_cast<std::string>(chatId) > static_cast<std::string>(newerChatId)
+            ? chatId : newerChatId;
+        AssertWithMessage(db->ListChat(userId, 0, 1).front().id == expectedFirst,
+            "Equal activity timestamps should have deterministic ordering");
+        AssertWithMessage(db->ListPinnedChat(userId).front().id == expectedFirst,
+            "Both lists should use the same tie-breaker");
+        AssertWithMessage(db->ListChat(userId, 1, 1).front().id != expectedFirst,
+            "Pagination should not duplicate chats with equal timestamps");
+        co_await rawDb->ExecAsync(
+            "UPDATE chat SET timestamp = CASE WHEN id = ? THEN 1 ELSE 2 END WHERE user_id = ?;",
+            static_cast<std::string>(chatId), static_cast<std::string>(userId));
+        bool rejected = false;
+        try
+        {
+            co_await db->AppendChatHistoryAsync(userId, chatId, node0);
+        }
+        catch (const std::exception&)
+        {
+            rejected = true;
+        }
+        AssertWithMessage(rejected, "Duplicate message writes should fail");
+        AssertWithMessage(db->ListChat(userId).front().id == newerChatId,
+            "Failed message writes should not change activity order");
+        co_await db->SetChatPinnedAsync(userId, chatId, false);
+        co_await db->SetChatPinnedAsync(userId, chatId, false);
+        AssertWithMessage(db->ListPinnedChat(userId).size() == 1, "Unpinning should be idempotent");
+        co_await db->DeleteChatAsync(userId, newerChatId);
+        AssertWithMessage(db->ListPinnedChat(userId).empty(), "Deleting a chat should remove its pin");
     }
     size_t count = db->GetChatCount(userId);
     AssertWithMessage(count == 1, "Chat count should be 1");
@@ -351,6 +443,7 @@ JS::Promise<void> TestAsync()
 {
     /** Always run this first */
     RunAsyncTest(TestCreateAsync());
+    RunAsyncTest(TestChatMigrationAsync());
     RunAsyncTest(TestGlobalAsync());
     RunAsyncTest(TestModelAsync());
     RunAsyncTest(TestUserAsync());
